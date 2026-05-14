@@ -1,0 +1,132 @@
+// Game log + state-codec viewer/loader.
+// Lists every turn captured so far (snapshot + log lines) and offers a paste box for
+// rewinding to an arbitrary saved state.
+
+import { useState } from 'react';
+import type { TyrantsState } from '../game';
+
+interface Props {
+  G: TyrantsState;
+  onLoad: (codec: string) => void;
+}
+
+export function GameLog({ G, onLoad }: Props) {
+  const [pasted, setPasted] = useState('');
+  const [expandedTurn, setExpandedTurn] = useState<number | null>(null);
+
+  // Pair each snapshot with its matching turn's log lines (if completed).
+  const entries = G.snapshots.map(s => ({
+    snapshot: s,
+    log: G.turnLogs.find(t => t.turn === s.turn),
+  })).slice().reverse();
+
+  function copy(text: string) {
+    navigator.clipboard.writeText(text);
+  }
+
+  function downloadAll() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      log: G.log,
+      turnLogs: G.turnLogs,
+      snapshots: G.snapshots,
+      players: Object.fromEntries(Object.entries(G.players).map(([pid, p]) => [pid, { color: p.color, vp: p.vp }])),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `tyrants-log-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div style={{ padding: 8 }}>
+      <div style={{ marginBottom: 12, fontSize: 12, opacity: 0.85 }}>
+        Each entry below is one turn. The codec is a base64 snapshot of the game at that
+        turn's start. Copy a codec, then paste into the box below and click <b>Load</b> to
+        rewind to that state. Newest turns first.
+      </div>
+
+      <div style={{ marginBottom: 16, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <textarea
+          value={pasted}
+          onChange={e => setPasted(e.target.value)}
+          placeholder="Paste a codec here to load..."
+          rows={3}
+          style={{ flex: 1, padding: 6, fontFamily: 'monospace', fontSize: 11, background: '#0c0814', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4 }}
+        />
+        <button
+          onClick={() => {
+            if (!pasted.trim()) return;
+            if (!confirm('Load this state? Current game progress will be replaced.')) return;
+            onLoad(pasted.trim());
+            setPasted('');
+          }}
+          disabled={!pasted.trim()}
+          style={{ padding: '8px 16px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}
+        >
+          Load state
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, opacity: 0.7, flex: 1 }}>
+          {entries.length} turn{entries.length === 1 ? '' : 's'} captured.
+        </div>
+        <button onClick={downloadAll}
+          style={{ fontSize: 12, padding: '4px 10px', background: '#3a2055', color: '#fff', border: 'none', borderRadius: 3, cursor: 'pointer' }}>
+          Download full log (JSON)
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {entries.map(({ snapshot, log }) => {
+          const isOpen = expandedTurn === snapshot.turn;
+          return (
+            <div key={snapshot.turn} style={{ background: '#1a1228', borderRadius: 4, padding: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span
+                  onClick={() => setExpandedTurn(isOpen ? null : snapshot.turn)}
+                  style={{ cursor: 'pointer', fontSize: 13, flex: 1 }}>
+                  {isOpen ? '▾' : '▸'} Turn {snapshot.turn} · P{Number(snapshot.playerId) + 1} ({snapshot.color})
+                  {log && <span style={{ opacity: 0.6, marginLeft: 8, fontSize: 11 }}>· {log.lines.length} actions</span>}
+                </span>
+                <button onClick={() => copy(snapshot.codec)} style={{ fontSize: 11, padding: '2px 8px' }}>
+                  Copy codec
+                </button>
+                <button onClick={() => { if (confirm(`Load turn ${snapshot.turn}? Current progress replaced.`)) onLoad(snapshot.codec); }}
+                  style={{ fontSize: 11, padding: '2px 8px', background: '#3a2055', color: '#fff', border: 'none', borderRadius: 3 }}>
+                  Load
+                </button>
+              </div>
+              {isOpen && (
+                <div style={{ marginTop: 8, fontSize: 12 }}>
+                  {log ? (
+                    <>
+                      <div style={{ opacity: 0.7, marginBottom: 4 }}>Actions during this turn:</div>
+                      {log.lines.length === 0
+                        ? <div style={{ opacity: 0.5 }}>(no actions logged)</div>
+                        : log.lines.map((l, i) => <div key={i} style={{ padding: '1px 0', opacity: 0.9 }}>{l}</div>)
+                      }
+                    </>
+                  ) : (
+                    <div style={{ opacity: 0.5 }}>(turn in progress)</div>
+                  )}
+                  <details style={{ marginTop: 6 }}>
+                    <summary style={{ cursor: 'pointer', fontSize: 11, opacity: 0.6 }}>codec ({snapshot.codec.length} chars)</summary>
+                    <pre style={{ marginTop: 4, padding: 6, background: '#0c0814', borderRadius: 3, fontSize: 10, wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                      {snapshot.codec}
+                    </pre>
+                  </details>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {entries.length === 0 && <div style={{ opacity: 0.6, fontSize: 12 }}>No turns recorded yet — play a turn to populate.</div>}
+      </div>
+    </div>
+  );
+}

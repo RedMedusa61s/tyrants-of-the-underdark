@@ -1,0 +1,36 @@
+{
+  "name": "tyrants-of-the-underdark",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "extract-assets": "node scripts/extract-assets.mjs",
+    "sim": "vite-node scripts/headless.ts --"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "boardgame.io": "^0.50.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sharp": "^0.34.5",
+    "tesseract.js": "^7.0.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.12"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "vite-node": "^6.0.0"
+  }
+}

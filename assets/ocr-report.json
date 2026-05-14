@@ -1,0 +1,655 @@
+{
+  "matches": [
+    {
+      "key": "drow::6",
+      "name": "Advocate"
+    },
+    {
+      "key": "drow::21",
+      "name": "Infiltrator"
+    },
+    {
+      "key": "drow::9",
+      "name": "Blackguard"
+    },
+    {
+      "key": "drow::12",
+      "name": "Bounty Hunter"
+    },
+    {
+      "key": "drow::23",
+      "name": "Information Broker"
+    },
+    {
+      "key": "drow::33",
+      "name": "Spellspinner"
+    },
+    {
+      "key": "drow::28",
+      "name": "Masters of Sorcere"
+    },
+    {
+      "key": "drow::11",
+      "name": "Bounty Hunter"
+    },
+    {
+      "key": "drow::20",
+      "name": "Drow Negotiator"
+    },
+    {
+      "key": "drow::8",
+      "name": "Blackguard"
+    },
+    {
+      "key": "drow::19",
+      "name": "Drow Negotiator"
+    },
+    {
+      "key": "drow::14",
+      "name": "Chosen of Lolth"
+    },
+    {
+      "key": "drow::10",
+      "name": "Blackguard"
+    },
+    {
+      "key": "drow::34",
+      "name": "Spellspinner"
+    },
+    {
+      "key": "drow::15",
+      "name": "Council Member"
+    },
+    {
+      "key": "drow::35",
+      "name": "Spy Master"
+    },
+    {
+      "key": "drow::26",
+      "name": "Master of Melee-Magthere"
+    },
+    {
+      "key": "drow::27",
+      "name": "Master of Melee-Magthere"
+    },
+    {
+      "key": "drow::22",
+      "name": "Infiltrator"
+    },
+    {
+      "key": "drow::13",
+      "name": "Chosen of Lolth"
+    },
+    {
+      "key": "drow::3",
+      "name": "Advocate"
+    },
+    {
+      "key": "drow::25",
+      "name": "Inquisitor"
+    },
+    {
+      "key": "drow::36",
+      "name": "Spy Master"
+    },
+    {
+      "key": "drow::30",
+      "name": "Mercenary Squad"
+    },
+    {
+      "key": "drow::1",
+      "name": "Advance Scout"
+    },
+    {
+      "key": "drow::17",
+      "name": "Doppelganger"
+    },
+    {
+      "key": "drow::18",
+      "name": "Doppelganger"
+    },
+    {
+      "key": "drow::16",
+      "name": "Deathblade"
+    },
+    {
+      "key": "drow::4",
+      "name": "Advocate"
+    },
+    {
+      "key": "drow::32",
+      "name": "Spellspinner"
+    },
+    {
+      "key": "drow::2",
+      "name": "Advance Scout"
+    },
+    {
+      "key": "drow::38",
+      "name": "Underdark Ranger"
+    },
+    {
+      "key": "drow::39",
+      "name": "Weaponmaster"
+    },
+    {
+      "key": "drow::5",
+      "name": "Advocate"
+    },
+    {
+      "key": "drow::29",
+      "name": "Matron Mother"
+    },
+    {
+      "key": "drow::0",
+      "name": "Advance Scout"
+    },
+    {
+      "key": "drow::7",
+      "name": "Blackguard"
+    },
+    {
+      "key": "drow::37",
+      "name": "Underdark Ranger"
+    },
+    {
+      "key": "drow::24",
+      "name": "Information Broker"
+    },
+    {
+      "key": "drow::31",
+      "name": "Mercenary Squad"
+    },
+    {
+      "key": "dragons::23",
+      "name": "Kobold"
+    },
+    {
+      "key": "dragons::20",
+      "name": "Green Wyrmling"
+    },
+    {
+      "key": "dragons::32",
+      "name": "Watcher of Thay"
+    },
+    {
+      "key": "dragons::7",
+      "name": "Cleric of Laogzed"
+    },
+    {
+      "key": "dragons::5",
+      "name": "Blue Wyrmling"
+    },
+    {
+      "key": "dragons::28",
+      "name": "Red Wyrmling"
+    },
+    {
+      "key": "dragons::1",
+      "name": "Black Wyrmling"
+    },
+    {
+      "key": "dragons::15",
+      "name": "Dragonclaw"
+    },
+    {
+      "key": "dragons::13",
+      "name": "Dragon Cultist"
+    },
+    {
+      "key": "dragons::29",
+      "name": "Severin Silrajin"
+    },
+    {
+      "key": "dragons::2",
+      "name": "Black Wyrmling"
+    },
+    {
+      "key": "dragons::30",
+      "name": "Watcher of Thay"
+    },
+    {
+      "key": "dragons::34",
+      "name": "White Wyrmling"
+    },
+    {
+      "key": "dragons::8",
+      "name": "Cult Fanatic"
+    },
+    {
+      "key": "dragons::19",
+      "name": "Green Dragon"
+    },
+    {
+      "key": "dragons::12",
+      "name": "Dragon Cultist"
+    },
+    {
+      "key": "dragons::21",
+      "name": "Green Wyrmling"
+    },
+    {
+      "key": "dragons::18",
+      "name": "Enchanter of Thay"
+    },
+    {
+      "key": "dragons::11",
+      "name": "Dragon Cultist"
+    },
+    {
+      "key": "dragons::17",
+      "name": "Enchanter of Thay"
+    },
+    {
+      "key": "dragons::31",
+      "name": "Watcher of Thay"
+    },
+    {
+      "key": "dragons::27",
+      "name": "Red Wyrmling"
+    },
+    {
+      "key": "dragons::39",
+      "name": "Wyrmspeaker"
+    },
+    {
+      "key": "dragons::9",
+      "name": "Cult Fanatic"
+    },
+    {
+      "key": "dragons::6",
+      "name": "Cleric of Laogzed"
+    },
+    {
+      "key": "dragons::35",
+      "name": "White Wyrmling"
+    },
+    {
+      "key": "dragons::36",
+      "name": "White Wyrmling"
+    },
+    {
+      "key": "dragons::4",
+      "name": "Blue Wyrmling"
+    },
+    {
+      "key": "dragons::3",
+      "name": "Blue Dragon"
+    },
+    {
+      "key": "dragons::37",
+      "name": "Wyrmspeaker"
+    },
+    {
+      "key": "dragons::16",
+      "name": "Enchanter of Thay"
+    },
+    {
+      "key": "dragons::0",
+      "name": "Black Dragon"
+    },
+    {
+      "key": "dragons::14",
+      "name": "Dragonclaw"
+    },
+    {
+      "key": "dragons::38",
+      "name": "Wyrmspeaker"
+    },
+    {
+      "key": "dragons::33",
+      "name": "White Dragon"
+    },
+    {
+      "key": "dragons::26",
+      "name": "Red Dragon"
+    },
+    {
+      "key": "elemental::2",
+      "name": "Air Elemental"
+    },
+    {
+      "key": "elemental::22",
+      "name": "Fire Elemental"
+    },
+    {
+      "key": "elemental::8",
+      "name": "Black Earth Cultist"
+    },
+    {
+      "key": "elemental::23",
+      "name": "Fire Elemental"
+    },
+    {
+      "key": "elemental::18",
+      "name": "Eternal Flame Cultist"
+    },
+    {
+      "key": "elemental::38",
+      "name": "Water Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::30",
+      "name": "Marlos Urnrayle"
+    },
+    {
+      "key": "elemental::12",
+      "name": "Crushing Wave Cultist"
+    },
+    {
+      "key": "elemental::5",
+      "name": "Air Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::21",
+      "name": "Fire Elemental"
+    },
+    {
+      "key": "elemental::20",
+      "name": "Eternal Flame Cultist"
+    },
+    {
+      "key": "elemental::24",
+      "name": "Fire Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::34",
+      "name": "Water Elemental"
+    },
+    {
+      "key": "elemental::13",
+      "name": "Crushing Wave Cultist"
+    },
+    {
+      "key": "elemental::1",
+      "name": "Air Elemental"
+    },
+    {
+      "key": "elemental::26",
+      "name": "Gar Shatterkeel"
+    },
+    {
+      "key": "elemental::3",
+      "name": "Air Elemental"
+    },
+    {
+      "key": "elemental::37",
+      "name": "Water Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::33",
+      "name": "Vanifer"
+    },
+    {
+      "key": "elemental::27",
+      "name": "Howling Hatred Cultist"
+    },
+    {
+      "key": "elemental::39",
+      "name": "Yan-C-Bin"
+    },
+    {
+      "key": "elemental::25",
+      "name": "Fire Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::11",
+      "name": "Crushing Wave Cultist"
+    },
+    {
+      "key": "elemental::36",
+      "name": "Water Elemental"
+    },
+    {
+      "key": "elemental::9",
+      "name": "Black Earth Cultist"
+    },
+    {
+      "key": "elemental::15",
+      "name": "Earth Elemental"
+    },
+    {
+      "key": "elemental::14",
+      "name": "Earth Elemental"
+    },
+    {
+      "key": "elemental::17",
+      "name": "Earth Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::29",
+      "name": "Imix"
+    },
+    {
+      "key": "elemental::28",
+      "name": "Howling Hatred Cultist"
+    },
+    {
+      "key": "elemental::4",
+      "name": "Air Elemental"
+    },
+    {
+      "key": "elemental::6",
+      "name": "Air Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::35",
+      "name": "Water Elemental"
+    },
+    {
+      "key": "elemental::16",
+      "name": "Earth Elemental Myrmidon"
+    },
+    {
+      "key": "elemental::10",
+      "name": "Black Earth Cultist"
+    },
+    {
+      "key": "elemental::7",
+      "name": "Black Earth Cultist"
+    },
+    {
+      "key": "elemental::32",
+      "name": "Olhydra"
+    },
+    {
+      "key": "elemental::19",
+      "name": "Eternal Flame Cultist"
+    },
+    {
+      "key": "elemental::31",
+      "name": "Ogremoch"
+    },
+    {
+      "key": "demons::32",
+      "name": "Night Hag"
+    },
+    {
+      "key": "demons::17",
+      "name": "Jackalwere"
+    },
+    {
+      "key": "demons::35",
+      "name": "Orcus"
+    },
+    {
+      "key": "demons::31",
+      "name": "nalfeshnee"
+    },
+    {
+      "key": "demons::37",
+      "name": "Succubus"
+    },
+    {
+      "key": "demons::4",
+      "name": "Ettin"
+    },
+    {
+      "key": "demons::14",
+      "name": "Graz'zt"
+    },
+    {
+      "key": "demons::33",
+      "name": "Night Hag"
+    },
+    {
+      "key": "demons::38",
+      "name": "Vrock"
+    },
+    {
+      "key": "demons::5",
+      "name": "Ettin"
+    },
+    {
+      "key": "demons::19",
+      "name": "Jackalwere"
+    },
+    {
+      "key": "demons::13",
+      "name": "Glabrezu"
+    },
+    {
+      "key": "demons::20",
+      "name": "Marilith"
+    },
+    {
+      "key": "demons::23",
+      "name": "Mind Flayer"
+    },
+    {
+      "key": "demons::12",
+      "name": "Gibbering Mouther"
+    },
+    {
+      "key": "demons::9",
+      "name": "Ghoul"
+    },
+    {
+      "key": "demons::29",
+      "name": "Myconid Sovereign"
+    },
+    {
+      "key": "demons::34",
+      "name": "Night Hag"
+    },
+    {
+      "key": "demons::28",
+      "name": "Myconid Sovereign"
+    },
+    {
+      "key": "demons::30",
+      "name": "nalfeshnee"
+    },
+    {
+      "key": "demons::22",
+      "name": "Mind Flayer"
+    },
+    {
+      "key": "demons::16",
+      "name": "Hezrou"
+    },
+    {
+      "key": "demons::36",
+      "name": "Succubus"
+    },
+    {
+      "key": "demons::11",
+      "name": "Gibbering Mouther"
+    },
+    {
+      "key": "demons::15",
+      "name": "Hezrou"
+    },
+    {
+      "key": "demons::7",
+      "name": "Ghoul"
+    },
+    {
+      "key": "demons::8",
+      "name": "Ghoul"
+    },
+    {
+      "key": "demons::3",
+      "name": "Derro"
+    },
+    {
+      "key": "demons::18",
+      "name": "Jackalwere"
+    },
+    {
+      "key": "demons::0",
+      "name": "Balor"
+    },
+    {
+      "key": "demons::24",
+      "name": "Mind Flayer"
+    },
+    {
+      "key": "demons::27",
+      "name": "Myconid Adult"
+    },
+    {
+      "key": "demons::6",
+      "name": "Ettin"
+    },
+    {
+      "key": "demons::21",
+      "name": "Marilith"
+    },
+    {
+      "key": "demons::10",
+      "name": "Gibbering Mouther"
+    },
+    {
+      "key": "demons::2",
+      "name": "Derro"
+    },
+    {
+      "key": "demons::1",
+      "name": "Demogorgon"
+    }
+  ],
+  "mismatches": [],
+  "unreadable": [
+    {
+      "key": "dragons::25",
+      "assigned": "Rather Modar",
+      "ocr": "RATH MoDAR 6 em Eres mas"
+    },
+    {
+      "key": "dragons::10",
+      "assigned": "Dragon Cultist",
+      "ocr": "Draco CuLTisT 3 I D— 222104 A At"
+    },
+    {
+      "key": "dragons::22",
+      "assigned": "Kobold",
+      "ocr": "KosoLp 1 hem [—"
+    },
+    {
+      "key": "dragons::24",
+      "assigned": "Kobold",
+      "ocr": "KoBotb | em [VR"
+    },
+    {
+      "key": "elemental::0",
+      "assigned": "Aerisi Kalinoth",
+      "ocr": "Aeris KaLinoTH 5 ID =r ="
+    },
+    {
+      "key": "demons::25",
+      "assigned": "Myconid Adult",
+      "ocr": "Myconip ApuLt 3 I PO"
+    },
+    {
+      "key": "demons::39",
+      "assigned": "Zuggtmoy",
+      "ocr": "LucGTMOY 6 BP arm"
+    },
+    {
+      "key": "demons::26",
+      "assigned": "Myconid Adult",
+      "ocr": "Myconip Apurt 3 J Bl rm Arb."
+    }
+  ]
+}

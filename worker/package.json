@@ -1,0 +1,16 @@
+{
+  "name": "tyrants-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker relay: in-game Problem Reports → GitHub Issues, completed game logs → public logs/ directory in the same repo (SHA256-deduped). Keeps the GitHub PAT off the client.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.4.0",
+    "wrangler": "^3.78.0"
+  }
+}

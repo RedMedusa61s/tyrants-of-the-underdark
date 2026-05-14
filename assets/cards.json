@@ -1,0 +1,1120 @@
+{
+  "decks": {
+    "drow": {
+      "nickname": "Drow half-deck",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 40
+    },
+    "dragons": {
+      "nickname": "Dragons half-deck",
+      "sheetUrl": "http://i.imgur.com/l4SqNiD.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 40
+    },
+    "elemental": {
+      "nickname": "Elemental half-deck",
+      "sheetUrl": "http://i.imgur.com/iBmGf64.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 40
+    },
+    "demons": {
+      "nickname": "Demons half-deck",
+      "sheetUrl": "http://i.imgur.com/UrS3eUS.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 40
+    },
+    "house-guards": {
+      "nickname": "House Guards",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 15
+    },
+    "priestesses": {
+      "nickname": "Priestessess of Lolth",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 15
+    },
+    "insane-outcasts": {
+      "nickname": "Insane Outcasts",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 30
+    },
+    "starter-1": {
+      "nickname": "(starter 1)",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 10
+    },
+    "starter-2": {
+      "nickname": "(starter 2)",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 10
+    },
+    "starter-3": {
+      "nickname": "(starter 3)",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 10
+    },
+    "starter-4": {
+      "nickname": "(starter 4)",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5,
+      "count": 10
+    }
+  },
+  "cards": [
+    {
+      "deck": "drow",
+      "slot": 6,
+      "name": "",
+      "image": "assets/cards/drow/06-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 21,
+      "name": "",
+      "image": "assets/cards/drow/21-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 9,
+      "name": "",
+      "image": "assets/cards/drow/09-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 12,
+      "name": "",
+      "image": "assets/cards/drow/12-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 23,
+      "name": "",
+      "image": "assets/cards/drow/23-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 33,
+      "name": "",
+      "image": "assets/cards/drow/33-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 28,
+      "name": "",
+      "image": "assets/cards/drow/28-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 11,
+      "name": "",
+      "image": "assets/cards/drow/11-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 20,
+      "name": "",
+      "image": "assets/cards/drow/20-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 8,
+      "name": "",
+      "image": "assets/cards/drow/08-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 19,
+      "name": "",
+      "image": "assets/cards/drow/19-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 14,
+      "name": "",
+      "image": "assets/cards/drow/14-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 10,
+      "name": "",
+      "image": "assets/cards/drow/10-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 34,
+      "name": "",
+      "image": "assets/cards/drow/34-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 15,
+      "name": "",
+      "image": "assets/cards/drow/15-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 35,
+      "name": "",
+      "image": "assets/cards/drow/35-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 26,
+      "name": "",
+      "image": "assets/cards/drow/26-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 27,
+      "name": "",
+      "image": "assets/cards/drow/27-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 22,
+      "name": "",
+      "image": "assets/cards/drow/22-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 13,
+      "name": "",
+      "image": "assets/cards/drow/13-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 3,
+      "name": "",
+      "image": "assets/cards/drow/03-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 25,
+      "name": "",
+      "image": "assets/cards/drow/25-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 36,
+      "name": "",
+      "image": "assets/cards/drow/36-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 30,
+      "name": "",
+      "image": "assets/cards/drow/30-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 1,
+      "name": "",
+      "image": "assets/cards/drow/01-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 17,
+      "name": "",
+      "image": "assets/cards/drow/17-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 18,
+      "name": "",
+      "image": "assets/cards/drow/18-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 16,
+      "name": "",
+      "image": "assets/cards/drow/16-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 4,
+      "name": "",
+      "image": "assets/cards/drow/04-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 32,
+      "name": "",
+      "image": "assets/cards/drow/32-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 2,
+      "name": "",
+      "image": "assets/cards/drow/02-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 38,
+      "name": "",
+      "image": "assets/cards/drow/38-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 39,
+      "name": "",
+      "image": "assets/cards/drow/39-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 5,
+      "name": "",
+      "image": "assets/cards/drow/05-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 29,
+      "name": "",
+      "image": "assets/cards/drow/29-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 0,
+      "name": "",
+      "image": "assets/cards/drow/00-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 7,
+      "name": "",
+      "image": "assets/cards/drow/07-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 37,
+      "name": "",
+      "image": "assets/cards/drow/37-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 24,
+      "name": "",
+      "image": "assets/cards/drow/24-unnamed.jpg"
+    },
+    {
+      "deck": "drow",
+      "slot": 31,
+      "name": "",
+      "image": "assets/cards/drow/31-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 23,
+      "name": "",
+      "image": "assets/cards/dragons/23-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 20,
+      "name": "",
+      "image": "assets/cards/dragons/20-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 32,
+      "name": "",
+      "image": "assets/cards/dragons/32-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 7,
+      "name": "",
+      "image": "assets/cards/dragons/07-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 5,
+      "name": "",
+      "image": "assets/cards/dragons/05-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 28,
+      "name": "",
+      "image": "assets/cards/dragons/28-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 1,
+      "name": "",
+      "image": "assets/cards/dragons/01-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 15,
+      "name": "",
+      "image": "assets/cards/dragons/15-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 13,
+      "name": "",
+      "image": "assets/cards/dragons/13-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 29,
+      "name": "",
+      "image": "assets/cards/dragons/29-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 2,
+      "name": "",
+      "image": "assets/cards/dragons/02-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 30,
+      "name": "",
+      "image": "assets/cards/dragons/30-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 34,
+      "name": "",
+      "image": "assets/cards/dragons/34-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 8,
+      "name": "",
+      "image": "assets/cards/dragons/08-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 19,
+      "name": "",
+      "image": "assets/cards/dragons/19-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 12,
+      "name": "",
+      "image": "assets/cards/dragons/12-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 25,
+      "name": "",
+      "image": "assets/cards/dragons/25-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 21,
+      "name": "",
+      "image": "assets/cards/dragons/21-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 18,
+      "name": "",
+      "image": "assets/cards/dragons/18-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 11,
+      "name": "",
+      "image": "assets/cards/dragons/11-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 17,
+      "name": "",
+      "image": "assets/cards/dragons/17-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 31,
+      "name": "",
+      "image": "assets/cards/dragons/31-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 27,
+      "name": "",
+      "image": "assets/cards/dragons/27-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 39,
+      "name": "",
+      "image": "assets/cards/dragons/39-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 9,
+      "name": "",
+      "image": "assets/cards/dragons/09-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 6,
+      "name": "",
+      "image": "assets/cards/dragons/06-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 35,
+      "name": "",
+      "image": "assets/cards/dragons/35-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 36,
+      "name": "",
+      "image": "assets/cards/dragons/36-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 4,
+      "name": "",
+      "image": "assets/cards/dragons/04-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 10,
+      "name": "",
+      "image": "assets/cards/dragons/10-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 22,
+      "name": "",
+      "image": "assets/cards/dragons/22-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 3,
+      "name": "",
+      "image": "assets/cards/dragons/03-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 37,
+      "name": "",
+      "image": "assets/cards/dragons/37-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 16,
+      "name": "",
+      "image": "assets/cards/dragons/16-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 0,
+      "name": "",
+      "image": "assets/cards/dragons/00-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 14,
+      "name": "",
+      "image": "assets/cards/dragons/14-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 38,
+      "name": "",
+      "image": "assets/cards/dragons/38-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 33,
+      "name": "",
+      "image": "assets/cards/dragons/33-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 24,
+      "name": "",
+      "image": "assets/cards/dragons/24-unnamed.jpg"
+    },
+    {
+      "deck": "dragons",
+      "slot": 26,
+      "name": "",
+      "image": "assets/cards/dragons/26-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 2,
+      "name": "",
+      "image": "assets/cards/elemental/02-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 22,
+      "name": "",
+      "image": "assets/cards/elemental/22-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 8,
+      "name": "",
+      "image": "assets/cards/elemental/08-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 23,
+      "name": "",
+      "image": "assets/cards/elemental/23-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 18,
+      "name": "",
+      "image": "assets/cards/elemental/18-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 38,
+      "name": "",
+      "image": "assets/cards/elemental/38-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 30,
+      "name": "",
+      "image": "assets/cards/elemental/30-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 0,
+      "name": "",
+      "image": "assets/cards/elemental/00-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 12,
+      "name": "",
+      "image": "assets/cards/elemental/12-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 5,
+      "name": "",
+      "image": "assets/cards/elemental/05-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 21,
+      "name": "",
+      "image": "assets/cards/elemental/21-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 20,
+      "name": "",
+      "image": "assets/cards/elemental/20-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 24,
+      "name": "",
+      "image": "assets/cards/elemental/24-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 34,
+      "name": "",
+      "image": "assets/cards/elemental/34-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 13,
+      "name": "",
+      "image": "assets/cards/elemental/13-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 1,
+      "name": "",
+      "image": "assets/cards/elemental/01-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 26,
+      "name": "",
+      "image": "assets/cards/elemental/26-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 3,
+      "name": "",
+      "image": "assets/cards/elemental/03-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 37,
+      "name": "",
+      "image": "assets/cards/elemental/37-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 33,
+      "name": "",
+      "image": "assets/cards/elemental/33-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 27,
+      "name": "",
+      "image": "assets/cards/elemental/27-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 39,
+      "name": "",
+      "image": "assets/cards/elemental/39-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 25,
+      "name": "",
+      "image": "assets/cards/elemental/25-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 11,
+      "name": "",
+      "image": "assets/cards/elemental/11-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 36,
+      "name": "",
+      "image": "assets/cards/elemental/36-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 9,
+      "name": "",
+      "image": "assets/cards/elemental/09-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 15,
+      "name": "",
+      "image": "assets/cards/elemental/15-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 14,
+      "name": "",
+      "image": "assets/cards/elemental/14-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 17,
+      "name": "",
+      "image": "assets/cards/elemental/17-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 29,
+      "name": "",
+      "image": "assets/cards/elemental/29-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 28,
+      "name": "",
+      "image": "assets/cards/elemental/28-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 4,
+      "name": "",
+      "image": "assets/cards/elemental/04-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 6,
+      "name": "",
+      "image": "assets/cards/elemental/06-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 35,
+      "name": "",
+      "image": "assets/cards/elemental/35-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 16,
+      "name": "",
+      "image": "assets/cards/elemental/16-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 10,
+      "name": "",
+      "image": "assets/cards/elemental/10-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 7,
+      "name": "",
+      "image": "assets/cards/elemental/07-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 32,
+      "name": "",
+      "image": "assets/cards/elemental/32-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 19,
+      "name": "",
+      "image": "assets/cards/elemental/19-unnamed.jpg"
+    },
+    {
+      "deck": "elemental",
+      "slot": 31,
+      "name": "",
+      "image": "assets/cards/elemental/31-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 25,
+      "name": "",
+      "image": "assets/cards/demons/25-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 32,
+      "name": "",
+      "image": "assets/cards/demons/32-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 17,
+      "name": "",
+      "image": "assets/cards/demons/17-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 35,
+      "name": "",
+      "image": "assets/cards/demons/35-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 31,
+      "name": "",
+      "image": "assets/cards/demons/31-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 37,
+      "name": "",
+      "image": "assets/cards/demons/37-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 4,
+      "name": "",
+      "image": "assets/cards/demons/04-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 14,
+      "name": "",
+      "image": "assets/cards/demons/14-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 33,
+      "name": "",
+      "image": "assets/cards/demons/33-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 38,
+      "name": "",
+      "image": "assets/cards/demons/38-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 5,
+      "name": "",
+      "image": "assets/cards/demons/05-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 19,
+      "name": "",
+      "image": "assets/cards/demons/19-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 39,
+      "name": "",
+      "image": "assets/cards/demons/39-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 13,
+      "name": "",
+      "image": "assets/cards/demons/13-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 20,
+      "name": "",
+      "image": "assets/cards/demons/20-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 23,
+      "name": "",
+      "image": "assets/cards/demons/23-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 12,
+      "name": "",
+      "image": "assets/cards/demons/12-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 9,
+      "name": "",
+      "image": "assets/cards/demons/09-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 29,
+      "name": "",
+      "image": "assets/cards/demons/29-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 34,
+      "name": "",
+      "image": "assets/cards/demons/34-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 28,
+      "name": "",
+      "image": "assets/cards/demons/28-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 30,
+      "name": "",
+      "image": "assets/cards/demons/30-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 22,
+      "name": "",
+      "image": "assets/cards/demons/22-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 16,
+      "name": "",
+      "image": "assets/cards/demons/16-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 26,
+      "name": "",
+      "image": "assets/cards/demons/26-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 36,
+      "name": "",
+      "image": "assets/cards/demons/36-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 11,
+      "name": "",
+      "image": "assets/cards/demons/11-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 15,
+      "name": "",
+      "image": "assets/cards/demons/15-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 7,
+      "name": "",
+      "image": "assets/cards/demons/07-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 8,
+      "name": "",
+      "image": "assets/cards/demons/08-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 3,
+      "name": "",
+      "image": "assets/cards/demons/03-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 18,
+      "name": "",
+      "image": "assets/cards/demons/18-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 0,
+      "name": "",
+      "image": "assets/cards/demons/00-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 24,
+      "name": "",
+      "image": "assets/cards/demons/24-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 27,
+      "name": "",
+      "image": "assets/cards/demons/27-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 6,
+      "name": "",
+      "image": "assets/cards/demons/06-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 21,
+      "name": "",
+      "image": "assets/cards/demons/21-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 10,
+      "name": "",
+      "image": "assets/cards/demons/10-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 2,
+      "name": "",
+      "image": "assets/cards/demons/02-unnamed.jpg"
+    },
+    {
+      "deck": "demons",
+      "slot": 1,
+      "name": "",
+      "image": "assets/cards/demons/01-unnamed.jpg"
+    },
+    {
+      "deck": "house-guards",
+      "slot": 40,
+      "name": "",
+      "image": "assets/cards/house-guards/40-unnamed.jpg"
+    },
+    {
+      "deck": "priestesses",
+      "slot": 43,
+      "name": "",
+      "image": "assets/cards/priestesses/43-unnamed.jpg"
+    },
+    {
+      "deck": "insane-outcasts",
+      "slot": 41,
+      "name": "",
+      "image": "assets/cards/insane-outcasts/41-unnamed.jpg"
+    },
+    {
+      "deck": "starter-1",
+      "slot": 42,
+      "name": "",
+      "image": "assets/cards/starter-1/42-unnamed.jpg"
+    },
+    {
+      "deck": "starter-1",
+      "slot": 44,
+      "name": "",
+      "image": "assets/cards/starter-1/44-unnamed.jpg"
+    },
+    {
+      "deck": "starter-2",
+      "slot": 42,
+      "name": "",
+      "image": "assets/cards/starter-2/42-unnamed.jpg"
+    },
+    {
+      "deck": "starter-2",
+      "slot": 44,
+      "name": "",
+      "image": "assets/cards/starter-2/44-unnamed.jpg"
+    },
+    {
+      "deck": "starter-3",
+      "slot": 42,
+      "name": "",
+      "image": "assets/cards/starter-3/42-unnamed.jpg"
+    },
+    {
+      "deck": "starter-3",
+      "slot": 44,
+      "name": "",
+      "image": "assets/cards/starter-3/44-unnamed.jpg"
+    },
+    {
+      "deck": "starter-4",
+      "slot": 42,
+      "name": "",
+      "image": "assets/cards/starter-4/42-unnamed.jpg"
+    },
+    {
+      "deck": "starter-4",
+      "slot": 44,
+      "name": "",
+      "image": "assets/cards/starter-4/44-unnamed.jpg"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+# --- Node / build ---
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# --- Env / local config ---
+.env
+.env.local
+.env.*.local
+
+# --- Logs ---
+training-logs/
+*.log
+
+# --- OS / editor / agent local config ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+
+# --- OCR runtime asset (large; downloaded by tesseract.js) ---
+eng.traineddata
+
+# --- Wizards of the Coast IP (do not redistribute) ---
+# Card art, board art, tokens, and the rulebook are copyrighted. Users obtain
+# their own copies (extracted from TTS Workshop mod 881660322 via
+# `npm run extract-assets`; rulebook from WotC). Local copies are fine.
+assets/raw/
+assets/cards/
+assets/board/
+assets/tokens/
+assets/models/
+assets/site-crops/
+assets/site-crops-round/
+docs/rulebook.pdf
+
+# --- Cloudflare Worker build output ---
+worker/.wrangler/
+worker/dist/
+worker/node_modules/

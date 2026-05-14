@@ -1,0 +1,3059 @@
+{
+  "drow::0": {
+    "deck": "drow",
+    "slot": 0,
+    "name": "Advance Scout",
+    "image": "assets/cards/drow/00-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "Supplant white troop"
+    ],
+    "effectKey": "advance-scout",
+    "_matchedSheet": true
+  },
+  "drow::1": {
+    "deck": "drow",
+    "slot": 1,
+    "name": "Advance Scout",
+    "image": "assets/cards/drow/01-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "Supplant white troop"
+    ],
+    "effectKey": "advance-scout",
+    "_matchedSheet": true
+  },
+  "drow::2": {
+    "deck": "drow",
+    "slot": 2,
+    "name": "Advance Scout",
+    "image": "assets/cards/drow/02-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "Supplant white troop"
+    ],
+    "effectKey": "advance-scout",
+    "_matchedSheet": true
+  },
+  "drow::3": {
+    "deck": "drow",
+    "slot": 3,
+    "name": "Advocate",
+    "image": "assets/cards/drow/03-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "2 money",
+      "eot promote a card"
+    ],
+    "effectKey": "advocate",
+    "_matchedSheet": true
+  },
+  "drow::4": {
+    "deck": "drow",
+    "slot": 4,
+    "name": "Advocate",
+    "image": "assets/cards/drow/04-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "2 money",
+      "eot promote a card"
+    ],
+    "effectKey": "advocate",
+    "_matchedSheet": true
+  },
+  "drow::5": {
+    "deck": "drow",
+    "slot": 5,
+    "name": "Advocate",
+    "image": "assets/cards/drow/05-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "2 money",
+      "eot promote a card"
+    ],
+    "effectKey": "advocate",
+    "_matchedSheet": true
+  },
+  "drow::6": {
+    "deck": "drow",
+    "slot": 6,
+    "name": "Advocate",
+    "image": "assets/cards/drow/06-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "2 money",
+      "eot promote a card"
+    ],
+    "effectKey": "advocate",
+    "_matchedSheet": true
+  },
+  "drow::7": {
+    "deck": "drow",
+    "slot": 7,
+    "name": "Blackguard",
+    "image": "assets/cards/drow/07-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or assassinate"
+    ],
+    "effectKey": "blackguard",
+    "_matchedSheet": true
+  },
+  "drow::8": {
+    "deck": "drow",
+    "slot": 8,
+    "name": "Blackguard",
+    "image": "assets/cards/drow/08-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or assassinate"
+    ],
+    "effectKey": "blackguard",
+    "_matchedSheet": true
+  },
+  "drow::9": {
+    "deck": "drow",
+    "slot": 9,
+    "name": "Blackguard",
+    "image": "assets/cards/drow/09-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or assassinate"
+    ],
+    "effectKey": "blackguard",
+    "_matchedSheet": true
+  },
+  "drow::10": {
+    "deck": "drow",
+    "slot": 10,
+    "name": "Blackguard",
+    "image": "assets/cards/drow/10-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or assassinate"
+    ],
+    "effectKey": "blackguard",
+    "_matchedSheet": true
+  },
+  "drow::11": {
+    "deck": "drow",
+    "slot": 11,
+    "name": "Bounty Hunter",
+    "image": "assets/cards/drow/11-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "3 atk"
+    ],
+    "effectKey": "bounty-hunter",
+    "_matchedSheet": true
+  },
+  "drow::12": {
+    "deck": "drow",
+    "slot": 12,
+    "name": "Bounty Hunter",
+    "image": "assets/cards/drow/12-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "3 atk"
+    ],
+    "effectKey": "bounty-hunter",
+    "_matchedSheet": true
+  },
+  "drow::13": {
+    "deck": "drow",
+    "slot": 13,
+    "name": "Chosen of Lolth",
+    "image": "assets/cards/drow/13-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "return troop or spy",
+      "eot promote a card played"
+    ],
+    "effectKey": "chosen-of-lolth",
+    "_matchedSheet": true
+  },
+  "drow::14": {
+    "deck": "drow",
+    "slot": 14,
+    "name": "Chosen of Lolth",
+    "image": "assets/cards/drow/14-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "return troop or spy",
+      "eot promote a card played"
+    ],
+    "effectKey": "chosen-of-lolth",
+    "_matchedSheet": true
+  },
+  "drow::15": {
+    "deck": "drow",
+    "slot": 15,
+    "name": "Council Member",
+    "image": "assets/cards/drow/15-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "move 2 enemy troops",
+      "eot promote played card"
+    ],
+    "effectKey": "council-member",
+    "_matchedSheet": true
+  },
+  "drow::16": {
+    "deck": "drow",
+    "slot": 16,
+    "name": "Deathblade",
+    "image": "assets/cards/drow/16-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "assassinate 2 troops"
+    ],
+    "effectKey": "deathblade",
+    "_matchedSheet": true
+  },
+  "drow::17": {
+    "deck": "drow",
+    "slot": 17,
+    "name": "Doppelganger",
+    "image": "assets/cards/drow/17-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Doppleganger",
+    "rarity": 2,
+    "benefits": [
+      "supplant"
+    ],
+    "effectKey": "doppelganger",
+    "_matchedSheet": true
+  },
+  "drow::18": {
+    "deck": "drow",
+    "slot": 18,
+    "name": "Doppelganger",
+    "image": "assets/cards/drow/18-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Doppleganger",
+    "rarity": 2,
+    "benefits": [
+      "supplant"
+    ],
+    "effectKey": "doppelganger",
+    "_matchedSheet": true
+  },
+  "drow::19": {
+    "deck": "drow",
+    "slot": 19,
+    "name": "Drow Negotiator",
+    "image": "assets/cards/drow/19-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "If there are 4+ cards promoted, gain 3 money.",
+      "eot promote a card played this turn"
+    ],
+    "effectKey": "drow-negotiator",
+    "_matchedSheet": true
+  },
+  "drow::20": {
+    "deck": "drow",
+    "slot": 20,
+    "name": "Drow Negotiator",
+    "image": "assets/cards/drow/20-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "If there are 4+ cards promoted, gain 3 money.",
+      "eot promote a card played this turn"
+    ],
+    "effectKey": "drow-negotiator",
+    "_matchedSheet": true
+  },
+  "drow::21": {
+    "deck": "drow",
+    "slot": 21,
+    "name": "Infiltrator",
+    "image": "assets/cards/drow/21-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "spy, troop there for 1 attack"
+    ],
+    "effectKey": "infiltrator",
+    "_matchedSheet": true
+  },
+  "drow::22": {
+    "deck": "drow",
+    "slot": 22,
+    "name": "Infiltrator",
+    "image": "assets/cards/drow/22-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "spy, troop there for 1 attack"
+    ],
+    "effectKey": "infiltrator",
+    "_matchedSheet": true
+  },
+  "drow::23": {
+    "deck": "drow",
+    "slot": 23,
+    "name": "Information Broker",
+    "image": "assets/cards/drow/23-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "or spy",
+      "or return spy for 3 cards"
+    ],
+    "effectKey": "information-broker",
+    "_matchedSheet": true
+  },
+  "drow::24": {
+    "deck": "drow",
+    "slot": 24,
+    "name": "Information Broker",
+    "image": "assets/cards/drow/24-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "or spy",
+      "or return spy for 3 cards"
+    ],
+    "effectKey": "information-broker",
+    "_matchedSheet": true
+  },
+  "drow::25": {
+    "deck": "drow",
+    "slot": 25,
+    "name": "Inquisitor",
+    "image": "assets/cards/drow/25-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "or 2 money",
+      "or assassinate"
+    ],
+    "effectKey": "inquisitor",
+    "_matchedSheet": true
+  },
+  "drow::26": {
+    "deck": "drow",
+    "slot": 26,
+    "name": "Master of Melee-Magthere",
+    "image": "assets/cards/drow/26-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "or deploy 4 troops",
+      "or supplant white troop anywhere"
+    ],
+    "effectKey": "master-of-melee-magthere",
+    "_matchedSheet": true
+  },
+  "drow::27": {
+    "deck": "drow",
+    "slot": 27,
+    "name": "Master of Melee-Magthere",
+    "image": "assets/cards/drow/27-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "or deploy 4 troops",
+      "or supplant white troop anywhere"
+    ],
+    "effectKey": "master-of-melee-magthere",
+    "_matchedSheet": true
+  },
+  "drow::28": {
+    "deck": "drow",
+    "slot": 28,
+    "name": "Masters of Sorcere",
+    "image": "assets/cards/drow/28-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "or place 2 spies",
+      "or return a spy for 4 atk"
+    ],
+    "effectKey": "masters-of-sorcere",
+    "_matchedSheet": true
+  },
+  "drow::29": {
+    "deck": "drow",
+    "slot": 29,
+    "name": "Matron Mother",
+    "image": "assets/cards/drow/29-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Ambition",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "Put your deck into discard.",
+      "Promote a card from discard."
+    ],
+    "effectKey": "matron-mother",
+    "_matchedSheet": true
+  },
+  "drow::39": {
+    "deck": "drow",
+    "slot": 39,
+    "name": "Weaponmaster",
+    "image": "assets/cards/drow/39-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "or deploy a troop",
+      "or assassinate white troop"
+    ],
+    "effectKey": "weaponmaster",
+    "_matchedSheet": true
+  },
+  "drow::37": {
+    "deck": "drow",
+    "slot": 37,
+    "name": "Underdark Ranger",
+    "image": "assets/cards/drow/37-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "assassinate 2 white troops"
+    ],
+    "effectKey": "underdark-ranger",
+    "_matchedSheet": true
+  },
+  "drow::38": {
+    "deck": "drow",
+    "slot": 38,
+    "name": "Underdark Ranger",
+    "image": "assets/cards/drow/38-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "assassinate 2 white troops"
+    ],
+    "effectKey": "underdark-ranger",
+    "_matchedSheet": true
+  },
+  "drow::35": {
+    "deck": "drow",
+    "slot": 35,
+    "name": "Spy Master",
+    "image": "assets/cards/drow/35-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "spy"
+    ],
+    "effectKey": "spy-master",
+    "_matchedSheet": true
+  },
+  "drow::36": {
+    "deck": "drow",
+    "slot": 36,
+    "name": "Spy Master",
+    "image": "assets/cards/drow/36-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "spy"
+    ],
+    "effectKey": "spy-master",
+    "_matchedSheet": true
+  },
+  "drow::32": {
+    "deck": "drow",
+    "slot": 32,
+    "name": "Spellspinner",
+    "image": "assets/cards/drow/32-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return spy to supplant a troop there"
+    ],
+    "effectKey": "spellspinner",
+    "_matchedSheet": true
+  },
+  "drow::33": {
+    "deck": "drow",
+    "slot": 33,
+    "name": "Spellspinner",
+    "image": "assets/cards/drow/33-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return spy to supplant a troop there"
+    ],
+    "effectKey": "spellspinner",
+    "_matchedSheet": true
+  },
+  "drow::34": {
+    "deck": "drow",
+    "slot": 34,
+    "name": "Spellspinner",
+    "image": "assets/cards/drow/34-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return spy to supplant a troop there"
+    ],
+    "effectKey": "spellspinner",
+    "_matchedSheet": true
+  },
+  "drow::30": {
+    "deck": "drow",
+    "slot": 30,
+    "name": "Mercenary Squad",
+    "image": "assets/cards/drow/30-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "3 troops"
+    ],
+    "effectKey": "mercenary-squad",
+    "_matchedSheet": true
+  },
+  "drow::31": {
+    "deck": "drow",
+    "slot": 31,
+    "name": "Mercenary Squad",
+    "image": "assets/cards/drow/31-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "3 troops"
+    ],
+    "effectKey": "mercenary-squad",
+    "_matchedSheet": true
+  },
+  "dragons::0": {
+    "deck": "dragons",
+    "slot": 0,
+    "name": "Black Dragon",
+    "image": "assets/cards/dragons/00-unnamed.jpg",
+    "cost": 1,
+    "deckVp": 3,
+    "innerCircleVp": 7,
+    "aspect": "Conquest",
+    "type": "Dragon",
+    "rarity": 1,
+    "benefits": [
+      "supplant white troop anywhere",
+      "1vp per 3 white trophies"
+    ],
+    "effectKey": "black-dragon",
+    "_matchedSheet": true
+  },
+  "dragons::1": {
+    "deck": "dragons",
+    "slot": 1,
+    "name": "Black Wyrmling",
+    "image": "assets/cards/dragons/01-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "1 money",
+      "assassinate a white troop"
+    ],
+    "effectKey": "black-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::2": {
+    "deck": "dragons",
+    "slot": 2,
+    "name": "Black Wyrmling",
+    "image": "assets/cards/dragons/02-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "1 money",
+      "assassinate a white troop"
+    ],
+    "effectKey": "black-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::3": {
+    "deck": "dragons",
+    "slot": 3,
+    "name": "Blue Dragon",
+    "image": "assets/cards/dragons/03-unnamed.jpg",
+    "cost": 8,
+    "deckVp": 4,
+    "innerCircleVp": 8,
+    "aspect": "Ambition",
+    "type": "Dragon",
+    "rarity": 1,
+    "benefits": [
+      "eot promote 2 other cards",
+      "1vp per 3 promoted cards"
+    ],
+    "effectKey": "blue-dragon",
+    "_matchedSheet": true
+  },
+  "dragons::4": {
+    "deck": "dragons",
+    "slot": 4,
+    "name": "Blue Wyrmling",
+    "image": "assets/cards/dragons/04-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "3 money",
+      "return a troop or spy"
+    ],
+    "effectKey": "blue-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::5": {
+    "deck": "dragons",
+    "slot": 5,
+    "name": "Blue Wyrmling",
+    "image": "assets/cards/dragons/05-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "3 money",
+      "return a troop or spy"
+    ],
+    "effectKey": "blue-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::6": {
+    "deck": "dragons",
+    "slot": 6,
+    "name": "Cleric of Laogzed",
+    "image": "assets/cards/dragons/06-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Troglodyte",
+    "rarity": 2,
+    "benefits": [
+      "Move an enemy troop",
+      "eot promote a played card"
+    ],
+    "effectKey": "cleric-of-laogzed",
+    "_matchedSheet": true
+  },
+  "dragons::7": {
+    "deck": "dragons",
+    "slot": 7,
+    "name": "Cleric of Laogzed",
+    "image": "assets/cards/dragons/07-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Troglodyte",
+    "rarity": 2,
+    "benefits": [
+      "Move an enemy troop",
+      "eot promote a played card"
+    ],
+    "effectKey": "cleric-of-laogzed",
+    "_matchedSheet": true
+  },
+  "dragons::8": {
+    "deck": "dragons",
+    "slot": 8,
+    "name": "Cult Fanatic",
+    "image": "assets/cards/dragons/08-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Half-Dragon",
+    "rarity": 2,
+    "benefits": [
+      "2 money",
+      "may devour a market card"
+    ],
+    "effectKey": "cult-fanatic",
+    "_matchedSheet": true
+  },
+  "dragons::9": {
+    "deck": "dragons",
+    "slot": 9,
+    "name": "Cult Fanatic",
+    "image": "assets/cards/dragons/09-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Half-Dragon",
+    "rarity": 2,
+    "benefits": [
+      "2 money",
+      "may devour a market card"
+    ],
+    "effectKey": "cult-fanatic",
+    "_matchedSheet": true
+  },
+  "dragons::10": {
+    "deck": "dragons",
+    "slot": 10,
+    "name": "Dragon Cultist",
+    "image": "assets/cards/dragons/10-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or 2 money"
+    ],
+    "effectKey": "dragon-cultist",
+    "_matchedSheet": true
+  },
+  "dragons::11": {
+    "deck": "dragons",
+    "slot": 11,
+    "name": "Dragon Cultist",
+    "image": "assets/cards/dragons/11-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or 2 money"
+    ],
+    "effectKey": "dragon-cultist",
+    "_matchedSheet": true
+  },
+  "dragons::12": {
+    "deck": "dragons",
+    "slot": 12,
+    "name": "Dragon Cultist",
+    "image": "assets/cards/dragons/12-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or 2 money"
+    ],
+    "effectKey": "dragon-cultist",
+    "_matchedSheet": true
+  },
+  "dragons::13": {
+    "deck": "dragons",
+    "slot": 13,
+    "name": "Dragon Cultist",
+    "image": "assets/cards/dragons/13-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or 2 money"
+    ],
+    "effectKey": "dragon-cultist",
+    "_matchedSheet": true
+  },
+  "dragons::14": {
+    "deck": "dragons",
+    "slot": 14,
+    "name": "Dragonclaw",
+    "image": "assets/cards/dragons/14-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 2,
+    "benefits": [
+      "assassinate a troop",
+      "5 trophies ? 2 attack"
+    ],
+    "effectKey": "dragonclaw",
+    "_matchedSheet": true
+  },
+  "dragons::15": {
+    "deck": "dragons",
+    "slot": 15,
+    "name": "Dragonclaw",
+    "image": "assets/cards/dragons/15-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 2,
+    "benefits": [
+      "assassinate a troop",
+      "5 trophies ? 2 attack"
+    ],
+    "effectKey": "dragonclaw",
+    "_matchedSheet": true
+  },
+  "dragons::16": {
+    "deck": "dragons",
+    "slot": 16,
+    "name": "Enchanter of Thay",
+    "image": "assets/cards/dragons/16-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "spy",
+      "return spy 4 attack"
+    ],
+    "effectKey": "enchanter-of-thay",
+    "_matchedSheet": true
+  },
+  "dragons::17": {
+    "deck": "dragons",
+    "slot": 17,
+    "name": "Enchanter of Thay",
+    "image": "assets/cards/dragons/17-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "spy",
+      "return spy 4 attack"
+    ],
+    "effectKey": "enchanter-of-thay",
+    "_matchedSheet": true
+  },
+  "dragons::18": {
+    "deck": "dragons",
+    "slot": 18,
+    "name": "Enchanter of Thay",
+    "image": "assets/cards/dragons/18-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "spy",
+      "return spy 4 attack"
+    ],
+    "effectKey": "enchanter-of-thay",
+    "_matchedSheet": true
+  },
+  "dragons::19": {
+    "deck": "dragons",
+    "slot": 19,
+    "name": "Green Dragon",
+    "image": "assets/cards/dragons/19-unnamed.jpg",
+    "cost": 1,
+    "deckVp": 3,
+    "innerCircleVp": 7,
+    "aspect": "Guile",
+    "type": "Dragon",
+    "rarity": 1,
+    "benefits": [
+      "or spy, supplant troop there",
+      "or return spy, supplant a troop there, 1vp for each site control marker you have"
+    ],
+    "effectKey": "green-dragon",
+    "_matchedSheet": true
+  },
+  "dragons::20": {
+    "deck": "dragons",
+    "slot": 20,
+    "name": "Green Wyrmling",
+    "image": "assets/cards/dragons/20-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "place a spy",
+      "it troop there, 2 money"
+    ],
+    "effectKey": "green-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::21": {
+    "deck": "dragons",
+    "slot": 21,
+    "name": "Green Wyrmling",
+    "image": "assets/cards/dragons/21-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "place a spy",
+      "it troop there, 2 money"
+    ],
+    "effectKey": "green-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::25": {
+    "deck": "dragons",
+    "slot": 25,
+    "name": "Rather Modar",
+    "image": "assets/cards/dragons/25-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 1,
+    "benefits": [
+      "draw 2 cards",
+      "spy"
+    ],
+    "effectKey": "rather-modar",
+    "_matchedSheet": true
+  },
+  "dragons::26": {
+    "deck": "dragons",
+    "slot": 26,
+    "name": "Red Dragon",
+    "image": "assets/cards/dragons/26-unnamed.jpg",
+    "cost": 8,
+    "deckVp": 4,
+    "innerCircleVp": 8,
+    "aspect": "Malice",
+    "type": "Dragon",
+    "rarity": 1,
+    "benefits": [
+      "supplant a troop",
+      "return enemy spy, 1vp for each total controlled site"
+    ],
+    "effectKey": "red-dragon",
+    "_matchedSheet": true
+  },
+  "dragons::27": {
+    "deck": "dragons",
+    "slot": 27,
+    "name": "Red Wyrmling",
+    "image": "assets/cards/dragons/27-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "2 atk 2 money"
+    ],
+    "effectKey": "red-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::28": {
+    "deck": "dragons",
+    "slot": 28,
+    "name": "Red Wyrmling",
+    "image": "assets/cards/dragons/28-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Dragon",
+    "rarity": 2,
+    "benefits": [
+      "2 atk 2 money"
+    ],
+    "effectKey": "red-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::29": {
+    "deck": "dragons",
+    "slot": 29,
+    "name": "Severin Silrajin",
+    "image": "assets/cards/dragons/29-unnamed.jpg",
+    "cost": 1,
+    "deckVp": 4,
+    "innerCircleVp": 8,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 1,
+    "benefits": [
+      "5 atk"
+    ],
+    "effectKey": "severin-silrajin",
+    "_matchedSheet": true
+  },
+  "dragons::37": {
+    "deck": "dragons",
+    "slot": 37,
+    "name": "Wyrmspeaker",
+    "image": "assets/cards/dragons/37-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Dwarf",
+    "rarity": 3,
+    "benefits": [
+      "1 money",
+      "eot promote a played card"
+    ],
+    "effectKey": "wyrmspeaker",
+    "_matchedSheet": true
+  },
+  "dragons::38": {
+    "deck": "dragons",
+    "slot": 38,
+    "name": "Wyrmspeaker",
+    "image": "assets/cards/dragons/38-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Dwarf",
+    "rarity": 3,
+    "benefits": [
+      "1 money",
+      "eot promote a played card"
+    ],
+    "effectKey": "wyrmspeaker",
+    "_matchedSheet": true
+  },
+  "dragons::39": {
+    "deck": "dragons",
+    "slot": 39,
+    "name": "Wyrmspeaker",
+    "image": "assets/cards/dragons/39-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Dwarf",
+    "rarity": 3,
+    "benefits": [
+      "1 money",
+      "eot promote a played card"
+    ],
+    "effectKey": "wyrmspeaker",
+    "_matchedSheet": true
+  },
+  "dragons::34": {
+    "deck": "dragons",
+    "slot": 34,
+    "name": "White Wyrmling",
+    "image": "assets/cards/dragons/34-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Dragon",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "may discard a card in market"
+    ],
+    "effectKey": "white-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::35": {
+    "deck": "dragons",
+    "slot": 35,
+    "name": "White Wyrmling",
+    "image": "assets/cards/dragons/35-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Dragon",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "may discard a card in market"
+    ],
+    "effectKey": "white-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::36": {
+    "deck": "dragons",
+    "slot": 36,
+    "name": "White Wyrmling",
+    "image": "assets/cards/dragons/36-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Dragon",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "may discard a card in market"
+    ],
+    "effectKey": "white-wyrmling",
+    "_matchedSheet": true
+  },
+  "dragons::23": {
+    "deck": "dragons",
+    "slot": 23,
+    "name": "Kobold",
+    "image": "assets/cards/dragons/23-unnamed.jpg",
+    "cost": 1,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Kobold",
+    "rarity": 3,
+    "benefits": [
+      "or deploy a troop",
+      "or assassinate a white troop"
+    ],
+    "effectKey": "kobold",
+    "_matchedSheet": true
+  },
+  "dragons::24": {
+    "deck": "dragons",
+    "slot": 24,
+    "name": "Kobold",
+    "image": "assets/cards/dragons/24-unnamed.jpg",
+    "cost": 1,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Kobold",
+    "rarity": 3,
+    "benefits": [
+      "or deploy a troop",
+      "or assassinate a white troop"
+    ],
+    "effectKey": "kobold",
+    "_matchedSheet": true
+  },
+  "dragons::33": {
+    "deck": "dragons",
+    "slot": 33,
+    "name": "White Dragon",
+    "image": "assets/cards/dragons/33-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Conquest",
+    "type": "Dragon",
+    "rarity": 1,
+    "benefits": [
+      "deploy 3 troops",
+      "1 vp for every 2 sites controlled"
+    ],
+    "effectKey": "white-dragon",
+    "_matchedSheet": true
+  },
+  "dragons::30": {
+    "deck": "dragons",
+    "slot": 30,
+    "name": "Watcher of Thay",
+    "image": "assets/cards/dragons/30-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return spy for 3 money"
+    ],
+    "effectKey": "watcher-of-thay",
+    "_matchedSheet": true
+  },
+  "dragons::31": {
+    "deck": "dragons",
+    "slot": 31,
+    "name": "Watcher of Thay",
+    "image": "assets/cards/dragons/31-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return spy for 3 money"
+    ],
+    "effectKey": "watcher-of-thay",
+    "_matchedSheet": true
+  },
+  "dragons::32": {
+    "deck": "dragons",
+    "slot": 32,
+    "name": "Watcher of Thay",
+    "image": "assets/cards/dragons/32-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return spy for 3 money"
+    ],
+    "effectKey": "watcher-of-thay",
+    "_matchedSheet": true
+  },
+  "dragons::22": {
+    "deck": "dragons",
+    "slot": 22,
+    "name": "Kobold",
+    "image": "assets/cards/dragons/22-unnamed.jpg",
+    "cost": 1,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Kobold",
+    "rarity": 3,
+    "benefits": [
+      "or deploy a troop",
+      "or assassinate a white troop"
+    ],
+    "effectKey": "kobold",
+    "_matchedSheet": true
+  },
+  "elemental::0": {
+    "deck": "elemental",
+    "slot": 0,
+    "name": "Aerisi Kalinoth",
+    "image": "assets/cards/elemental/00-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Elf",
+    "rarity": 1,
+    "benefits": [
+      "1 attack, spy",
+      "recruite a guile card that costs 4 or less"
+    ],
+    "effectKey": "aerisi-kalinoth",
+    "_matchedSheet": true
+  },
+  "elemental::1": {
+    "deck": "elemental",
+    "slot": 1,
+    "name": "Air Elemental",
+    "image": "assets/cards/elemental/01-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 4,
+    "benefits": [
+      "or spy",
+      "or return a spy to deploy 3 troops",
+      "focus: draw a card"
+    ],
+    "effectKey": "air-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::2": {
+    "deck": "elemental",
+    "slot": 2,
+    "name": "Air Elemental",
+    "image": "assets/cards/elemental/02-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 4,
+    "benefits": [
+      "or spy",
+      "or return a spy to deploy 3 troops",
+      "focus: draw a card"
+    ],
+    "effectKey": "air-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::3": {
+    "deck": "elemental",
+    "slot": 3,
+    "name": "Air Elemental",
+    "image": "assets/cards/elemental/03-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 4,
+    "benefits": [
+      "or spy",
+      "or return a spy to deploy 3 troops",
+      "focus: draw a card"
+    ],
+    "effectKey": "air-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::4": {
+    "deck": "elemental",
+    "slot": 4,
+    "name": "Air Elemental",
+    "image": "assets/cards/elemental/04-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 4,
+    "benefits": [
+      "or spy",
+      "or return a spy to deploy 3 troops",
+      "focus: draw a card"
+    ],
+    "effectKey": "air-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::5": {
+    "deck": "elemental",
+    "slot": 5,
+    "name": "Air Elemental Myrmidon",
+    "image": "assets/cards/elemental/05-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "spy",
+      "eot promote an Obedience card played this turn"
+    ],
+    "effectKey": "air-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::6": {
+    "deck": "elemental",
+    "slot": 6,
+    "name": "Air Elemental Myrmidon",
+    "image": "assets/cards/elemental/06-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "spy",
+      "eot promote an Obedience card played this turn"
+    ],
+    "effectKey": "air-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::7": {
+    "deck": "elemental",
+    "slot": 7,
+    "name": "Black Earth Cultist",
+    "image": "assets/cards/elemental/07-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "eot promote another played card",
+      "focus: 2 money"
+    ],
+    "effectKey": "black-earth-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::8": {
+    "deck": "elemental",
+    "slot": 8,
+    "name": "Black Earth Cultist",
+    "image": "assets/cards/elemental/08-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "eot promote another played card",
+      "focus: 2 money"
+    ],
+    "effectKey": "black-earth-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::9": {
+    "deck": "elemental",
+    "slot": 9,
+    "name": "Black Earth Cultist",
+    "image": "assets/cards/elemental/09-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "eot promote another played card",
+      "focus: 2 money"
+    ],
+    "effectKey": "black-earth-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::10": {
+    "deck": "elemental",
+    "slot": 10,
+    "name": "Black Earth Cultist",
+    "image": "assets/cards/elemental/10-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 4,
+    "benefits": [
+      "eot promote another played card",
+      "focus: 2 money"
+    ],
+    "effectKey": "black-earth-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::11": {
+    "deck": "elemental",
+    "slot": 11,
+    "name": "Crushing Wave Cultist",
+    "image": "assets/cards/elemental/11-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "assassinate a white troop",
+      "focus: deploy 2 troops"
+    ],
+    "effectKey": "crushing-wave-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::12": {
+    "deck": "elemental",
+    "slot": 12,
+    "name": "Crushing Wave Cultist",
+    "image": "assets/cards/elemental/12-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "assassinate a white troop",
+      "focus: deploy 2 troops"
+    ],
+    "effectKey": "crushing-wave-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::13": {
+    "deck": "elemental",
+    "slot": 13,
+    "name": "Crushing Wave Cultist",
+    "image": "assets/cards/elemental/13-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "assassinate a white troop",
+      "focus: deploy 2 troops"
+    ],
+    "effectKey": "crushing-wave-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::14": {
+    "deck": "elemental",
+    "slot": 14,
+    "name": "Earth Elemental",
+    "image": "assets/cards/elemental/14-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "1 money",
+      "return another troops/spy",
+      "focus: draw a card"
+    ],
+    "effectKey": "earth-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::15": {
+    "deck": "elemental",
+    "slot": 15,
+    "name": "Earth Elemental",
+    "image": "assets/cards/elemental/15-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "1 money",
+      "return another troops/spy",
+      "focus: draw a card"
+    ],
+    "effectKey": "earth-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::16": {
+    "deck": "elemental",
+    "slot": 16,
+    "name": "Earth Elemental Myrmidon",
+    "image": "assets/cards/elemental/16-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "2 money",
+      "eot promote another played card"
+    ],
+    "effectKey": "earth-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::17": {
+    "deck": "elemental",
+    "slot": 17,
+    "name": "Earth Elemental Myrmidon",
+    "image": "assets/cards/elemental/17-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "2 money",
+      "eot promote another played card"
+    ],
+    "effectKey": "earth-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::18": {
+    "deck": "elemental",
+    "slot": 18,
+    "name": "Eternal Flame Cultist",
+    "image": "assets/cards/elemental/18-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "assassinate a troop",
+      "focus: 2 attack"
+    ],
+    "effectKey": "eternal-flame-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::19": {
+    "deck": "elemental",
+    "slot": 19,
+    "name": "Eternal Flame Cultist",
+    "image": "assets/cards/elemental/19-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "assassinate a troop",
+      "focus: 2 attack"
+    ],
+    "effectKey": "eternal-flame-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::20": {
+    "deck": "elemental",
+    "slot": 20,
+    "name": "Eternal Flame Cultist",
+    "image": "assets/cards/elemental/20-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "assassinate a troop",
+      "focus: 2 attack"
+    ],
+    "effectKey": "eternal-flame-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::21": {
+    "deck": "elemental",
+    "slot": 21,
+    "name": "Fire Elemental",
+    "image": "assets/cards/elemental/21-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Elemental",
+    "rarity": 3,
+    "benefits": [
+      "or 2 attack",
+      "or 2 money",
+      "focus: draw a card"
+    ],
+    "effectKey": "fire-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::22": {
+    "deck": "elemental",
+    "slot": 22,
+    "name": "Fire Elemental",
+    "image": "assets/cards/elemental/22-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Elemental",
+    "rarity": 3,
+    "benefits": [
+      "or 2 attack",
+      "or 2 money",
+      "focus: draw a card"
+    ],
+    "effectKey": "fire-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::23": {
+    "deck": "elemental",
+    "slot": 23,
+    "name": "Fire Elemental",
+    "image": "assets/cards/elemental/23-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Elemental",
+    "rarity": 3,
+    "benefits": [
+      "or 2 attack",
+      "or 2 money",
+      "focus: draw a card"
+    ],
+    "effectKey": "fire-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::24": {
+    "deck": "elemental",
+    "slot": 24,
+    "name": "Fire Elemental Myrmidon",
+    "image": "assets/cards/elemental/24-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "2 attack",
+      "eot promote an obedience card played this turn"
+    ],
+    "effectKey": "fire-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::25": {
+    "deck": "elemental",
+    "slot": 25,
+    "name": "Fire Elemental Myrmidon",
+    "image": "assets/cards/elemental/25-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "2 attack",
+      "eot promote an obedience card played this turn"
+    ],
+    "effectKey": "fire-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::26": {
+    "deck": "elemental",
+    "slot": 26,
+    "name": "Gar Shatterkeel",
+    "image": "assets/cards/elemental/26-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Conquest",
+    "type": "Human",
+    "rarity": 1,
+    "benefits": [
+      "deploy 3 troops",
+      "recruit a conquest card that costs 4 or less"
+    ],
+    "effectKey": "gar-shatterkeel",
+    "_matchedSheet": true
+  },
+  "elemental::27": {
+    "deck": "elemental",
+    "slot": 27,
+    "name": "Howling Hatred Cultist",
+    "image": "assets/cards/elemental/27-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 2,
+    "benefits": [
+      "or spy",
+      "or return a spy 3 money, focus: 1 attack"
+    ],
+    "effectKey": "howling-hatred-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::28": {
+    "deck": "elemental",
+    "slot": 28,
+    "name": "Howling Hatred Cultist",
+    "image": "assets/cards/elemental/28-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 2,
+    "benefits": [
+      "or spy",
+      "or return a spy 3 money, focus: 1 attack"
+    ],
+    "effectKey": "howling-hatred-cultist",
+    "_matchedSheet": true
+  },
+  "elemental::29": {
+    "deck": "elemental",
+    "slot": 29,
+    "name": "Imix",
+    "image": "assets/cards/elemental/29-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Malice",
+    "type": "Elemental Prince",
+    "rarity": 1,
+    "benefits": [
+      "4 attack",
+      "focus: 2 attack"
+    ],
+    "effectKey": "imix",
+    "_matchedSheet": true
+  },
+  "elemental::30": {
+    "deck": "elemental",
+    "slot": 30,
+    "name": "Marlos Urnrayle",
+    "image": "assets/cards/elemental/30-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Medusa",
+    "rarity": 1,
+    "benefits": [
+      "1 money",
+      "eot promote another played card",
+      "recruit an ambition card that costs 4 or less"
+    ],
+    "effectKey": "marlos-urnrayle",
+    "_matchedSheet": true
+  },
+  "elemental::31": {
+    "deck": "elemental",
+    "slot": 31,
+    "name": "Ogremoch",
+    "image": "assets/cards/elemental/31-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 7,
+    "aspect": "Ambition",
+    "type": "Elemental Prince",
+    "rarity": 1,
+    "benefits": [
+      "2 money, eot promote another played card",
+      "focus: eot promote another played card"
+    ],
+    "effectKey": "ogremoch",
+    "_matchedSheet": true
+  },
+  "elemental::32": {
+    "deck": "elemental",
+    "slot": 32,
+    "name": "Olhydra",
+    "image": "assets/cards/elemental/32-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Conquest",
+    "type": "Elemental Prince",
+    "rarity": 1,
+    "benefits": [
+      "supplant a white troop anywhere on the board",
+      "focus: deploy 2 troops"
+    ],
+    "effectKey": "olhydra",
+    "_matchedSheet": true
+  },
+  "elemental::33": {
+    "deck": "elemental",
+    "slot": 33,
+    "name": "Vanifer",
+    "image": "assets/cards/elemental/33-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Tiefling",
+    "rarity": 1,
+    "benefits": [
+      "assassinate a troop",
+      "recruit a malice card that costs 4 or less"
+    ],
+    "effectKey": "vanifer",
+    "_matchedSheet": true
+  },
+  "elemental::34": {
+    "deck": "elemental",
+    "slot": 34,
+    "name": "Water Elemental",
+    "image": "assets/cards/elemental/34-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Elemental",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "focus: draw a card"
+    ],
+    "effectKey": "water-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::35": {
+    "deck": "elemental",
+    "slot": 35,
+    "name": "Water Elemental",
+    "image": "assets/cards/elemental/35-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Elemental",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "focus: draw a card"
+    ],
+    "effectKey": "water-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::36": {
+    "deck": "elemental",
+    "slot": 36,
+    "name": "Water Elemental",
+    "image": "assets/cards/elemental/36-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Elemental",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "focus: draw a card"
+    ],
+    "effectKey": "water-elemental",
+    "_matchedSheet": true
+  },
+  "elemental::37": {
+    "deck": "elemental",
+    "slot": 37,
+    "name": "Water Elemental Myrmidon",
+    "image": "assets/cards/elemental/37-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "assassinate a white troop",
+      "eot promote an obedience card played this turn"
+    ],
+    "effectKey": "water-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::38": {
+    "deck": "elemental",
+    "slot": 38,
+    "name": "Water Elemental Myrmidon",
+    "image": "assets/cards/elemental/38-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Elemental",
+    "rarity": 2,
+    "benefits": [
+      "assassinate a white troop",
+      "eot promote an obedience card played this turn"
+    ],
+    "effectKey": "water-elemental-myrmidon",
+    "_matchedSheet": true
+  },
+  "elemental::39": {
+    "deck": "elemental",
+    "slot": 39,
+    "name": "Yan-C-Bin",
+    "image": "assets/cards/elemental/39-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Guile",
+    "type": "Elemental Prince",
+    "rarity": 1,
+    "benefits": [
+      "spy, assassinate a troop there",
+      "focus: spy"
+    ],
+    "effectKey": "yan-c-bin",
+    "_matchedSheet": true
+  },
+  "demons::0": {
+    "deck": "demons",
+    "slot": 0,
+    "name": "Balor",
+    "image": "assets/cards/demons/00-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Conquest",
+    "type": "Fiend",
+    "rarity": 1,
+    "benefits": [
+      "devour a card in hand to supplant a white troop anywhere on the board",
+      "then deploy a troop"
+    ],
+    "effectKey": "balor",
+    "_matchedSheet": true
+  },
+  "demons::1": {
+    "deck": "demons",
+    "slot": 1,
+    "name": "Demogorgon",
+    "image": "assets/cards/demons/01-unnamed.jpg",
+    "cost": 8,
+    "deckVp": 5,
+    "innerCircleVp": 10,
+    "aspect": "Conquest",
+    "type": "Fiend",
+    "rarity": 1,
+    "benefits": [
+      "devour a card in hand to supplant a white troop anywhere on the board",
+      "supplant 2 white troops, each opponent recruits 2 insane outcasts"
+    ],
+    "effectKey": "demogorgon",
+    "_matchedSheet": true
+  },
+  "demons::35": {
+    "deck": "demons",
+    "slot": 35,
+    "name": "Orcus",
+    "image": "assets/cards/demons/35-unnamed.jpg",
+    "cost": 8,
+    "deckVp": 5,
+    "innerCircleVp": 10,
+    "aspect": "Malice",
+    "type": "Fiend",
+    "rarity": 1,
+    "benefits": [
+      "devour a card in your hand for 5 attack",
+      "assassinate 2 troops, take 2 trophies from another hand and deploy them anywhere."
+    ],
+    "effectKey": "orcus",
+    "_matchedSheet": true
+  },
+  "demons::2": {
+    "deck": "demons",
+    "slot": 2,
+    "name": "Derro",
+    "image": "assets/cards/demons/02-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Gerro",
+    "rarity": 2,
+    "benefits": [
+      "supplant a white troop anywhere",
+      "recruit an insane outcast"
+    ],
+    "effectKey": "derro",
+    "_matchedSheet": true
+  },
+  "demons::3": {
+    "deck": "demons",
+    "slot": 3,
+    "name": "Derro",
+    "image": "assets/cards/demons/03-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Gerro",
+    "rarity": 2,
+    "benefits": [
+      "supplant a white troop anywhere",
+      "recruit an insane outcast"
+    ],
+    "effectKey": "derro",
+    "_matchedSheet": true
+  },
+  "demons::4": {
+    "deck": "demons",
+    "slot": 4,
+    "name": "Ettin",
+    "image": "assets/cards/demons/04-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Giant",
+    "rarity": 3,
+    "benefits": [
+      "or deploy 3 troops",
+      "or assassinate 2 white troops"
+    ],
+    "effectKey": "ettin",
+    "_matchedSheet": true
+  },
+  "demons::5": {
+    "deck": "demons",
+    "slot": 5,
+    "name": "Ettin",
+    "image": "assets/cards/demons/05-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Giant",
+    "rarity": 3,
+    "benefits": [
+      "or deploy 3 troops",
+      "or assassinate 2 white troops"
+    ],
+    "effectKey": "ettin",
+    "_matchedSheet": true
+  },
+  "demons::6": {
+    "deck": "demons",
+    "slot": 6,
+    "name": "Ettin",
+    "image": "assets/cards/demons/06-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Giant",
+    "rarity": 3,
+    "benefits": [
+      "or deploy 3 troops",
+      "or assassinate 2 white troops"
+    ],
+    "effectKey": "ettin",
+    "_matchedSheet": true
+  },
+  "demons::7": {
+    "deck": "demons",
+    "slot": 7,
+    "name": "Ghoul",
+    "image": "assets/cards/demons/07-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Undead",
+    "rarity": 3,
+    "benefits": [
+      "2 attack",
+      "give insane outcast to each opponent"
+    ],
+    "effectKey": "ghoul",
+    "_matchedSheet": true
+  },
+  "demons::8": {
+    "deck": "demons",
+    "slot": 8,
+    "name": "Ghoul",
+    "image": "assets/cards/demons/08-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Undead",
+    "rarity": 3,
+    "benefits": [
+      "2 attack",
+      "give insane outcast to each opponent"
+    ],
+    "effectKey": "ghoul",
+    "_matchedSheet": true
+  },
+  "demons::9": {
+    "deck": "demons",
+    "slot": 9,
+    "name": "Ghoul",
+    "image": "assets/cards/demons/09-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Undead",
+    "rarity": 3,
+    "benefits": [
+      "2 attack",
+      "give insane outcast to each opponent"
+    ],
+    "effectKey": "ghoul",
+    "_matchedSheet": true
+  },
+  "demons::10": {
+    "deck": "demons",
+    "slot": 10,
+    "name": "Gibbering Mouther",
+    "image": "assets/cards/demons/10-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Aberration",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "give insane outcase t player troop adjacent to deployed troop"
+    ],
+    "effectKey": "gibbering-mouther",
+    "_matchedSheet": true
+  },
+  "demons::11": {
+    "deck": "demons",
+    "slot": 11,
+    "name": "Gibbering Mouther",
+    "image": "assets/cards/demons/11-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Aberration",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "give insane outcase t player troop adjacent to deployed troop"
+    ],
+    "effectKey": "gibbering-mouther",
+    "_matchedSheet": true
+  },
+  "demons::12": {
+    "deck": "demons",
+    "slot": 12,
+    "name": "Gibbering Mouther",
+    "image": "assets/cards/demons/12-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Aberration",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "give insane outcase t player troop adjacent to deployed troop"
+    ],
+    "effectKey": "gibbering-mouther",
+    "_matchedSheet": true
+  },
+  "demons::13": {
+    "deck": "demons",
+    "slot": 13,
+    "name": "Glabrezu",
+    "image": "assets/cards/demons/13-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Fiend",
+    "rarity": 1,
+    "benefits": [
+      "devour a card from hand to",
+      "assassinate 2 troops"
+    ],
+    "effectKey": "glabrezu",
+    "_matchedSheet": true
+  },
+  "demons::14": {
+    "deck": "demons",
+    "slot": 14,
+    "name": "Graz'zt",
+    "image": "assets/cards/demons/14-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Fiend",
+    "rarity": 1,
+    "benefits": [
+      "or place 2 spies",
+      "or return any spies to supplant a troop at each of those sites"
+    ],
+    "effectKey": "grazzt",
+    "_matchedSheet": true
+  },
+  "demons::15": {
+    "deck": "demons",
+    "slot": 15,
+    "name": "Hezrou",
+    "image": "assets/cards/demons/15-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "move an enemy troop",
+      "promote top card of your deck"
+    ],
+    "effectKey": "hezrou",
+    "_matchedSheet": true
+  },
+  "demons::16": {
+    "deck": "demons",
+    "slot": 16,
+    "name": "Hezrou",
+    "image": "assets/cards/demons/16-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "move an enemy troop",
+      "promote top card of your deck"
+    ],
+    "effectKey": "hezrou",
+    "_matchedSheet": true
+  },
+  "demons::17": {
+    "deck": "demons",
+    "slot": 17,
+    "name": "Jackalwere",
+    "image": "assets/cards/demons/17-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Shapechanger",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or remove spy for 2 atk 2 money"
+    ],
+    "effectKey": "jackalwere",
+    "_matchedSheet": true
+  },
+  "demons::18": {
+    "deck": "demons",
+    "slot": 18,
+    "name": "Jackalwere",
+    "image": "assets/cards/demons/18-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Shapechanger",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or remove spy for 2 atk 2 money"
+    ],
+    "effectKey": "jackalwere",
+    "_matchedSheet": true
+  },
+  "demons::19": {
+    "deck": "demons",
+    "slot": 19,
+    "name": "Jackalwere",
+    "image": "assets/cards/demons/19-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Shapechanger",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or remove spy for 2 atk 2 money"
+    ],
+    "effectKey": "jackalwere",
+    "_matchedSheet": true
+  },
+  "demons::20": {
+    "deck": "demons",
+    "slot": 20,
+    "name": "Marilith",
+    "image": "assets/cards/demons/20-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "devour a card in your hand for 5 attack"
+    ],
+    "effectKey": "marilith",
+    "_matchedSheet": true
+  },
+  "demons::21": {
+    "deck": "demons",
+    "slot": 21,
+    "name": "Marilith",
+    "image": "assets/cards/demons/21-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "devour a card in your hand for 5 attack"
+    ],
+    "effectKey": "marilith",
+    "_matchedSheet": true
+  },
+  "demons::22": {
+    "deck": "demons",
+    "slot": 22,
+    "name": "Mind Flayer",
+    "image": "assets/cards/demons/22-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Illithid",
+    "rarity": 3,
+    "benefits": [
+      "devour a card from hand to",
+      "3 money or assassinate a troop"
+    ],
+    "effectKey": "mind-flayer",
+    "_matchedSheet": true
+  },
+  "demons::23": {
+    "deck": "demons",
+    "slot": 23,
+    "name": "Mind Flayer",
+    "image": "assets/cards/demons/23-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Illithid",
+    "rarity": 3,
+    "benefits": [
+      "devour a card from hand to",
+      "3 money or assassinate a troop"
+    ],
+    "effectKey": "mind-flayer",
+    "_matchedSheet": true
+  },
+  "demons::24": {
+    "deck": "demons",
+    "slot": 24,
+    "name": "Mind Flayer",
+    "image": "assets/cards/demons/24-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Illithid",
+    "rarity": 3,
+    "benefits": [
+      "devour a card from hand to",
+      "3 money or assassinate a troop"
+    ],
+    "effectKey": "mind-flayer",
+    "_matchedSheet": true
+  },
+  "demons::25": {
+    "deck": "demons",
+    "slot": 25,
+    "name": "Myconid Adult",
+    "image": "assets/cards/demons/25-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Myconid",
+    "rarity": 3,
+    "benefits": [
+      "2 money",
+      "give insane outcast"
+    ],
+    "effectKey": "myconid-adult",
+    "_matchedSheet": true
+  },
+  "demons::26": {
+    "deck": "demons",
+    "slot": 26,
+    "name": "Myconid Adult",
+    "image": "assets/cards/demons/26-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Myconid",
+    "rarity": 3,
+    "benefits": [
+      "2 money",
+      "give insane outcast"
+    ],
+    "effectKey": "myconid-adult",
+    "_matchedSheet": true
+  },
+  "demons::27": {
+    "deck": "demons",
+    "slot": 27,
+    "name": "Myconid Adult",
+    "image": "assets/cards/demons/27-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Myconid",
+    "rarity": 3,
+    "benefits": [
+      "2 money",
+      "give insane outcast"
+    ],
+    "effectKey": "myconid-adult",
+    "_matchedSheet": true
+  },
+  "demons::28": {
+    "deck": "demons",
+    "slot": 28,
+    "name": "Myconid Sovereign",
+    "image": "assets/cards/demons/28-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Myconid",
+    "rarity": 2,
+    "benefits": [
+      "give insane outcast",
+      "eot promote a played card"
+    ],
+    "effectKey": "myconid-sovereign",
+    "_matchedSheet": true
+  },
+  "demons::29": {
+    "deck": "demons",
+    "slot": 29,
+    "name": "Myconid Sovereign",
+    "image": "assets/cards/demons/29-unnamed.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Myconid",
+    "rarity": 2,
+    "benefits": [
+      "give insane outcast",
+      "eot promote a played card"
+    ],
+    "effectKey": "myconid-sovereign",
+    "_matchedSheet": true
+  },
+  "demons::30": {
+    "deck": "demons",
+    "slot": 30,
+    "name": "nalfeshnee",
+    "image": "assets/cards/demons/30-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "3 money",
+      "promote your top card"
+    ],
+    "effectKey": "nalfeshnee",
+    "_matchedSheet": true
+  },
+  "demons::31": {
+    "deck": "demons",
+    "slot": 31,
+    "name": "nalfeshnee",
+    "image": "assets/cards/demons/31-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "3 money",
+      "promote your top card"
+    ],
+    "effectKey": "nalfeshnee",
+    "_matchedSheet": true
+  },
+  "demons::32": {
+    "deck": "demons",
+    "slot": 32,
+    "name": "Night Hag",
+    "image": "assets/cards/demons/32-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Fiend",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or remove spy for 2 cards"
+    ],
+    "effectKey": "night-hag",
+    "_matchedSheet": true
+  },
+  "demons::33": {
+    "deck": "demons",
+    "slot": 33,
+    "name": "Night Hag",
+    "image": "assets/cards/demons/33-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Fiend",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or remove spy for 2 cards"
+    ],
+    "effectKey": "night-hag",
+    "_matchedSheet": true
+  },
+  "demons::34": {
+    "deck": "demons",
+    "slot": 34,
+    "name": "Night Hag",
+    "image": "assets/cards/demons/34-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Fiend",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or remove spy for 2 cards"
+    ],
+    "effectKey": "night-hag",
+    "_matchedSheet": true
+  },
+  "demons::36": {
+    "deck": "demons",
+    "slot": 36,
+    "name": "Succubus",
+    "image": "assets/cards/demons/36-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "devour a card from hand to",
+      "place a spy and assasinate a troop there"
+    ],
+    "effectKey": "succubus",
+    "_matchedSheet": true
+  },
+  "demons::37": {
+    "deck": "demons",
+    "slot": 37,
+    "name": "Succubus",
+    "image": "assets/cards/demons/37-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Guile",
+    "type": "Fiend",
+    "rarity": 2,
+    "benefits": [
+      "devour a card from hand to",
+      "place a spy and assasinate a troop there"
+    ],
+    "effectKey": "succubus",
+    "_matchedSheet": true
+  },
+  "demons::38": {
+    "deck": "demons",
+    "slot": 38,
+    "name": "Vrock",
+    "image": "assets/cards/demons/38-unnamed.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Fiend",
+    "rarity": 1,
+    "benefits": [
+      "or spy",
+      "or return a spy for 5 attack"
+    ],
+    "effectKey": "vrock",
+    "_matchedSheet": true
+  },
+  "demons::39": {
+    "deck": "demons",
+    "slot": 39,
+    "name": "Zuggtmoy",
+    "image": "assets/cards/demons/39-unnamed.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Ambition",
+    "type": "Fiend",
+    "rarity": 1,
+    "benefits": [
+      "devour a card in your inner circle to",
+      "3 money and eot promote up to 2 other played cards"
+    ],
+    "effectKey": "zuggtmoy",
+    "_matchedSheet": true
+  },
+  "house-guards::40": {
+    "deck": "house-guards",
+    "slot": 40,
+    "name": "House Guard",
+    "image": "assets/cards/house-guards/40-unnamed.jpg",
+    "cost": 3,
+    "deckVp": 13,
+    "innerCircleVp": 0,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 15,
+    "benefits": [
+      "2 attack"
+    ],
+    "effectKey": "house-guard",
+    "_matchedSheet": true
+  },
+  "priestesses::43": {
+    "deck": "priestesses",
+    "slot": 43,
+    "name": "Priestess of Lolth",
+    "image": "assets/cards/priestesses/43-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 15,
+    "benefits": [
+      "2 money"
+    ],
+    "effectKey": "priestess-of-lolth",
+    "_matchedSheet": true
+  },
+  "insane-outcasts::41": {
+    "deck": "insane-outcasts",
+    "slot": 41,
+    "name": "Insane Outcast",
+    "image": "assets/cards/insane-outcasts/41-unnamed.jpg",
+    "cost": 0,
+    "deckVp": -1,
+    "innerCircleVp": 0,
+    "aspect": "-",
+    "type": "Drow",
+    "rarity": 30,
+    "benefits": [
+      "discard a card from your hand to return this card to the supply.",
+      "If this card would be devoured or promoted, return it to the supply"
+    ],
+    "effectKey": "insane-outcast",
+    "_matchedSheet": true
+  },
+  "starter-1::42": {
+    "deck": "starter-1",
+    "slot": 42,
+    "name": "Noble",
+    "image": "assets/cards/starter-1/42-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 7,
+    "benefits": [
+      "attack"
+    ],
+    "effectKey": "noble",
+    "_matchedSheet": true
+  },
+  "starter-1::44": {
+    "deck": "starter-1",
+    "slot": 44,
+    "name": "Soldier",
+    "image": "assets/cards/starter-1/44-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "money"
+    ],
+    "effectKey": "soldier",
+    "_matchedSheet": true
+  },
+  "starter-2::42": {
+    "deck": "starter-2",
+    "slot": 42,
+    "name": "Noble",
+    "image": "assets/cards/starter-2/42-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 7,
+    "benefits": [
+      "attack"
+    ],
+    "effectKey": "noble",
+    "_matchedSheet": true
+  },
+  "starter-2::44": {
+    "deck": "starter-2",
+    "slot": 44,
+    "name": "Soldier",
+    "image": "assets/cards/starter-2/44-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "money"
+    ],
+    "effectKey": "soldier",
+    "_matchedSheet": true
+  },
+  "starter-3::42": {
+    "deck": "starter-3",
+    "slot": 42,
+    "name": "Noble",
+    "image": "assets/cards/starter-3/42-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 7,
+    "benefits": [
+      "attack"
+    ],
+    "effectKey": "noble",
+    "_matchedSheet": true
+  },
+  "starter-3::44": {
+    "deck": "starter-3",
+    "slot": 44,
+    "name": "Soldier",
+    "image": "assets/cards/starter-3/44-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "money"
+    ],
+    "effectKey": "soldier",
+    "_matchedSheet": true
+  },
+  "starter-4::42": {
+    "deck": "starter-4",
+    "slot": 42,
+    "name": "Noble",
+    "image": "assets/cards/starter-4/42-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 7,
+    "benefits": [
+      "attack"
+    ],
+    "effectKey": "noble",
+    "_matchedSheet": true
+  },
+  "starter-4::44": {
+    "deck": "starter-4",
+    "slot": 44,
+    "name": "Soldier",
+    "image": "assets/cards/starter-4/44-unnamed.jpg",
+    "cost": 0,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "money"
+    ],
+    "effectKey": "soldier",
+    "_matchedSheet": true
+  }
+}

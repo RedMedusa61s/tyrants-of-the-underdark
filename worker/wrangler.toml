@@ -1,0 +1,18 @@
+name = "tyrants-relay"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Cloudflare Workers free tier is plenty for this traffic profile (single-user
+# dev + occasional public clicks). No KV/Durable Objects needed: SHA256-based
+# dedup is computed per-request and we let GitHub be the source of truth.
+
+# Secrets (set via `wrangler secret put NAME` after deploy):
+#   GITHUB_TOKEN  — fine-grained PAT with Contents + Issues read/write
+#                   scoped to the target repo only
+#   GITHUB_REPO   — "owner/repo", e.g. "johnchampaign/tyrants-of-the-underdark"
+
+# CORS: the in-game client and the headless sim both call this Worker from
+# arbitrary origins (localhost:5173 during dev; whatever public URL the game is
+# deployed to later). Adjust ALLOWED_ORIGIN below if you want to lock it down.
+[vars]
+ALLOWED_ORIGIN = "*"

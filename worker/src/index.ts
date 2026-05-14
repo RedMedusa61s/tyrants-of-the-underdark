@@ -1,0 +1,218 @@
+// Tyrants relay — single Cloudflare Worker that routes:
+//   POST /problem-report  → creates a GitHub Issue (Issues API)
+//   POST /game-log        → SHA256-deduped commit to logs/<hash>.json via Contents API
+//
+// All GitHub-authenticated calls happen here so the PAT lives only in Worker
+// secrets (`GITHUB_TOKEN`). Clients (browser + headless sim) POST plain JSON.
+//
+// Secrets (set with `wrangler secret put NAME`):
+//   GITHUB_TOKEN — fine-grained PAT, Contents + Issues read/write
+//   GITHUB_REPO  — "owner/repo" form
+//
+// Plain vars (in wrangler.toml [vars]):
+//   ALLOWED_ORIGIN — CORS Access-Control-Allow-Origin, default "*"
+
+interface Env {
+  GITHUB_TOKEN: string;
+  GITHUB_REPO: string;
+  ALLOWED_ORIGIN?: string;
+}
+
+interface ProblemReportPayload {
+  description: string;
+  expected?: string;
+  includeState?: boolean;
+  includeLog?: boolean;
+  state?: unknown;
+  log?: string[];
+  meta?: Record<string, unknown>;
+}
+
+interface GameLogPayload {
+  /** Free-form game record. Whatever the client wants archived. The Worker
+   *  treats this opaquely except for hashing. */
+  game: unknown;
+  /** Optional human-readable label embedded in the commit message (e.g.
+   *  "sim:heuristic-vs-random" or "browser-game"). */
+  source?: string;
+  /** Optional metadata to embed alongside the payload. */
+  meta?: Record<string, unknown>;
+}
+
+export default {
+  async fetch(req: Request, env: Env): Promise<Response> {
+    const url = new URL(req.url);
+
+    // CORS preflight
+    if (req.method === 'OPTIONS') return corsResponse(env, 204);
+
+    if (req.method !== 'POST') {
+      return jsonResponse(env, { error: 'POST only' }, 405);
+    }
+
+    try {
+      if (url.pathname === '/problem-report') {
+        return await handleProblemReport(req, env);
+      }
+      if (url.pathname === '/game-log') {
+        return await handleGameLog(req, env);
+      }
+      return jsonResponse(env, { error: `unknown route ${url.pathname}` }, 404);
+    } catch (err) {
+      return jsonResponse(env, { error: String(err) }, 500);
+    }
+  },
+};
+
+// ---------- /problem-report ----------
+
+async function handleProblemReport(req: Request, env: Env): Promise<Response> {
+  const body = await req.json() as ProblemReportPayload;
+  const description = (body.description || '').trim();
+  if (!description) return jsonResponse(env, { error: 'empty description' }, 400);
+
+  const title = description.split('\n')[0].slice(0, 80) || 'Problem report';
+  const sections: string[] = [`**What happened**\n\n${description}`];
+  if (body.expected?.trim()) sections.push(`**What I expected**\n\n${body.expected.trim()}`);
+  if (body.meta) {
+    const metaLines = Object.entries(body.meta).map(([k, v]) => `- ${k}: \`${JSON.stringify(v)}\``);
+    sections.push(`**Build / context**\n\n${metaLines.join('\n')}`);
+  }
+  if (body.includeLog && body.log?.length) {
+    const tail = body.log.slice(-40).join('\n');
+    sections.push(`**Last ${Math.min(40, body.log.length)} log lines**\n\n\`\`\`\n${tail}\n\`\`\``);
+  }
+  if (body.includeState && body.state) {
+    const stateJson = JSON.stringify(body.state, null, 2);
+    // GitHub issue body cap is ~65535 chars. Slice generously.
+    const truncated = stateJson.length > 50000 ? stateJson.slice(0, 50000) + '\n...(truncated)' : stateJson;
+    sections.push(`**Game state**\n\n\`\`\`json\n${truncated}\n\`\`\``);
+  }
+  const issueBody = sections.join('\n\n---\n\n');
+
+  const resp = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/issues`, {
+    method: 'POST',
+    headers: githubHeaders(env),
+    body: JSON.stringify({
+      title,
+      body: issueBody,
+      labels: ['bug', 'from-game'],
+    }),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    return jsonResponse(env, { ok: false, error: `GitHub ${resp.status}: ${text.slice(0, 400)}` }, 502);
+  }
+  const issue = await resp.json() as { html_url: string; number: number };
+  return jsonResponse(env, { ok: true, url: issue.html_url, number: issue.number }, 200);
+}
+
+// ---------- /game-log ----------
+
+async function handleGameLog(req: Request, env: Env): Promise<Response> {
+  const body = await req.json() as GameLogPayload;
+  if (!body.game) return jsonResponse(env, { error: 'missing game payload' }, 400);
+
+  const packaged = {
+    publishedAt: new Date().toISOString(),
+    source: body.source ?? 'unknown',
+    meta: body.meta ?? {},
+    game: body.game,
+  };
+  const json = JSON.stringify(packaged, null, 2);
+  const hash = await sha256Hex(json);
+  const filename = `${hash.slice(0, 16)}.json`;
+  const repoPath = `logs/${filename}`;
+
+  // Check whether this content already exists (SHA256 dedup). If GitHub returns
+  // 200 with matching SHA, we skip the PUT and return a "deduped" response.
+  const existing = await fetch(
+    `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${repoPath}`,
+    { headers: githubHeaders(env) }
+  );
+  if (existing.status === 200) {
+    const existingJson = await existing.json() as { content?: string };
+    if (existingJson.content) {
+      const decoded = atob(existingJson.content.replace(/\n/g, ''));
+      if (decoded === json) {
+        return jsonResponse(env, {
+          ok: true, deduped: true, path: repoPath, hash, message: 'already present',
+        }, 200);
+      }
+      // Hash collision on the prefix (very unlikely) — fall through to overwrite-via-PUT
+      // with the full SHA in the filename to avoid clobbering.
+    }
+  }
+
+  const putResp = await fetch(
+    `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${repoPath}`,
+    {
+      method: 'PUT',
+      headers: githubHeaders(env),
+      body: JSON.stringify({
+        message: `log: publish game (${body.source ?? 'unknown'}) ${hash.slice(0, 8)}`,
+        content: btoaUtf8(json),
+      }),
+    }
+  );
+
+  if (!putResp.ok) {
+    const text = await putResp.text();
+    return jsonResponse(env, { ok: false, error: `GitHub ${putResp.status}: ${text.slice(0, 400)}` }, 502);
+  }
+  const result = await putResp.json() as { content?: { html_url?: string; download_url?: string } };
+  return jsonResponse(env, {
+    ok: true,
+    deduped: false,
+    path: repoPath,
+    hash,
+    htmlUrl: result.content?.html_url,
+    downloadUrl: result.content?.download_url,
+  }, 200);
+}
+
+// ---------- helpers ----------
+
+function githubHeaders(env: Env): Record<string, string> {
+  return {
+    'Accept': 'application/vnd.github+json',
+    'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+    'Content-Type': 'application/json',
+    'User-Agent': 'tyrants-relay',
+  };
+}
+
+function corsHeaders(env: Env): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN ?? '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+  };
+}
+
+function jsonResponse(env: Env, payload: unknown, status: number): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(env) },
+  });
+}
+
+function corsResponse(env: Env, status: number): Response {
+  return new Response(null, { status, headers: corsHeaders(env) });
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function btoaUtf8(text: string): string {
+  // btoa requires ASCII; UTF-8 encode first.
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
