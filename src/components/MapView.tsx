@@ -362,10 +362,10 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 : '0 1px 3px rgba(0,0,0,0.6)',
             }} />}
             {spies.map((sp, i) => (
-              <span key={i} style={{
-                width: 18, height: 18, background: COLOR_HEX[sp],
+              <span key={i} title={`spy: ${sp}`} style={{
+                width: 24, height: 24, background: COLOR_HEX[sp],
                 border: '2px solid #fff',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.6)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.7)',
               }} />
             ))}
           </div>

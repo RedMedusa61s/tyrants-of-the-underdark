@@ -11,6 +11,8 @@ import { GameLog } from './components/GameLog';
 import { CardTextVerify } from './components/CardTextVerify';
 import { RouteVerify } from './components/RouteVerify';
 import { ProblemReportDialog } from './components/ProblemReportDialog';
+import { FirstRunImageImport } from './components/FirstRunImageImport';
+import { useCachedImage } from './image-cache';
 import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
@@ -64,6 +66,7 @@ const SessionContext = createContext<SessionCtx | null>(null);
 
 function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; label?: string }) {
   const [hover, setHover] = useState(false);
+  const imgUrl = useCachedImage(card.image);
   return (
     <div
       onClick={onClick}
@@ -78,7 +81,7 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
       title={card.name}
     >
       <img
-        src={'/' + card.image.replace(/^assets\//, '')}
+        src={imgUrl}
         alt={card.name}
         style={{
           width: '100%', display: 'block', borderRadius: 8,
@@ -943,6 +946,14 @@ function configFromSave(codec: string): GameConfig | null {
 }
 
 export function App() {
+  // First-run gate: if a remote image source is configured and we haven't
+  // imported yet, the bulk-import dialog renders on top and the rest of the
+  // app waits behind it. Once dismissed (or with no source configured), it
+  // returns null and the regular UI takes over.
+  const [imagesReady, setImagesReady] = useState<boolean>(() =>
+    typeof localStorage !== 'undefined' && localStorage.getItem('totu.image-cache-ready') === '1'
+  );
+
   // Hot-seat mode: single tab, no playerID gating. P1 is the human; P2..PN are AI.
   // Mounting flow: if we have a saved game AND its config, jump straight back into
   // the Client (Board's useEffect will restore the codec). Otherwise show the
@@ -975,9 +986,16 @@ export function App() {
     if (savedConfig) setConfig(savedConfig);
   }
 
-  if (!config) {
-    const hasSave = !!localStorage.getItem(SAVE_KEY) && !!savedConfig;
-    return <NewGameDialog onStart={startNew} hasSave={hasSave} onResume={resumeSaved} lastConfig={savedConfig} />;
-  }
-  return <ClientHolder config={config} onNewGame={newGameFromSession} />;
+  return (
+    <>
+      {!imagesReady && <FirstRunImageImport onClose={() => setImagesReady(true)} />}
+      {(() => {
+        if (!config) {
+          const hasSave = !!localStorage.getItem(SAVE_KEY) && !!savedConfig;
+          return <NewGameDialog onStart={startNew} hasSave={hasSave} onResume={resumeSaved} lastConfig={savedConfig} />;
+        }
+        return <ClientHolder config={config} onNewGame={newGameFromSession} />;
+      })()}
+    </>
+  );
 }

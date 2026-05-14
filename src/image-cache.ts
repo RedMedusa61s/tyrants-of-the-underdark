@@ -1,0 +1,179 @@
+// Card / board image cache backed by IndexedDB.
+//
+// Goal: on first run the app fetches every image once from a configured remote
+// source (e.g. an Imgur mirror or your own CDN) and stores the blob bytes in
+// IndexedDB. On every subsequent load the images are served from the local
+// store — zero network traffic, instant render.
+//
+// The remote source is configured via VITE_TOTU_IMAGE_BASE_URL (a base URL
+// that mirrors the `assets/` directory layout). If unset, we fall back to
+// relative paths (`/cards/<file>`), which is what the dev server provides
+// when you've run `npm run extract-assets` locally.
+//
+// All Card usages should call `useCachedImage(relativePath)` instead of
+// embedding the path directly; the hook handles cache hit, miss, in-flight
+// fetch, and error-fallback.
+
+import { useEffect, useState } from 'react';
+
+const DB_NAME = 'totu.image-cache';
+const STORE = 'blobs';
+const DB_VERSION = 1;
+
+/** Open (or create) the IndexedDB. Cached promise so we open once. */
+let dbPromise: Promise<IDBDatabase> | null = null;
+function openDb(): Promise<IDBDatabase> {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+
+async function dbGet(key: string): Promise<Blob | undefined> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).get(key);
+    req.onsuccess = () => resolve(req.result as Blob | undefined);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function dbPut(key: string, blob: Blob): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(blob, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function dbKeys(): Promise<string[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAllKeys();
+    req.onsuccess = () => resolve(req.result as string[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearImageCache(): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** Map a relative `assets/cards/foo.jpg` path to its remote source URL. */
+function remoteUrlFor(relativePath: string): string {
+  const base = (import.meta.env.VITE_TOTU_IMAGE_BASE_URL as string | undefined)?.replace(/\/$/, '');
+  // Strip the leading "assets/" so the base URL maps to the assets/ tree.
+  const trimmed = relativePath.replace(/^assets\//, '');
+  if (base) return `${base}/${trimmed}`;
+  // No base configured — fall back to the local dev path (works when the
+  // assets are present on the server / in the dev publicDir).
+  return `/${trimmed}`;
+}
+
+/** Fetch a single image into the cache. Resolves with the cached blob. */
+async function fetchAndStore(relativePath: string): Promise<Blob> {
+  const url = remoteUrlFor(relativePath);
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`fetch ${url} → HTTP ${resp.status}`);
+  const blob = await resp.blob();
+  await dbPut(relativePath, blob);
+  return blob;
+}
+
+/** Public: get a blob-URL for the image. Reads from cache; on miss, fetches
+ *  and caches. The blob URL is reusable across the same page lifetime — the
+ *  caller is responsible for revoking it when no longer needed (or just let
+ *  the page unload clean it up). */
+const blobUrlCache = new Map<string, string>();
+
+export async function getImageBlobUrl(relativePath: string): Promise<string> {
+  if (blobUrlCache.has(relativePath)) return blobUrlCache.get(relativePath)!;
+  let blob = await dbGet(relativePath);
+  if (!blob) blob = await fetchAndStore(relativePath);
+  const url = URL.createObjectURL(blob);
+  blobUrlCache.set(relativePath, url);
+  return url;
+}
+
+export interface BulkImportProgress {
+  total: number;
+  done: number;
+  failed: number;
+  current: string | null;
+  finished: boolean;
+}
+
+/** Import every image in `paths` into the cache. Skips already-cached entries.
+ *  Calls `onProgress` after each fetch. Resolves when all have been processed
+ *  (success or failure). */
+export async function bulkImport(
+  paths: string[],
+  onProgress: (p: BulkImportProgress) => void,
+  concurrency = 6,
+): Promise<BulkImportProgress> {
+  const existing = new Set(await dbKeys());
+  const pending = paths.filter(p => !existing.has(p));
+  const state: BulkImportProgress = {
+    total: pending.length,
+    done: 0, failed: 0, current: null, finished: false,
+  };
+  onProgress({ ...state });
+  if (pending.length === 0) {
+    state.finished = true;
+    onProgress({ ...state });
+    return state;
+  }
+
+  // Worker-pool concurrency.
+  let nextIdx = 0;
+  const workers = Array.from({ length: Math.min(concurrency, pending.length) }, async () => {
+    while (true) {
+      const i = nextIdx++;
+      if (i >= pending.length) return;
+      const p = pending[i];
+      state.current = p;
+      try { await fetchAndStore(p); state.done++; }
+      catch { state.failed++; }
+      onProgress({ ...state });
+    }
+  });
+  await Promise.all(workers);
+  state.current = null;
+  state.finished = true;
+  onProgress({ ...state });
+  return state;
+}
+
+/** React hook: resolves a relative-path image to a usable URL. Returns the
+ *  remote URL string for an immediate render (so the browser shows something
+ *  while we're loading the cached blob), then swaps to a blob URL once
+ *  available. On any error, returns the remote URL — the consumer can render
+ *  it normally and let onError fall through to a placeholder. */
+export function useCachedImage(relativePath: string): string {
+  const [url, setUrl] = useState<string>(() => remoteUrlFor(relativePath));
+  useEffect(() => {
+    let cancelled = false;
+    getImageBlobUrl(relativePath)
+      .then(blobUrl => { if (!cancelled) setUrl(blobUrl); })
+      .catch(() => { /* keep the initial remote-URL fallback */ });
+    return () => { cancelled = true; };
+  }, [relativePath]);
+  return url;
+}
