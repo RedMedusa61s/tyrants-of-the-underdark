@@ -147,6 +147,35 @@ function liveLogPlugin(): Plugin {
         });
       });
 
+      // Local fallback for the auto-publish flow on ctx.gameover. When the
+      // client hasn't set VITE_TOTU_RELAY_URL, completed games land here on
+      // disk instead of being pushed to the public logs/ repo. Writes one
+      // JSON file per game into training-logs/published-locally/.
+      const publishLocallyDir = path.join(outDir, 'published-locally');
+      mkdirSync(publishLocallyDir, { recursive: true });
+      server.middlewares.use('/__publish-game-log', (req, res) => {
+        if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
+        const chunks: Buffer[] = [];
+        req.on('data', c => chunks.push(c));
+        req.on('end', () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const filePath = path.join(publishLocallyDir, `${body.source || 'game'}-${stamp}.json`);
+            writeFileSync(filePath, JSON.stringify(body, null, 2));
+            res.statusCode = 200;
+            res.setHeader('content-type', 'application/json');
+            res.end(JSON.stringify({
+              ok: true,
+              filePath: path.relative(__dirname, filePath),
+              note: 'VITE_TOTU_RELAY_URL unset — game saved locally.',
+            }));
+          } catch (err) {
+            res.statusCode = 400; res.end(String(err));
+          }
+        });
+      });
+
       server.middlewares.use('/__save-log', (req, res) => {
         if (req.method !== 'POST') { res.statusCode = 405; res.end(); return; }
         const chunks: Buffer[] = [];

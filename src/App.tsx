@@ -14,6 +14,7 @@ import { ProblemReportDialog } from './components/ProblemReportDialog';
 import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
+import { publishGameLog } from './publish-game-log';
 import { decideAiMove, type AiMove } from './ai/random-ai';
 import { decideHeuristicMove } from './ai/heuristic-ai';
 import { lookupCard } from './card-data';
@@ -136,6 +137,32 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     const latest = G.snapshots[G.snapshots.length - 1].codec;
     localStorage.setItem(SAVE_KEY, latest);
   }, [G.snapshots.length, ctx.gameover]);
+
+  // Auto-publish a completed game to the public log repo via the Cloudflare
+  // relay. Fires exactly once per game-over transition; the relay's SHA256
+  // dedup keeps re-mounts (page reload, etc.) from creating duplicate
+  // commits. Falls back to the local Vite middleware in dev when
+  // VITE_TOTU_RELAY_URL is unset.
+  const publishedRef = useRef(false);
+  useEffect(() => {
+    if (!ctx.gameover) return;
+    if (publishedRef.current) return;
+    publishedRef.current = true;
+    publishGameLog(G, {
+      numPlayers: Object.keys(G.players).length,
+      halfDecks: session?.config.halfDecks ?? [],
+      aiStyles: session?.config.aiStyles ?? [],
+      source: 'browser-game',
+    }).then(r => {
+      if (r.ok) {
+        // eslint-disable-next-line no-console
+        console.info('[publish-game-log]', r.deduped ? 'deduped' : 'published', r.path ?? r.filePath, r.htmlUrl ?? '');
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn('[publish-game-log] failed:', r.error);
+      }
+    });
+  }, [ctx.gameover, G, session]);
 
   // Dev-only: mirror the live game log to disk via the vite plugin endpoint.
   // Lets the developer (or an assistant) read the current state without manual
