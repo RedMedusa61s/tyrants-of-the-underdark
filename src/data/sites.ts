@@ -46,12 +46,13 @@ const seedPos = (() => {
 
 const seed = (
   id: string, name: string, section: Section, vp: number, troopSlots: number,
-  flags: { control?: boolean; start?: boolean; whites?: number } = {}
+  flags: { control?: boolean; start?: boolean; whites?: number; whiteSlots?: number[] } = {}
 ): Site => ({
   id, name, section, vp, troopSlots,
   // Default: 0 whites at starting sites (players deploy there), 1 elsewhere. Override
   // per-site by passing `whites: N` until per-site counts are calibrated.
   whitesAtStart: flags.whites ?? (flags.start ? 0 : 1),
+  ...(flags.whiteSlots && { whiteSlots: flags.whiteSlots }),
   hasControlMarker: !!flags.control,
   isStartingSite: !!flags.start,
   ...seedPos(section),
@@ -77,12 +78,12 @@ export const SITES: Site[] = [
   seed('araumycos',     'Araumycos',                 'center', 3, 4, { control: true, whites: 4 }),
   seed('eryndlyn',      'Eryndlyn',                  'center', 3, 3, { start: true, whites: 0 }),
   seed('labyrinth',     'The Labyrinth',             'center', 3, 3, { whites: 1 }),
-  seed('halls-legion',  'Halls of the Scoured Legion','center', 3, 2, { whites: 1 }),
+  seed('halls-legion',  'Halls of the Scoured Legion','center', 3, 2, { whites: 1, whiteSlots: [1] }),
   seed('ched-nasad',    'Ched Nasad',                'center', 3, 4, { start: true, whites: 0 }),
 
   // Right section (used in 3p with-right, 4p)
   seed('chchitl',       "Ch'Chitl",                  'right',  2, 3, { control: true, start: true, whites: 2 }),
-  seed('phaerlin',      'The Phaerlin',              'right',  2, 3, { control: true, whites: 3 }),
+  seed('phaerlin',      'The Phaerlin',              'right',  2, 3, { control: true, whites: 2, whiteSlots: [0, 1] }),
   seed('llacerellyn',   'Llacerellyn',               'right',  2, 2, { whites: 0 }),
   seed('sszuraassnee',  "Ss'zuraass'nee",            'right',  2, 3, { control: true, whites: 2 }),
   seed('tsenviilyq',    'Tsenviilyq',                'right',  4, 3, { control: true, whites: 3 }),
