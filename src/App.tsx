@@ -579,7 +579,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark <span style={{ fontSize: 14, opacity: 0.6 }}>(scaffold)</span></h1>
+        <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark</h1>
         <button onClick={() => {
           const cur = isNoImagesMode();
           localStorage.setItem(NO_IMAGES_KEY, cur ? '0' : '1');
