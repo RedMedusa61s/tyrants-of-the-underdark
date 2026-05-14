@@ -15,9 +15,9 @@ export interface Route {
 
 export const ROUTES: Route[] = [
   { id: 'menz-mantol', a: 'menzoberranzan', b: 'mantol-derith', spaces: 3 },
-  { id: 'araumycos-laby', a: 'araumycos', b: 'labyrinth', spaces: 2 },
-  { id: 'mantol-blingden', a: 'mantol-derith', b: 'blingdenstone', spaces: 1 },
-  { id: 'araumycos-chasm', a: 'araumycos', b: 'chasmleap', spaces: 1 },
+  { id: 'araumycos-laby', a: 'araumycos', b: 'labyrinth', spaces: 2, whiteSlots: [0] },
+  { id: 'mantol-blingden', a: 'mantol-derith', b: 'blingdenstone', spaces: 1, whiteSlots: [0] },
+  { id: 'araumycos-chasm', a: 'araumycos', b: 'chasmleap', spaces: 1, whiteSlots: [0] },
   { id: 'jhachalk-buiyran', a: 'jhachalkhyn', b: 'buiyrandyn', spaces: 1 },
   { id: 'jhachalk-grackl', a: 'jhachalkhyn', b: 'gracklstugh', spaces: 1 },
   { id: 'chasm-grackl', a: 'chasmleap', b: 'gracklstugh', spaces: 2 },
@@ -47,8 +47,8 @@ export const ROUTES: Route[] = [
   { id: 'mantol-derith-wormwrithings', a: 'mantol-derith', b: 'wormwrithings', spaces: 1 },
   { id: 'ched-nasad-halls-legion', a: 'ched-nasad', b: 'halls-legion', spaces: 2 },
   { id: 'llacerellyn-eryndlyn', a: 'llacerellyn', b: 'eryndlyn', spaces: 1 },
-  { id: 'ched-nasad-araumycos', a: 'ched-nasad', b: 'araumycos', spaces: 1 },
-  { id: 'araumycos-eryndlyn', a: 'araumycos', b: 'eryndlyn', spaces: 1 },
+  { id: 'ched-nasad-araumycos', a: 'ched-nasad', b: 'araumycos', spaces: 1, whiteSlots: [0] },
+  { id: 'araumycos-eryndlyn', a: 'araumycos', b: 'eryndlyn', spaces: 1, whiteSlots: [0] },
   { id: 'gauntlgrym-jhachalkhyn', a: 'gauntlgrym', b: 'jhachalkhyn', spaces: 1 },
   { id: 'buiyrandyn-labyrinth', a: 'buiyrandyn', b: 'labyrinth', spaces: 1 },
   { id: 'labyrinth-gracklstugh', a: 'labyrinth', b: 'gracklstugh', spaces: 1 },
