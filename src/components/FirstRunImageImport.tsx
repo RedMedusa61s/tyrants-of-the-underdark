@@ -17,7 +17,9 @@ import { bulkImport, clearImageCache, type BulkImportProgress } from '../image-c
 const FLAG_KEY = 'totu.image-cache-ready';
 
 function hasRemoteSource(): boolean {
-  return !!(import.meta.env.VITE_TOTU_IMAGE_BASE_URL as string | undefined);
+  // Imgur deck sheets are always available (compiled into sheet-config.ts), so
+  // the importer is unconditionally useful — no need for an env-var base URL.
+  return true;
 }
 
 function uniqueImagePaths(): string[] {
@@ -76,14 +78,16 @@ export function FirstRunImageImport({ onClose }: { onClose?: () => void }) {
         <h2 style={{ marginTop: 0 }}>One-time setup: download card art</h2>
         <p style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
           Tyrants of the Underdark uses card and board art published by Wizards
-          of the Coast. This app doesn't host or redistribute that art — but it
-          can download it once from a third-party mirror, store it locally in
-          your browser, and reuse it from then on. Network usage after this
-          one-time fetch is zero.
+          of the Coast. This app doesn't host or redistribute that art. With
+          your consent it can download four deck sheets from a public Imgur
+          mirror (the Tabletop Simulator workshop mod), slice the cards out of
+          them in your browser, and cache the results locally. After this
+          one-time setup, network usage is zero.
         </p>
         <p style={{ fontSize: 12, opacity: 0.6 }}>
-          Card art © Wizards of the Coast. Continuing imports the images for
-          your personal use only. You can clear the cache later from settings.
+          Card art © Wizards of the Coast / Gale Force Nine. By continuing
+          you confirm this is for your personal use only. You can clear the
+          cache later from settings.
         </p>
 
         {!started && (

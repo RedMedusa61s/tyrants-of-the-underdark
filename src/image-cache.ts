@@ -15,6 +15,7 @@
 // fetch, and error-fallback.
 
 import { useEffect, useState } from 'react';
+import { DECK_SHEETS, parseCardPath, type SheetInfo } from './sheet-config';
 
 const DB_NAME = 'totu.image-cache';
 const STORE = 'blobs';
@@ -87,12 +88,78 @@ function remoteUrlFor(relativePath: string): string {
   return `/${trimmed}`;
 }
 
-/** Fetch a single image into the cache. Resolves with the cached blob. */
-async function fetchAndStore(relativePath: string): Promise<Blob> {
-  const url = remoteUrlFor(relativePath);
+/** Fetch a raw URL into a blob (for sheets / non-card images). */
+async function fetchBlob(url: string): Promise<Blob> {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`fetch ${url} → HTTP ${resp.status}`);
-  const blob = await resp.blob();
+  return await resp.blob();
+}
+
+/** Cache of in-memory Image objects per sheet URL — slicing reuses one decoded
+ *  bitmap for the 40 cards on that sheet rather than re-decoding each time.
+ *  Caches the in-flight Promise so concurrent slice requests don't all race
+ *  to fetch the same sheet. */
+const sheetImagePromises = new Map<string, Promise<HTMLImageElement>>();
+
+function loadSheetImage(sheetUrl: string): Promise<HTMLImageElement> {
+  const cached = sheetImagePromises.get(sheetUrl);
+  if (cached) return cached;
+  const p = (async () => {
+    // Pull the sheet blob (from IndexedDB if previously cached; else fetch).
+    let blob = await dbGet(sheetUrl);
+    if (!blob) {
+      blob = await fetchBlob(sheetUrl);
+      await dbPut(sheetUrl, blob);
+    }
+    const objectUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error(`decode failed: ${sheetUrl}`));
+      img.src = objectUrl;
+    });
+    return img;
+  })();
+  sheetImagePromises.set(sheetUrl, p);
+  return p;
+}
+
+/** Slice a single tile out of the sheet at `slot`, return a JPEG blob. */
+async function sliceTile(sheet: SheetInfo, slot: number): Promise<Blob> {
+  const img = await loadSheetImage(sheet.url);
+  const tileW = Math.floor(img.naturalWidth / sheet.cols);
+  const tileH = Math.floor(img.naturalHeight / sheet.rows);
+  const row = Math.floor(slot / sheet.cols);
+  const col = slot % sheet.cols;
+  const canvas = document.createElement('canvas');
+  canvas.width = tileW;
+  canvas.height = tileH;
+  const cx = canvas.getContext('2d');
+  if (!cx) throw new Error('no 2d context');
+  cx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, tileW, tileH);
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      b => b ? resolve(b) : reject(new Error('canvas.toBlob returned null')),
+      'image/jpeg',
+      0.9
+    );
+  });
+}
+
+/** Fetch (or slice) a single image into the cache. Resolves with the blob. */
+async function fetchAndStore(relativePath: string): Promise<Blob> {
+  // Card paths get sliced out of the deck's sheet.
+  const parsed = parseCardPath(relativePath);
+  if (parsed && DECK_SHEETS[parsed.deck]) {
+    const sheet = DECK_SHEETS[parsed.deck];
+    const blob = await sliceTile(sheet, parsed.slot);
+    await dbPut(relativePath, blob);
+    return blob;
+  }
+  // Non-card path → fall back to the per-path remote URL.
+  const url = remoteUrlFor(relativePath);
+  const blob = await fetchBlob(url);
   await dbPut(relativePath, blob);
   return blob;
 }
