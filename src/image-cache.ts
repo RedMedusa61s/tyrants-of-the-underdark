@@ -128,59 +128,42 @@ function loadSheetImage(sheetUrl: string): Promise<HTMLImageElement> {
   return p;
 }
 
-/** Derive the cities-and-routes board map from the workshop mod's table image:
- *  1. Fetch the public table URL (TABLE_URL).
- *  2. Downsample to 200×N greyscale → find the bounding box of pixels that
- *     are NOT the purple background (~RGB 60,25,50, ±40).
- *  3. Crop full-resolution at that bbox with a 0.005 inset.
- *  4. Rotate -90° (CCW) so the map is portrait.
- *  This regenerates a byte-identical map to the one we computed offline, so
- *  all the calibrated site/slot positions remain valid. */
+/** Derive the cities-and-routes board map from the workshop mod's 8449×4992
+ *  table image. The crop offsets and dimensions below were computed offline
+ *  by sharp using a purple-background bbox detection at 0.005 inset; baking
+ *  them as constants makes the in-browser canvas pipeline produce the same
+ *  cropped region sharp did, byte-for-byte alignment-wise (the JPEG bytes
+ *  may differ due to encoder choices, but the pixel grid matches).
+ *
+ *  Calibrated site / slot positions in the app are stored as fractions of
+ *  the post-crop, post-rotate image — so any drift in either operation
+ *  would shift all the tokens off the printed slots. The constants here
+ *  ensure no drift. */
+const BOARD_CROP = { left: 2999, top: 152, width: 4605, height: 4646 } as const;
+
 async function deriveBoardMap(): Promise<Blob> {
   const { TABLE_URL } = await import('./sheet-config');
   const tableBlob = await fetchBlob(TABLE_URL);
   const bmp = await createImageBitmap(tableBlob);
-  const W = bmp.width, H = bmp.height;
-
-  // Downsample to 200×H' for the purple-detection pass.
-  const downW = 200;
-  const downH = Math.round(H * downW / W);
-  const downCanvas = document.createElement('canvas');
-  downCanvas.width = downW; downCanvas.height = downH;
-  const downCx = downCanvas.getContext('2d');
-  if (!downCx) throw new Error('no 2d context');
-  downCx.drawImage(bmp, 0, 0, downW, downH);
-  const downData = downCx.getImageData(0, 0, downW, downH).data;
-  let minX = downW, maxX = 0, minY = downH, maxY = 0;
-  for (let y = 0; y < downH; y++) {
-    for (let x = 0; x < downW; x++) {
-      const i = (y * downW + x) * 4;
-      const r = downData[i], g = downData[i + 1], b = downData[i + 2];
-      const isPurple = Math.abs(r - 60) < 40 && Math.abs(g - 25) < 40 && Math.abs(b - 50) < 40;
-      if (!isPurple) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
+  if (bmp.width !== 8449 || bmp.height !== 4992) {
+    // The mod author re-uploaded the table at a different size. Surface this
+    // loudly — slot positions would drift and the smart fix is to recompute
+    // the crop offsets, not silently rescale.
+    // eslint-disable-next-line no-console
+    console.warn(`[deriveBoardMap] table image dims ${bmp.width}×${bmp.height} != expected 8449×4992; crop offsets may be wrong`);
   }
-  const inset = 0.005;
-  const x0 = Math.round(W * (minX / downW + inset));
-  const y0 = Math.round(H * (minY / downH + inset));
-  const x1 = Math.round(W * (maxX / downW - inset));
-  const y1 = Math.round(H * (maxY / downH - inset));
-  const cropW = x1 - x0, cropH = y1 - y0;
-
-  // Crop full-resolution, then rotate -90° (CCW). After rotation, dims swap.
+  // Rotate -90° (CCW): the cropped region (4605×4646) becomes (4646×4605).
   const rotCanvas = document.createElement('canvas');
-  rotCanvas.width = cropH;
-  rotCanvas.height = cropW;
-  const rotCx = rotCanvas.getContext('2d');
-  if (!rotCx) throw new Error('no 2d context');
-  rotCx.translate(0, cropW);
-  rotCx.rotate(-Math.PI / 2);
-  rotCx.drawImage(bmp, x0, y0, cropW, cropH, 0, 0, cropW, cropH);
+  rotCanvas.width = BOARD_CROP.height;   // 4646
+  rotCanvas.height = BOARD_CROP.width;   // 4605
+  const cx = rotCanvas.getContext('2d');
+  if (!cx) throw new Error('no 2d context');
+  // For rotate(-90°) (CCW): translate by (0, cropW), then rotate, then draw.
+  cx.translate(0, BOARD_CROP.width);
+  cx.rotate(-Math.PI / 2);
+  cx.drawImage(bmp,
+    BOARD_CROP.left, BOARD_CROP.top, BOARD_CROP.width, BOARD_CROP.height,
+    0, 0, BOARD_CROP.width, BOARD_CROP.height);
   bmp.close();
   return await new Promise<Blob>((resolve, reject) => {
     rotCanvas.toBlob(
