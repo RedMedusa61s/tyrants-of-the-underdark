@@ -114,36 +114,36 @@ async function handleGameLog(req: Request, env: Env): Promise<Response> {
   const body = await req.json() as GameLogPayload;
   if (!body.game) return jsonResponse(env, { error: 'missing game payload' }, 400);
 
-  const packaged = {
-    publishedAt: new Date().toISOString(),
-    source: body.source ?? 'unknown',
-    meta: body.meta ?? {},
-    game: body.game,
-  };
-  const json = JSON.stringify(packaged, null, 2);
-  const hash = await sha256Hex(json);
+  // Hash the *game content* only, so a re-submission of the same game (e.g.,
+  // a retry after a network glitch) lands on the same filename and dedups.
+  // The published wrapper carries a fresh timestamp every call; including it
+  // in the hash would defeat dedup entirely.
+  const gameJson = JSON.stringify(body.game);
+  const hash = await sha256Hex(gameJson);
   const filename = `${hash.slice(0, 16)}.json`;
   const repoPath = `logs/${filename}`;
 
-  // Check whether this content already exists (SHA256 dedup). If GitHub returns
-  // 200 with matching SHA, we skip the PUT and return a "deduped" response.
+  // Existing file with this name → same game already published, no-op.
   const existing = await fetch(
     `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${repoPath}`,
     { headers: githubHeaders(env) }
   );
   if (existing.status === 200) {
-    const existingJson = await existing.json() as { content?: string };
-    if (existingJson.content) {
-      const decoded = atob(existingJson.content.replace(/\n/g, ''));
-      if (decoded === json) {
-        return jsonResponse(env, {
-          ok: true, deduped: true, path: repoPath, hash, message: 'already present',
-        }, 200);
-      }
-      // Hash collision on the prefix (very unlikely) — fall through to overwrite-via-PUT
-      // with the full SHA in the filename to avoid clobbering.
-    }
+    return jsonResponse(env, {
+      ok: true, deduped: true, path: repoPath, hash,
+      message: 'already present',
+    }, 200);
   }
+
+  // First publish of this content — build the wrapper and PUT it.
+  const packaged = {
+    publishedAt: new Date().toISOString(),
+    source: body.source ?? 'unknown',
+    hash,
+    meta: body.meta ?? {},
+    game: body.game,
+  };
+  const wrapperJson = JSON.stringify(packaged, null, 2);
 
   const putResp = await fetch(
     `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${repoPath}`,
@@ -152,7 +152,7 @@ async function handleGameLog(req: Request, env: Env): Promise<Response> {
       headers: githubHeaders(env),
       body: JSON.stringify({
         message: `log: publish game (${body.source ?? 'unknown'}) ${hash.slice(0, 8)}`,
-        content: btoaUtf8(json),
+        content: btoaUtf8(wrapperJson),
       }),
     }
   );
