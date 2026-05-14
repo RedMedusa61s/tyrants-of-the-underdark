@@ -5,6 +5,7 @@ import { sitesSpaces } from '../data/troop-spaces';
 import type { TyrantsState, Color } from '../game';
 import COMMITTED_SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
 import { useCachedImage } from '../image-cache';
+import { isNoImagesMode } from '../App';
 
 const COLOR_HEX: Record<Color, string> = {
   // Lifted toward grey so tokens contrast against near-black site boxes.
@@ -133,9 +134,57 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
     alert('Calibrated positions copied to clipboard.');
   }
 
+  // No-images mode replaces the printed board with a schematic spacer —
+  // same aspect ratio so all the calibrated coordinates still land correctly;
+  // a dark background with route lines drawn between sites; site labels show
+  // their name+VP where the printed art would. Tokens, spies, markers etc.
+  // all still render on top via the regular passes below.
+  const useSchematic = isNoImagesMode() && !calibrate && !editRoutes;
+
   return (
     <div style={{ position: 'relative', width: '100%', maxWidth: 1200, margin: '0 auto' }}>
-      <img id="totu-board" src={boardUrl} alt="game board" style={{ width: '100%', display: 'block', userSelect: 'none' }} draggable={false} />
+      {useSchematic ? (
+        <div id="totu-board" style={{
+          width: '100%', aspectRatio: '4646 / 4605',
+          background: 'radial-gradient(ellipse at center, #2a1840 0%, #0c0814 90%)',
+          border: '1px solid #3a2055',
+          position: 'relative',
+        }}>
+          {/* Route lines drawn between every active site pair. */}
+          <svg viewBox="0 0 1000 1000" preserveAspectRatio="none"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
+            {activeRoutes.map(r => {
+              const a = pos(SITES.find(s => s.id === r.a)!);
+              const b = pos(SITES.find(s => s.id === r.b)!);
+              if (!a || !b) return null;
+              return <line key={r.id}
+                x1={a.x * 1000} y1={a.y * 1000} x2={b.x * 1000} y2={b.y * 1000}
+                stroke="rgba(196,163,245,0.35)" strokeWidth={2} />;
+            })}
+          </svg>
+          {/* Site labels — same position the printed art would have used. */}
+          {SITES.filter(s => isSiteActive(s.id)).map(s => {
+            const p = pos(s);
+            return (
+              <div key={s.id} style={{
+                position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`,
+                transform: 'translate(-50%, -50%)',
+                padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                background: 'rgba(20, 14, 40, 0.85)',
+                color: '#e6e1f2',
+                border: '1px solid #5a3380',
+                borderRadius: 12,
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+              }}>
+                {s.name} <span style={{ opacity: 0.6 }}>({s.vp})</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <img id="totu-board" src={boardUrl} alt="game board" style={{ width: '100%', display: 'block', userSelect: 'none' }} draggable={false} />
+      )}
 
       {/* Routes overlay — only drawn in editor mode (the printed board already shows them).
           In normal play the route troop spaces along the printed lines are what matter. */}
