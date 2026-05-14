@@ -7,9 +7,17 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ROUTES } from '../data/routes';
-import { SITES_BY_ID } from '../data/sites';
+import { SITES, SITES_BY_ID } from '../data/sites';
+import { sitesSpaces } from '../data/troop-spaces';
 import COMMITTED_SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
 import { useCachedImage } from '../image-cache';
+
+const SITE_WHITES_KEY = 'totu.site-whites-overrides';
+type SiteOverride = { whiteSlots?: number[] };
+type SiteOverrides = Record<string, SiteOverride>;
+function loadSiteWhites(): SiteOverrides {
+  try { return JSON.parse(localStorage.getItem(SITE_WHITES_KEY) || '{}'); } catch { return {}; }
+}
 
 const SLOTS_STORAGE_KEY = 'totu.slot-positions';
 type SlotPositions = Record<string, { x: number; y: number }>;
@@ -29,7 +37,39 @@ function load(): AllOverrides {
 
 export function RouteVerify() {
   const [overrides, setOverrides] = useState<AllOverrides>(load);
+  const [siteOverrides, setSiteOverrides] = useState<SiteOverrides>(loadSiteWhites);
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides)); }, [overrides]);
+  useEffect(() => { localStorage.setItem(SITE_WHITES_KEY, JSON.stringify(siteOverrides)); }, [siteOverrides]);
+
+  /** Default whites for a site as a number[] (derives from either explicit
+   *  whiteSlots or the `first N slots` shorthand `whitesAtStart`). */
+  function defaultSiteWhites(siteId: string): number[] {
+    const s = SITES_BY_ID[siteId];
+    if (!s) return [];
+    if (s.whiteSlots) return s.whiteSlots;
+    return Array.from({ length: s.whitesAtStart }, (_, i) => i);
+  }
+
+  function toggleSiteSlot(siteId: string, slotIdx: number) {
+    const sheet = defaultSiteWhites(siteId);
+    setSiteOverrides(prev => {
+      const next = { ...prev };
+      const cur = { ...(next[siteId] ?? {}) } as SiteOverride;
+      const current = cur.whiteSlots ?? sheet;
+      const set = new Set(current);
+      if (set.has(slotIdx)) set.delete(slotIdx);
+      else set.add(slotIdx);
+      const arr = [...set].sort((a, b) => a - b);
+      if (arr.length === sheet.length && arr.every((v, i) => v === sheet[i])) {
+        delete cur.whiteSlots;
+      } else {
+        cur.whiteSlots = arr;
+      }
+      if (Object.keys(cur).length === 0) delete next[siteId];
+      else next[siteId] = cur;
+      return next;
+    });
+  }
 
   const routes = useMemo(() => [...ROUTES].sort((a, b) => {
     const an = `${SITES_BY_ID[a.a]?.name} ↔ ${SITES_BY_ID[a.b]?.name}`;
@@ -64,8 +104,9 @@ export function RouteVerify() {
   }
 
   function copyJson() {
-    navigator.clipboard.writeText(JSON.stringify(overrides, null, 2));
-    alert(`Copied overrides for ${Object.keys(overrides).length} routes.`);
+    const payload = { routes: overrides, sites: siteOverrides };
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    alert(`Copied: ${Object.keys(overrides).length} routes + ${Object.keys(siteOverrides).length} sites.`);
   }
 
   const totalWhites = routes.reduce((sum, r) => sum + effectiveWhites(r.id, r.whiteSlots ?? []).length, 0);
@@ -81,7 +122,7 @@ export function RouteVerify() {
       </div>
       <div style={{ marginBottom: 12 }}>
         <button onClick={copyJson} style={{ padding: '4px 12px', marginRight: 8 }}>Copy overrides</button>
-        <button onClick={() => { if (confirm('Clear all route-whites overrides?')) setOverrides({}); }}
+        <button onClick={() => { if (confirm('Clear all whites overrides (routes + sites)?')) { setOverrides({}); setSiteOverrides({}); } }}
           style={{ padding: '4px 12px', background: '#5a1f1f', color: '#fdd', border: '1px solid #802626' }}>
           Reset
         </button>
@@ -89,11 +130,14 @@ export function RouteVerify() {
 
       <RouteWhitesMap
         overrides={overrides}
-        onToggle={(routeId, slotIdx) => {
+        siteOverrides={siteOverrides}
+        defaultSiteWhites={defaultSiteWhites}
+        onToggleRoute={(routeId, slotIdx) => {
           const r = ROUTES.find(rr => rr.id === routeId);
           if (!r) return;
           toggleSlot(routeId, slotIdx, r.whiteSlots ?? []);
         }}
+        onToggleSite={toggleSiteSlot}
       />
 
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
@@ -163,17 +207,28 @@ export function RouteVerify() {
  *  to the same `totu.route-overrides` localStorage backing the table view. */
 function RouteWhitesMap({
   overrides,
-  onToggle,
+  siteOverrides,
+  defaultSiteWhites,
+  onToggleRoute,
+  onToggleSite,
 }: {
   overrides: AllOverrides;
-  onToggle: (routeId: string, slotIdx: number) => void;
+  siteOverrides: SiteOverrides;
+  defaultSiteWhites: (siteId: string) => number[];
+  onToggleRoute: (routeId: string, slotIdx: number) => void;
+  onToggleSite: (siteId: string, slotIdx: number) => void;
 }) {
   const boardUrl = useCachedImage('assets/board/map.jpg');
   const [slotPositions] = useState<SlotPositions>(loadSlotPositions);
 
-  // Build the list of every route slot with its (route, idx, x, y, white?).
+  // All clickable slots — both route spaces and site spaces.
+  type SlotEntry =
+    | { kind: 'route'; routeId: string; slot: number; x: number; y: number; isWhite: boolean }
+    | { kind: 'site';  siteId: string;  slot: number; x: number; y: number; isWhite: boolean };
+
   const slots = useMemo(() => {
-    const out: Array<{ routeId: string; slot: number; x: number; y: number; isWhite: boolean }> = [];
+    const out: SlotEntry[] = [];
+    // Route slots
     for (const r of ROUTES) {
       if (r.spaces < 1) continue;
       const o = overrides[r.id];
@@ -181,13 +236,25 @@ function RouteWhitesMap({
       for (let i = 0; i < r.spaces; i++) {
         const pos = slotPositions[`${r.id}:${i}`];
         if (!pos) continue;
-        out.push({ routeId: r.id, slot: i, x: pos.x, y: pos.y, isWhite: current.includes(i) });
+        out.push({ kind: 'route', routeId: r.id, slot: i, x: pos.x, y: pos.y, isWhite: current.includes(i) });
+      }
+    }
+    // Site slots
+    for (const s of SITES) {
+      const spaces = sitesSpaces(s.id);
+      const oWhites = siteOverrides[s.id]?.whiteSlots ?? defaultSiteWhites(s.id);
+      for (const sp of spaces) {
+        const pos = slotPositions[sp.id];
+        if (!pos) continue;
+        out.push({ kind: 'site', siteId: s.id, slot: sp.index, x: pos.x, y: pos.y, isWhite: oWhites.includes(sp.index) });
       }
     }
     return out;
-  }, [overrides, slotPositions]);
+  }, [overrides, siteOverrides, defaultSiteWhites, slotPositions]);
 
-  const totalSlots = ROUTES.reduce((s, r) => s + r.spaces, 0);
+  const totalRouteSlots = ROUTES.reduce((sum, r) => sum + r.spaces, 0);
+  const totalSiteSlots = SITES.reduce((sum, s) => sum + s.troopSlots, 0);
+  const totalSlots = totalRouteSlots + totalSiteSlots;
   const totalCalibrated = slots.length;
 
   return (
@@ -196,12 +263,13 @@ function RouteWhitesMap({
       background: '#1a1228', border: '2px solid #5a3380', borderRadius: 6,
     }}>
       <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 6, color: '#ffcc44' }}>
-        Click each edge slot on the printed board that should start with a white troop
+        Click every slot on the printed board that should start with a white troop
       </div>
       <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 8 }}>
-        {totalCalibrated} of {totalSlots} route slots are calibrated and clickable below.
-        Yellow ring = empty at game start; filled-white circle = printed white troop.
-        Click any ring to toggle.
+        Both site slots and route (edge) slots are clickable. Yellow ring =
+        empty at game start; filled-white circle = printed white troop.
+        Click any ring to toggle. {totalCalibrated} of {totalSlots} slots
+        are calibrated and clickable below.
         {totalCalibrated < totalSlots && (
           <span style={{ color: '#ff8888' }}>
             {' '}({totalSlots - totalCalibrated} slots aren't calibrated yet — they're not on the map. Use the slots tab to calibrate them, or the table below this map.)
@@ -217,9 +285,12 @@ function RouteWhitesMap({
           ? <img src={boardUrl} alt="board" style={{ width: '100%', display: 'block' }} draggable={false} />
           : <div style={{ width: '100%', aspectRatio: '4646 / 4605', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>loading board image…</div>}
         {slots.map(s => (
-          <div key={`${s.routeId}:${s.slot}`}
-            onClick={() => onToggle(s.routeId, s.slot)}
-            title={`${s.routeId} slot ${s.slot} — ${s.isWhite ? 'WHITE start' : 'empty'} (click to toggle)`}
+          <div key={s.kind === 'route' ? `r:${s.routeId}:${s.slot}` : `s:${s.siteId}:${s.slot}`}
+            onClick={() => {
+              if (s.kind === 'route') onToggleRoute(s.routeId, s.slot);
+              else onToggleSite(s.siteId, s.slot);
+            }}
+            title={`${s.kind === 'route' ? s.routeId : s.siteId} slot ${s.slot} — ${s.isWhite ? 'WHITE start' : 'empty'} (click to toggle)`}
             style={{
               position: 'absolute',
               left: `${s.x * 100}%`,

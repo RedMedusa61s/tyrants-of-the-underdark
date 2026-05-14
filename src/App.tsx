@@ -137,7 +137,7 @@ type BaseAction = null | { kind: 'deploy' | 'assassinate' } | { kind: 'return-sp
 
 function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const session = useContext(SessionContext);
-  const [tab, setTab] = useState<'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'edges' | 'slots' | 'log'>('game');
+  const [tab, setTab] = useState<'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'log'>('game');
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [devMode, setDevModeState] = useState<boolean>(initialDevMode);
@@ -641,7 +641,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
         {(devMode
-          ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'edges', 'slots', 'log'] as const
+          ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'log'] as const
           : ['game', 'map', 'log'] as const
         ).map(t => (
           <button key={t} onClick={() => {
@@ -690,7 +690,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {tab === 'costs' && <div style={{ marginTop: 16 }}><CostVerify /></div>}
       {tab === 'text' && <div style={{ marginTop: 16 }}><CardTextVerify /></div>}
       {tab === 'sites' && <div style={{ marginTop: 16 }}><SiteVerify /></div>}
-      {tab === 'edges' && <div style={{ marginTop: 16 }}><RouteVerify /></div>}
+      {tab === 'whites' && <div style={{ marginTop: 16 }}><RouteVerify /></div>}
       {tab === 'slots' && <div style={{ marginTop: 16 }}><SlotCalibration /></div>}
       {tab === 'log' && <div style={{ marginTop: 16 }}><GameLog G={G} onLoad={(codec) => moves.loadState(codec)} /></div>}
 

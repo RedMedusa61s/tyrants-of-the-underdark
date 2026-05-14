@@ -23,9 +23,13 @@ const SITE_SPACES: TroopSpace[] = SITES.flatMap((s: Site) =>
     id: `${s.id}:${i}`,
     parentSite: s.id,
     index: i,
-    // Per rulebook p.4 step 6, slots 0..(whitesAtStart-1) of each site get a white troop.
-    // The `whitesAtStart` field is set per-site in sites.ts.
-    startsWithWhite: i < s.whitesAtStart,
+    // Per rulebook p.4 step 6, sites have printed white troops. The
+    // explicit `whiteSlots: number[]` list (from sites.ts seeds + the
+    // whites-tab localStorage overrides) wins when present; otherwise
+    // fall back to the "first N slots" shorthand `whitesAtStart`.
+    startsWithWhite: s.whiteSlots
+      ? s.whiteSlots.includes(i)
+      : i < s.whitesAtStart,
   }))
 );
 

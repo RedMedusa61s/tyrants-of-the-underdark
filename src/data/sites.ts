@@ -17,8 +17,14 @@ export interface Site {
   troopSlots: number;
   /** Number of white troops placed in this site at setup. Slots 0..(whitesAtStart-1)
    *  start occupied by white. Per rulebook p.4 step 6, equals the number of × marks
-   *  printed in the site's box on the board. */
+   *  printed in the site's box on the board. Used as a fallback when
+   *  `whiteSlots` is undefined. */
   whitesAtStart: number;
+  /** Explicit slot indices that start with a white troop. When set, takes
+   *  precedence over `whitesAtStart` (which is a "first N slots" shorthand).
+   *  Needed for sites where the printed whites aren't in the lowest-indexed
+   *  slots. */
+  whiteSlots?: number[];
   hasControlMarker: boolean;
   isStartingSite: boolean;
   /** Normalized 0..1 board-image coords. */
@@ -94,6 +100,22 @@ import OCR_POSITIONS from '../../assets/site-positions-ocr.json';
 for (const [name, pos] of Object.entries(OCR_POSITIONS as Record<string, { x: number; y: number }>)) {
   const site = SITES.find(s => s.name === name);
   if (site) { site.x = pos.x; site.y = pos.y; }
+}
+
+// Browser-only: merge user-edited `whiteSlots` from localStorage (set via the
+// in-app "whites" tab). Mirrors the route-overrides pattern; baked values go
+// into the SITES seeds above.
+if (typeof localStorage !== 'undefined') {
+  try {
+    const raw = localStorage.getItem('totu.site-whites-overrides');
+    if (raw) {
+      const overrides = JSON.parse(raw) as Record<string, { whiteSlots?: number[] }>;
+      for (const s of SITES) {
+        const o = overrides[s.id];
+        if (o?.whiteSlots && Array.isArray(o.whiteSlots)) s.whiteSlots = o.whiteSlots;
+      }
+    }
+  } catch { /* corrupt overrides — ignore */ }
 }
 
 export const SITES_BY_ID: Record<string, Site> = Object.fromEntries(SITES.map(s => [s.id, s]));
