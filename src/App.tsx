@@ -12,6 +12,7 @@ import { CardTextVerify } from './components/CardTextVerify';
 import { RouteVerify } from './components/RouteVerify';
 import { ProblemReportDialog } from './components/ProblemReportDialog';
 import { FirstRunImageImport } from './components/FirstRunImageImport';
+import { PlaceholderCard } from './components/PlaceholderCard';
 import { useCachedImage } from './image-cache';
 import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
@@ -27,20 +28,33 @@ const AI_THINK_MS = 400;
 const SAVE_KEY = 'totu.savegame';
 const CONFIG_KEY = 'totu.gameconfig';
 const DEV_KEY = 'totu.dev-mode';
+const NO_IMAGES_KEY = 'totu.no-images';
+
+function readUrlBoolFlag(param: string, storageKey: string): boolean {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has(param)) {
+      const val = params.get(param) === '1' || params.get(param) === 'true';
+      localStorage.setItem(storageKey, val ? '1' : '0');
+      return val;
+    }
+    return localStorage.getItem(storageKey) === '1';
+  } catch { return false; }
+}
 
 /** Read dev-mode from URL (?dev=1 / ?dev=0) and persist in localStorage. The URL
  *  param takes precedence and updates the stored value; otherwise we honor the
  *  stored flag. Visiting the app fresh shows only player-facing tabs. */
 function initialDevMode(): boolean {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has('dev')) {
-      const val = params.get('dev') === '1' || params.get('dev') === 'true';
-      localStorage.setItem(DEV_KEY, val ? '1' : '0');
-      return val;
-    }
-    return localStorage.getItem(DEV_KEY) === '1';
-  } catch { return false; }
+  return readUrlBoolFlag('dev', DEV_KEY);
+}
+
+/** No-images mode (?no-images=1 / ?no-images=0). When on, the first-run image
+ *  import gate is skipped and the Card component renders text-only
+ *  placeholders. Lets users play the game without ever fetching art, and lets
+ *  the dev exercise the placeholder UI without clearing the image cache. */
+export function isNoImagesMode(): boolean {
+  return readUrlBoolFlag('no-images', NO_IMAGES_KEY);
 }
 
 type AiStyle = 'random' | 'heuristic';
@@ -66,7 +80,11 @@ const SessionContext = createContext<SessionCtx | null>(null);
 
 function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; label?: string }) {
   const [hover, setHover] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
   const imgUrl = useCachedImage(card.image);
+  // No-images mode forces the placeholder regardless of cache state. Also
+  // falls back to placeholder if the image actually 404s at runtime.
+  const showPlaceholder = isNoImagesMode() || imgFailed;
   return (
     <div
       onClick={onClick}
@@ -80,20 +98,25 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
       }}
       title={card.name}
     >
-      <img
-        src={imgUrl}
-        alt={card.name}
-        style={{
-          width: '100%', display: 'block', borderRadius: 8,
-          boxShadow: hover ? '0 8px 32px rgba(0,0,0,0.8)' : '0 2px 8px rgba(0,0,0,0.5)',
-          transform: hover ? 'scale(2.5)' : 'scale(1)',
-          transformOrigin: 'center center',
-          transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
-          zIndex: hover ? 1000 : 1,
-          position: 'relative',
-          pointerEvents: 'none',
-        }}
-      />
+      {showPlaceholder ? (
+        <PlaceholderCard card={card} hover={hover} />
+      ) : (
+        <img
+          src={imgUrl}
+          alt={card.name}
+          onError={() => setImgFailed(true)}
+          style={{
+            width: '100%', display: 'block', borderRadius: 8,
+            boxShadow: hover ? '0 8px 32px rgba(0,0,0,0.8)' : '0 2px 8px rgba(0,0,0,0.5)',
+            transform: hover ? 'scale(2.5)' : 'scale(1)',
+            transformOrigin: 'center center',
+            transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
+            zIndex: hover ? 1000 : 1,
+            position: 'relative',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {label && <div style={{ padding: '2px 6px', fontSize: 11, opacity: 0.8 }}>{label}</div>}
     </div>
   );
@@ -545,6 +568,15 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark <span style={{ fontSize: 14, opacity: 0.6 }}>(scaffold)</span></h1>
+        <button onClick={() => {
+          const cur = isNoImagesMode();
+          localStorage.setItem(NO_IMAGES_KEY, cur ? '0' : '1');
+          window.location.reload();
+        }}
+          title="Toggle no-images mode (uses text-only placeholder cards). Persists across reloads."
+          style={{ padding: '6px 14px', background: isNoImagesMode() ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+          {isNoImagesMode() ? '🖼 images off' : '🖼 images on'}
+        </button>
         <button onClick={() => setReportOpen(true)}
           style={{ padding: '6px 14px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
           Report a problem
@@ -948,11 +980,12 @@ function configFromSave(codec: string): GameConfig | null {
 export function App() {
   // First-run gate: if a remote image source is configured and we haven't
   // imported yet, the bulk-import dialog renders on top and the rest of the
-  // app waits behind it. Once dismissed (or with no source configured), it
-  // returns null and the regular UI takes over.
-  const [imagesReady, setImagesReady] = useState<boolean>(() =>
-    typeof localStorage !== 'undefined' && localStorage.getItem('totu.image-cache-ready') === '1'
-  );
+  // app waits behind it. Skipped entirely when no-images mode is on (the
+  // placeholder card renders without needing any fetched art).
+  const [imagesReady, setImagesReady] = useState<boolean>(() => {
+    if (isNoImagesMode()) return true;
+    return typeof localStorage !== 'undefined' && localStorage.getItem('totu.image-cache-ready') === '1';
+  });
 
   // Hot-seat mode: single tab, no playerID gating. P1 is the human; P2..PN are AI.
   // Mounting flow: if we have a saved game AND its config, jump straight back into
