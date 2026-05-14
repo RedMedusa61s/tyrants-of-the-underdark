@@ -46,10 +46,23 @@ export const TILE_URLS: Record<string, string> = (() => {
   return out;
 })();
 
-/** The printed game board, normalized to https. Used by MapView et al. */
+/** The printed game board (cities + routes). It's the texture for the
+ *  unnamed Custom_Model in the TTS save — NOT the unnamed Custom_Tile, which
+ *  is the central playmat (Market / Devoured / Outcasts / Priestesses / House
+ *  Guards stacks). The two unnamed items are easily confused if you only look
+ *  at the tile list. */
 export const BOARD_URL: string = (() => {
-  const unnamed = (urls.tiles as Array<{ nickname: string; url: string }>).find(t => !t.nickname);
-  return (unnamed?.url ?? '').replace(/^http:/, 'https:');
+  const unnamedModel = (urls.models as Array<{ nickname: string; url: string }>).find(m => !m.nickname);
+  return (unnamedModel?.url ?? '').replace(/^http:/, 'https:');
+})();
+
+/** The central playmat tile (Market / Devoured Cards / VP Tokens / Insane
+ *  Outcasts / Priestesses of Lolth / House Guards columns). Not currently
+ *  rendered, but kept here so we have a name for it if/when we wire a
+ *  "supply area" view. */
+export const PLAYMAT_URL: string = (() => {
+  const unnamedTile = (urls.tiles as Array<{ nickname: string; url: string }>).find(t => !t.nickname);
+  return (unnamedTile?.url ?? '').replace(/^http:/, 'https:');
 })();
 
 /** Generic local-path → external-URL map for non-card assets. Wire here when
