@@ -191,14 +191,31 @@ function RouteWhitesMap({
   const totalCalibrated = slots.length;
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
-        Click each route slot to toggle whether it starts with a printed white
-        troop. {totalCalibrated} of {totalSlots} slots have calibrated positions.
-        Filled white = starts with a token; empty ring = starts empty.
+    <div style={{
+      marginBottom: 16, padding: 12,
+      background: '#1a1228', border: '2px solid #5a3380', borderRadius: 6,
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 'bold', marginBottom: 6, color: '#ffcc44' }}>
+        Click each edge slot on the printed board that should start with a white troop
       </div>
-      <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', userSelect: 'none' }}>
-        <img src={boardUrl} alt="board" style={{ width: '100%', display: 'block' }} draggable={false} />
+      <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 8 }}>
+        {totalCalibrated} of {totalSlots} route slots are calibrated and clickable below.
+        Yellow ring = empty at game start; filled-white circle = printed white troop.
+        Click any ring to toggle.
+        {totalCalibrated < totalSlots && (
+          <span style={{ color: '#ff8888' }}>
+            {' '}({totalSlots - totalCalibrated} slots aren't calibrated yet — they're not on the map. Use the slots tab to calibrate them, or the table below this map.)
+          </span>
+        )}
+      </div>
+      <div style={{
+        position: 'relative', display: 'block', width: '100%',
+        background: '#0c0814', borderRadius: 4, overflow: 'hidden',
+        userSelect: 'none',
+      }}>
+        {boardUrl
+          ? <img src={boardUrl} alt="board" style={{ width: '100%', display: 'block' }} draggable={false} />
+          : <div style={{ width: '100%', aspectRatio: '4646 / 4605', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.5 }}>loading board image…</div>}
         {slots.map(s => (
           <div key={`${s.routeId}:${s.slot}`}
             onClick={() => onToggle(s.routeId, s.slot)}
@@ -207,16 +224,16 @@ function RouteWhitesMap({
               position: 'absolute',
               left: `${s.x * 100}%`,
               top: `${s.y * 100}%`,
-              width: 22, height: 22,
-              marginLeft: -11, marginTop: -11,
+              width: 28, height: 28,
+              marginLeft: -14, marginTop: -14,
               borderRadius: '50%',
-              background: s.isWhite ? '#d0d0d0' : 'transparent',
+              background: s.isWhite ? '#f0f0f0' : 'rgba(0,0,0,0.4)',
               border: s.isWhite
-                ? '2px solid #fff'
-                : '2px solid rgba(255, 204, 68, 0.85)',
+                ? '3px solid #fff'
+                : '3px solid #ffcc44',
               boxShadow: s.isWhite
-                ? '0 1px 3px rgba(0,0,0,0.6)'
-                : '0 0 6px rgba(255, 204, 68, 0.5)',
+                ? '0 2px 6px rgba(0,0,0,0.8), inset 0 0 0 1px #888'
+                : '0 0 8px rgba(255, 204, 68, 0.8)',
               cursor: 'pointer',
               zIndex: 5,
             }} />
