@@ -15,6 +15,12 @@ export interface PublishContext {
   halfDecks: string[];
   aiStyles: string[];
   source: string; // e.g. "browser-game", "sim:heuristic-vs-random"
+  /** Per-turn base64 codecs in `G.snapshots` are the bulk of the payload. They
+   *  enable mid-game replay but aren't needed for training (the move trace +
+   *  final state covers that). Default true for browser games (one-off,
+   *  payload size manageable); pass false for bulk sim publishing where the
+   *  Worker's CPU budget can choke on big game logs. */
+  includeSnapshots?: boolean;
 }
 
 export interface PublishResult {
@@ -61,7 +67,7 @@ export function buildGameRecord(G: TyrantsState, ctx: PublishContext): unknown {
       Object.entries(G.spies).filter(([, arr]) => arr.length > 0)
     ),
     turnLogs: G.turnLogs,
-    snapshots: G.snapshots, // per-turn base64 codecs for replay
+    snapshots: ctx.includeSnapshots === false ? undefined : G.snapshots,
     log: G.log,
   };
 }

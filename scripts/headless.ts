@@ -14,6 +14,14 @@
 //   --verbose            print per-turn move log
 //   --out DIR            write per-game JSON logs (default: training-logs/<timestamp>)
 //   --no-save            disable on-disk logging
+//   --publish            POST each finished game to the Cloudflare relay's
+//                        /game-log route (SHA256-deduped on the server). Used to
+//                        publish the AI-training corpus to the public logs/ folder
+//                        in the repo. Requires --relay-url or TOTU_RELAY_URL env var.
+//   --relay-url URL      Relay base URL (defaults to env TOTU_RELAY_URL).
+//   --half-decks A,B     Comma-separated half-deck pair for the market
+//                        (default: drow,dragons). Choices: drow, dragons,
+//                        elemental, demons.
 
 import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -23,6 +31,7 @@ import { decideAiMove, type AiMove } from '../src/ai/random-ai';
 import { decideHeuristicMove } from '../src/ai/heuristic-ai';
 import { scoreAll } from '../src/engine/scoring';
 import { checkTokenConservation } from '../src/engine/map-state';
+import { buildGameRecord } from '../src/publish-game-log';
 
 type AiFn = (G: TyrantsState, pid: string) => AiMove | null;
 const AIS: Record<string, AiFn> = {
@@ -38,11 +47,15 @@ function parseArgs() {
   };
   const has = (k: string) => a.includes(`--${k}`);
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
+  const halfDecks = get('half-decks', 'drow,dragons').split(',').map(s => s.trim());
   return {
     games: parseInt(get('games', '10')),
     verbose: has('verbose'),
     save: !has('no-save'),
     outDir: get('out', join('training-logs', ts)),
+    publish: has('publish'),
+    relayUrl: get('relay-url', process.env.TOTU_RELAY_URL ?? ''),
+    halfDecks,
     players: [
       get('p1', 'heuristic'),
       get('p2', 'random'),
@@ -84,9 +97,18 @@ function runOneGame(gameIdx: number): {
   finalLog: string[];
   turnLogs: TyrantsState['turnLogs'];
   snapshots: TyrantsState['snapshots'];
+  finalG: TyrantsState;
 } {
-  const reducer = CreateGameReducer({ game: TyrantsGame }) as unknown as Reducer;
-  let state = InitializeGame({ game: TyrantsGame, numPlayers: 4 }) as unknown as BgState;
+  // Pass setupData so the game's setup reads the configured half-decks for
+  // the market. boardgame.io threads setupData into the game-definition's
+  // setup(args, setupData) signature.
+  const wrappedGame = {
+    ...TyrantsGame,
+    setup: (sa: Parameters<NonNullable<typeof TyrantsGame.setup>>[0]) =>
+      TyrantsGame.setup!(sa, { halfDecks: args.halfDecks }),
+  };
+  const reducer = CreateGameReducer({ game: wrappedGame }) as unknown as Reducer;
+  let state = InitializeGame({ game: wrappedGame, numPlayers: 4 }) as unknown as BgState;
 
   const trace: MoveRecord[] = [];
   let safety = 20000;
@@ -142,6 +164,7 @@ function runOneGame(gameIdx: number): {
     finalLog: G.log,
     turnLogs: G.turnLogs,
     snapshots: G.snapshots,
+    finalG: G,
   };
 }
 
@@ -155,43 +178,115 @@ if (args.save) {
   console.log(`Saving logs → ${args.outDir}`);
 }
 
+if (args.publish) {
+  if (!args.relayUrl) {
+    console.error('--publish requires --relay-url URL or TOTU_RELAY_URL env var. Aborting.');
+    process.exit(2);
+  }
+  console.log(`Publishing each game → ${args.relayUrl.replace(/\/$/, '')}/game-log`);
+}
+
 const sessionSummary: Array<{
   game: number; scores: number[]; winner: number; turns: number;
   endReason: string; players: string[];
 }> = [];
+const publishStats = { published: 0, deduped: 0, failed: 0 };
 
-for (let g = 0; g < args.games; g++) {
-  const r = runOneGame(g);
-  wins[r.winner]++;
-  for (let i = 0; i < 4; i++) totalScore[i] += r.scores[i];
-  totalTurns += r.turns;
-  console.log(
-    `Game ${g + 1}: scores=[${r.scores.join(', ')}] winner=P${r.winner + 1} ` +
-    `(${args.players[r.winner]}) turns=${r.turns} end=${r.endReason}`
-  );
-  sessionSummary.push({
-    game: g + 1, scores: r.scores, winner: r.winner, turns: r.turns,
-    endReason: r.endReason, players: args.players,
+async function publishOne(g: number, finalG: TyrantsState): Promise<void> {
+  if (!args.publish) return;
+  const record = buildGameRecord(finalG, {
+    numPlayers: 4,
+    halfDecks: args.halfDecks,
+    aiStyles: args.players,
+    source: `sim:${args.players.join('-')}`,
+    // Snapshots are too heavy for the Worker's free-tier CPU budget on long
+    // games. The trace + turnLogs in the record are sufficient for training.
+    includeSnapshots: false,
   });
-  if (args.save) {
-    const fname = `game-${String(g + 1).padStart(4, '0')}.json`;
-    writeFileSync(
-      join(args.outDir, fname),
-      JSON.stringify({
-        game: g + 1,
-        players: args.players,
-        scores: r.scores,
-        winner: r.winner,
-        turns: r.turns,
-        endReason: r.endReason,
-        trace: r.trace,
-        turnLogs: r.turnLogs,
-        snapshots: r.snapshots, // base64 codec at the start of each turn
-        finalLogTail: r.finalLog.slice(-50),
-      })
-    );
+  const payload = JSON.stringify({
+    game: record,
+    source: `sim:${args.players.join('-')}`,
+    meta: {
+      gameIdx: g + 1,
+      halfDecks: args.halfDecks,
+      aiStyles: args.players,
+    },
+  });
+  // Retry on 5xx (Cloudflare edge hiccups, transient GitHub blips).
+  const url = `${args.relayUrl.replace(/\/$/, '')}/game-log`;
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      });
+      const raw = await resp.text();
+      let data: { ok?: boolean; deduped?: boolean; path?: string; error?: string } = {};
+      try { data = JSON.parse(raw); } catch { /* not json — keep raw for log */ }
+      if (data.ok && data.deduped) { publishStats.deduped++; console.log(`  ↳ deduped: ${data.path}`); return; }
+      if (data.ok) { publishStats.published++; console.log(`  ↳ published: ${data.path}`); return; }
+      const retriable = resp.status >= 500 && resp.status < 600;
+      if (retriable && attempt < maxAttempts) {
+        const delay = 500 * Math.pow(2, attempt - 1); // 500, 1000, 2000 ms
+        console.warn(`  ↳ HTTP ${resp.status} attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      publishStats.failed++;
+      console.warn(`  ↳ publish FAILED (HTTP ${resp.status}): ${data.error ?? raw.slice(0, 300)}`);
+      return;
+    } catch (err) {
+      if (attempt < maxAttempts) {
+        const delay = 500 * Math.pow(2, attempt - 1);
+        console.warn(`  ↳ network error attempt ${attempt}/${maxAttempts}, retrying in ${delay}ms: ${err}`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      publishStats.failed++;
+      console.warn(`  ↳ publish FAILED: ${err}`);
+      return;
+    }
   }
 }
+
+async function main() {
+  for (let g = 0; g < args.games; g++) {
+    const r = runOneGame(g);
+    wins[r.winner]++;
+    for (let i = 0; i < 4; i++) totalScore[i] += r.scores[i];
+    totalTurns += r.turns;
+    console.log(
+      `Game ${g + 1}: scores=[${r.scores.join(', ')}] winner=P${r.winner + 1} ` +
+      `(${args.players[r.winner]}) turns=${r.turns} end=${r.endReason}`
+    );
+    sessionSummary.push({
+      game: g + 1, scores: r.scores, winner: r.winner, turns: r.turns,
+      endReason: r.endReason, players: args.players,
+    });
+    if (args.save) {
+      const fname = `game-${String(g + 1).padStart(4, '0')}.json`;
+      writeFileSync(
+        join(args.outDir, fname),
+        JSON.stringify({
+          game: g + 1,
+          players: args.players,
+          scores: r.scores,
+          winner: r.winner,
+          turns: r.turns,
+          endReason: r.endReason,
+          trace: r.trace,
+          turnLogs: r.turnLogs,
+          snapshots: r.snapshots, // base64 codec at the start of each turn
+          finalLogTail: r.finalLog.slice(-50),
+        })
+      );
+    }
+    await publishOne(g, r.finalG);
+  }
+}
+await main();
 
 if (args.save) {
   writeFileSync(
@@ -217,3 +312,6 @@ for (let i = 0; i < 4; i++) {
 }
 console.log(`Avg turns/game: ${(totalTurns / args.games).toFixed(1)}`);
 console.log(`Wall clock: ${dt}s (${(args.games / Number(dt)).toFixed(1)} games/sec)`);
+if (args.publish) {
+  console.log(`Publish: ${publishStats.published} new, ${publishStats.deduped} deduped, ${publishStats.failed} failed`);
+}
