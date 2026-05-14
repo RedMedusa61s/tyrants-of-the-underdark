@@ -67,10 +67,14 @@ export const PLAYMAT_URL: string = (() => {
 
 /** Generic local-path → external-URL map for non-card assets. Wire here when
  *  we point a UI element at `/board/map.jpg` etc. so the image cache can
- *  fetch + cache it the same way it does card slices. */
-export const ASSET_URLS: Record<string, string> = {
-  'assets/board/map.jpg': BOARD_URL,
-};
+ *  fetch + cache it the same way it does card slices.
+ *
+ *  Note: the printed cities-and-routes game map is NOT in the TTS workshop
+ *  save (the unnamed tile is the playmat; the unnamed model is the 3D
+ *  pawn-area texture). Until we settle on a host for the map, the entry is
+ *  intentionally omitted — useCachedImage('assets/board/map.jpg') will fall
+ *  through to the local Vite publicDir path. */
+export const ASSET_URLS: Record<string, string> = {};
 
 /** Parse `assets/cards/<deck>/<slot>-<slug>.jpg` into { deck, slot }. */
 export function parseCardPath(relativePath: string): { deck: string; slot: number } | null {
