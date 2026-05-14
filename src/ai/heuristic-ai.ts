@@ -257,7 +257,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   // 2. Setup phase.
   if (G.setupPhase) {
     const open = SITES.filter(s =>
-      s.isStartingSite && sitesSpaces(s.id).every(sp => !G.troops[sp.id])
+      s.isStartingSite && s.id in G.siteControl &&
+      sitesSpaces(s.id).every(sp => sp.id in G.troops && !G.troops[sp.id])
     );
     // Prefer a starting site with a control marker / highest VP.
     open.sort((a, b) => {

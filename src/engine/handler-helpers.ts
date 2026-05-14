@@ -53,7 +53,7 @@ export function placeSpyAtChosenSite(opts?: { optional?: boolean }): EffectHandl
     if (!ctx.pendingChoice) {
       const myColor = ctx.G.players[ctx.actorId].color;
       const eligible = SITES
-        .filter(s => !(ctx.G.spies[s.id] ?? []).includes(myColor))
+        .filter(s => s.id in ctx.G.siteControl && !(ctx.G.spies[s.id] ?? []).includes(myColor))
         .map(s => s.id);
       ctx.pendingChoice = {
         kind: 'select-site',
@@ -329,10 +329,12 @@ export function supplantAtLastReturnedSpySite(): EffectHandler {
 
 // ---------- Troop-space targeting helpers ----------
 
-/** Spaces a player has presence at (the legal targets for assassinate/return from spaces). */
+/** Spaces a player has presence at (the legal targets for assassinate/return from spaces).
+ *  Filtered to spaces in active sections only (membership in G.troops). */
 function spacesWithPresence(G: import('../game').TyrantsState, color: import('../game').Color): string[] {
   const out: string[] = [];
   for (const ts of TROOP_SPACES) {
+    if (!(ts.id in G.troops)) continue;
     if (ts.parentSite) {
       if (hasPresence(G, color, { site: ts.parentSite })) out.push(ts.id);
     } else if (ts.parentRoute) {
@@ -343,13 +345,15 @@ function spacesWithPresence(G: import('../game').TyrantsState, color: import('..
 }
 
 /** Empty spaces the player may deploy into (presence required unless `anywhere` is true,
- *  per rulebook p.12). */
+ *  per rulebook p.12). Restricted to spaces in active sections — inactive
+ *  spaces are absent from G.troops entirely (their id is not a key), so the
+ *  `id in G.troops` test acts as both an "exists" and "in play" check. */
 function legalDeployTargets(
   G: import('../game').TyrantsState,
   color: import('../game').Color,
   anywhere: boolean
 ): string[] {
-  const empty = TROOP_SPACES.filter(ts => !G.troops[ts.id]);
+  const empty = TROOP_SPACES.filter(ts => ts.id in G.troops && G.troops[ts.id] === null);
   if (anywhere) return empty.map(ts => ts.id);
   const out: string[] = [];
   for (const ts of empty) {
@@ -650,7 +654,7 @@ export function moveEnemyTroopChoice(opts?: { count?: number }): EffectHandler {
         optional: true,
       } as PendingChoice;
     } else {
-      const empty = TROOP_SPACES.filter(t => !ctx.G.troops[t.id]).map(t => t.id);
+      const empty = TROOP_SPACES.filter(t => t.id in ctx.G.troops && ctx.G.troops[t.id] === null).map(t => t.id);
       if (empty.length === 0) { ctx.handlerState = null; return true; }
       ctx.pendingChoice = {
         kind: 'select-troop-space',
@@ -1439,7 +1443,7 @@ export function takeTrophyAndPlace(opts: { count: number }): EffectHandler {
       ctx.pendingChoice = {
         kind: 'select-troop-space',
         prompt: `Place the ${sel.color} trophy on any empty space (or decline to skip).`,
-        options: TROOP_SPACES.filter(t => !ctx.G.troops[t.id]).map(t => t.id),
+        options: TROOP_SPACES.filter(t => t.id in ctx.G.troops && ctx.G.troops[t.id] === null).map(t => t.id),
         optional: true,
       } as PendingChoice;
       ctx.paused = true;

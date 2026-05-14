@@ -69,8 +69,15 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
   const [routeDraft, setRouteDraft] = useState<Route[]>(() => loadRouteOverrides() ?? ROUTES);
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [defaultSpaces, setDefaultSpaces] = useState(1);
+  // Rulebook p.5: hide sites/routes outside this game's active sections. Calibrate
+  // / editRoutes modes ignore this so all sites stay reachable for setup work.
+  const activeSites = (G && !calibrate && !editRoutes)
+    ? new Set(G.activeSites)
+    : new Set(SITES.map(s => s.id));
+  const isSiteActive = (id: string) => activeSites.has(id);
+  const isRouteActive = (r: { a: string; b: string }) => activeSites.has(r.a) && activeSites.has(r.b);
 
-  const activeRoutes = editRoutes ? routeDraft : ROUTES;
+  const activeRoutes = (editRoutes ? routeDraft : ROUTES).filter(r => isRouteActive(r));
 
   const pos = (s: Site) => overrides[s.id] ?? { x: s.x, y: s.y };
 
@@ -187,7 +194,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
       {/* Calibrate/route-edit mode keeps the labeled site rectangle visible for dragging
           and route picking. Normal play hides it; tokens render directly on calibrated
           slot positions on the printed board. */}
-      {(calibrate || editRoutes) && SITES.map(s => {
+      {(calibrate || editRoutes) && SITES.filter(s => isSiteActive(s.id)).map(s => {
         const p = pos(s);
         const controller = G?.siteControl[s.id] ?? null;
         const borderColor = controller ? COLOR_HEX[controller] : (s.isStartingSite ? '#ffcc44' : 'rgba(196,163,245,0.5)');
@@ -222,7 +229,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
 
       {/* Site-slot tokens: one per space, positioned exactly on the printed slot.
           Falls back to an offset cluster around the site center if not calibrated. */}
-      {!editRoutes && G && SITES.flatMap(s => {
+      {!editRoutes && G && SITES.filter(s => isSiteActive(s.id)).flatMap(s => {
         const sitePos = pos(s);
         const controller = G.siteControl[s.id] ?? null;
         return sitesSpaces(s.id).map((sp, i) => {
@@ -286,7 +293,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           satisfy troop-space picks. Prevents the slot/site click conflation that made
           Spellspinner-style supplant chains require two clicks (one for spy-return
           site, one for supplant troop) on the same visual location. */}
-      {!editRoutes && G && clickableSites && clickableSites.size > 0 && SITES.map(s => {
+      {!editRoutes && G && clickableSites && clickableSites.size > 0 && SITES.filter(s => isSiteActive(s.id)).map(s => {
         if (!clickableSites.has(s.id)) return null;
         const p = pos(s);
         const spaces = sitesSpaces(s.id);
@@ -329,7 +336,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           row, centered on the site's printed art. We use the midpoint of the site
           label position and the slot centroid, which lands on the round-image center
           for control-marker sites and just below the label for rectangular ones. */}
-      {!editRoutes && G && SITES.map(s => {
+      {!editRoutes && G && SITES.filter(s => isSiteActive(s.id)).map(s => {
         const p = pos(s);
         const spies = G.spies[s.id] ?? [];
         const marker = G.controlMarkers[s.id];

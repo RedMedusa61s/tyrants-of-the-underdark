@@ -7,6 +7,7 @@ import { lookupCard, cardsInDeck } from './card-data';
 import type { EffectContext, PendingChoice } from './engine/types';
 import { SITES } from './data/sites';
 import { TROOP_SPACES, sitesSpaces } from './data/troop-spaces';
+import { ROUTES } from './data/routes';
 import { deployTroop, assassinateTroop, hasPresence, returnSpy, hasTotalControl } from './engine/map-state';
 
 export type Color = 'black' | 'red' | 'orange' | 'blue';
@@ -122,6 +123,15 @@ export interface TyrantsState {
    *  turn.order.first; the human is always seated at "0" but doesn't necessarily
    *  go first. */
   firstPlayerId: string;
+
+  /** Site IDs that are part of THIS game (rulebook p.5 player-count rules:
+   *  2P uses only the center section, 3P uses center + one outer, 4P uses
+   *  all three). Sites outside this set never appear in troops/siteControl
+   *  /controlMarkers and should be hidden from the map render. */
+  activeSites: string[];
+
+  /** Which sections are in play this game ('left' | 'center' | 'right'). */
+  activeSections: string[];
 }
 
 const COLORS: Color[] = ['black', 'red', 'orange', 'blue'];
@@ -218,9 +228,28 @@ export const TyrantsGame: Game<TyrantsState> = {
     return undefined;
   },
 
-  setup: ({ ctx, random }, setupData?: { halfDecks?: string[] }) => {
+  setup: ({ ctx, random }, setupData?: { halfDecks?: string[]; activeSections?: Array<'left'|'center'|'right'> }) => {
     const rng = () => random!.Number();
     const halfDecks = setupData?.halfDecks?.length === 2 ? setupData.halfDecks : ['drow', 'dragons'];
+    // Rulebook p.5: limit the board to the sections in play. 2P = center only,
+    // 3P = center + one outer, 4P = all three. Headless sim default = all
+    // three so existing tests/training corpus stays comparable.
+    const activeSections: Set<string> = new Set(
+      setupData?.activeSections && setupData.activeSections.length > 0
+        ? setupData.activeSections
+        : ['left', 'center', 'right']
+    );
+    const activeSiteSet = new Set(
+      SITES.filter(s => activeSections.has(s.section)).map(s => s.id)
+    );
+    const activeRouteSet = new Set(
+      ROUTES.filter(r => activeSiteSet.has(r.a) && activeSiteSet.has(r.b)).map(r => r.id)
+    );
+    const isActiveSpace = (ts: typeof TROOP_SPACES[number]): boolean => {
+      if (ts.parentSite) return activeSiteSet.has(ts.parentSite);
+      if (ts.parentRoute) return activeRouteSet.has(ts.parentRoute);
+      return false;
+    };
     const players: Record<string, PlayerData> = {};
     for (let i = 0; i < ctx.numPlayers; i++) {
       const deck = shuffle(startingDeck(), rng);
@@ -242,12 +271,19 @@ export const TyrantsGame: Game<TyrantsState> = {
     const row = marketDeck.splice(0, 6).map(c => c as CardRef | null);
     while (row.length < 6) row.push(null);
 
-    // Initial map state.
+    // Initial map state. Only spaces in active sections get an entry — sites
+    // and routes outside the player-count's allowed sections are absent from
+    // G.troops entirely, so they never appear as valid targets for moves or
+    // card effects.
     const troops: Record<string, Color | 'white' | null> = {};
-    for (const ts of TROOP_SPACES) troops[ts.id] = ts.startsWithWhite ? 'white' : null;
+    for (const ts of TROOP_SPACES) {
+      if (!isActiveSpace(ts)) continue;
+      troops[ts.id] = ts.startsWithWhite ? 'white' : null;
+    }
 
     const controlMarkers: Record<string, ControlMarker> = {};
     for (const s of SITES) {
+      if (!activeSiteSet.has(s.id)) continue;
       if (s.hasControlMarker) controlMarkers[s.id] = {
         siteId: s.id, holder: null, side: 'control',
         controlVp: 1, totalControlVp: 2,  // placeholder defaults; refine with per-marker values
@@ -268,7 +304,9 @@ export const TyrantsGame: Game<TyrantsState> = {
       pausedHandlerState: null,
       troops,
       spies: {},
-      siteControl: Object.fromEntries(SITES.map(s => [s.id, null])),
+      siteControl: Object.fromEntries(SITES.filter(s => activeSiteSet.has(s.id)).map(s => [s.id, null])),
+      activeSites: [...activeSiteSet],
+      activeSections: [...activeSections],
       controlMarkers,
       setupPhase: true,
       turnAspectsPlayed: {},

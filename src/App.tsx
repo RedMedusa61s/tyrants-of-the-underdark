@@ -60,17 +60,28 @@ export function isNoImagesMode(): boolean {
 type AiStyle = 'random' | 'heuristic';
 type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons';
 const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons'];
+type ThirdPlayerSide = 'left' | 'right';
 interface GameConfig {
   numPlayers: number;
   /** AI style for seats 1..N-1 (seat 0 is the human). */
   aiStyles: AiStyle[];
   /** Exactly 2 half-decks chosen for the market. */
   halfDecks: HalfDeck[];
+  /** For 3-player games only: which outer section plays alongside the center.
+   *  Ignored for 2-player (center only) and 4-player (all three sections). */
+  thirdPlayerSide?: ThirdPlayerSide;
 }
 const AI_FNS: Record<AiStyle, (G: TyrantsState, pid: string) => AiMove | null> = {
   random: decideAiMove,
   heuristic: decideHeuristicMove,
 };
+
+/** Rulebook p.5: 2P = center only; 3P = center + one outer; 4P = all three. */
+function activeSectionsFor(cfg: GameConfig): Array<'left' | 'center' | 'right'> {
+  if (cfg.numPlayers <= 2) return ['center'];
+  if (cfg.numPlayers === 3) return ['center', cfg.thirdPlayerSide ?? 'left'];
+  return ['left', 'center', 'right'];
+}
 
 interface SessionCtx {
   config: GameConfig;
@@ -323,6 +334,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     if (!baseAction || baseAction.kind === 'return-spy') return undefined;
     const out = new Set<string>();
     for (const t of TROOP_SPACES) {
+      if (!(t.id in G.troops)) continue; // outside active sections
       const occ = G.troops[t.id];
       if (baseAction.kind === 'deploy') {
         if (occ) continue;
@@ -338,7 +350,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   })();
 
   const startingClickable = G.setupPhase && myTurn
-    ? new Set(SITES.filter(s => s.isStartingSite && sitesSpaces(s.id).every(sp => !G.troops[sp.id])).map(s => s.id))
+    ? new Set(SITES.filter(s => s.isStartingSite && s.id in G.siteControl && sitesSpaces(s.id).every(sp => sp.id in G.troops && !G.troops[sp.id])).map(s => s.id))
     : humanSitePick
       ? new Set((humanSitePick.options as string[] | undefined) ?? SITES.map(s => s.id))
       : baseActionClickableSites;
@@ -812,6 +824,9 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   const [halfDecks, setHalfDecks] = useState<HalfDeck[]>(
     lastConfig?.halfDecks?.length === 2 ? lastConfig.halfDecks : ['drow', 'dragons']
   );
+  const [thirdSide, setThirdSide] = useState<ThirdPlayerSide>(
+    lastConfig?.thirdPlayerSide ?? 'left'
+  );
 
   function setStyle(i: number, s: AiStyle) {
     setStyles(prev => {
@@ -863,7 +878,27 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
                 }}>{n}</button>
             ))}
           </div>
+          <div style={{ marginTop: 6, fontSize: 11, opacity: 0.65 }}>
+            {numPlayers === 2 && 'Center section only.'}
+            {numPlayers === 3 && 'Center + one outer section.'}
+            {numPlayers === 4 && 'All three sections.'}
+          </div>
         </div>
+        {numPlayers === 3 && (
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', marginBottom: 4, opacity: 0.85 }}>Which outer section?</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {(['left', 'right'] as ThirdPlayerSide[]).map(side => (
+                <button key={side} onClick={() => setThirdSide(side)}
+                  style={{
+                    padding: '6px 16px', cursor: 'pointer', borderRadius: 4,
+                    background: thirdSide === side ? '#5a3380' : '#2a1840',
+                    color: '#e6e1f2', border: '1px solid #3a2055',
+                  }}>{side}</button>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', marginBottom: 4, opacity: 0.85 }}>Opponents (P1 is you)</label>
           {Array.from({ length: opponentCount }, (_, i) => (
@@ -908,7 +943,7 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
         </div>
         <button
           disabled={halfDecks.length !== 2}
-          onClick={() => onStart({ numPlayers, aiStyles: trimmedStyles, halfDecks })}
+          onClick={() => onStart({ numPlayers, aiStyles: trimmedStyles, halfDecks, thirdPlayerSide: thirdSide })}
           style={{
             padding: '10px 24px', fontSize: 14, color: '#fff', border: 'none',
             borderRadius: 4,
@@ -935,7 +970,10 @@ function ClientHolder({ config, onNewGame }: { config: GameConfig; onNewGame: ()
     const game = {
       ...TyrantsGame,
       setup: (args: Parameters<typeof origSetup>[0]) =>
-        origSetup(args, { halfDecks: config.halfDecks }),
+        origSetup(args, {
+          halfDecks: config.halfDecks,
+          activeSections: activeSectionsFor(config),
+        }),
     };
     return Client({ game, board: Board, numPlayers: config.numPlayers, debug: false });
   }, [config.numPlayers, config.halfDecks]);
