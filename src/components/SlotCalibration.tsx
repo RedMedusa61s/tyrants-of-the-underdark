@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { SITES, SITES_BY_ID } from '../data/sites';
 import { ROUTES } from '../data/routes';
 import { sitesSpaces, routeSpaces } from '../data/troop-spaces';
+import { useCachedImage } from '../image-cache';
 
 const STORAGE_KEY = 'totu.slot-positions';
 type SlotPositions = Record<string, { x: number; y: number }>;
@@ -16,6 +17,7 @@ function load(): SlotPositions {
 function save(p: SlotPositions) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
 
 export function SlotCalibration() {
+  const boardUrl = useCachedImage('assets/board/map.jpg');
   const [positions, setPositions] = useState<SlotPositions>(load);
   const [selectedSite, setSelectedSite] = useState<string | null>(null);
 
@@ -196,7 +198,7 @@ export function SlotCalibration() {
             );
           })()}
           <div style={{ position: 'relative' }}>
-            <img src="/board/map.jpg" alt="board"
+            <img src={boardUrl} alt="board"
               onClick={handleBoardClick}
               style={{ width: '100%', display: 'block', cursor: selectedSite ? 'crosshair' : 'default' }} />
             {/* Overlay calibrated dots */}

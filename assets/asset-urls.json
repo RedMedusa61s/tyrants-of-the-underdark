@@ -1,0 +1,168 @@
+{
+  "ranAt": "2026-05-14T19:09:46.719Z",
+  "source": "TTS Workshop mod 881660322",
+  "table": "http://i.imgur.com/XKkAsmk.jpg",
+  "sky": "http://i.imgur.com/pujkfKG.jpg",
+  "decks": {
+    "drow": {
+      "nickname": "Drow half-deck",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    },
+    "dragons": {
+      "nickname": "Dragons half-deck",
+      "sheetUrl": "http://i.imgur.com/l4SqNiD.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    },
+    "elemental": {
+      "nickname": "Elemental half-deck",
+      "sheetUrl": "http://i.imgur.com/iBmGf64.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    },
+    "demons": {
+      "nickname": "Demons half-deck",
+      "sheetUrl": "http://i.imgur.com/UrS3eUS.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    },
+    "house-guards": {
+      "nickname": "House Guards",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    },
+    "priestesses": {
+      "nickname": "Priestessess of Lolth",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    },
+    "insane-outcasts": {
+      "nickname": "Insane Outcasts",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    },
+    "misc": {
+      "nickname": "(unnamed)",
+      "sheetUrl": "http://i.imgur.com/p7TkLjk.jpg",
+      "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
+      "cols": 10,
+      "rows": 5
+    }
+  },
+  "tiles": [
+    {
+      "nickname": "",
+      "url": "http://i.imgur.com/X5mXW0i.jpg"
+    },
+    {
+      "nickname": "Xorlarrin Inner-Circle",
+      "url": "http://i.imgur.com/75zJSdY.jpg"
+    },
+    {
+      "nickname": "Xorlarrin Playmat",
+      "url": "http://i.imgur.com/ktc4T2L.jpg"
+    },
+    {
+      "nickname": "Barrison Del'Armgo Playmat",
+      "url": "http://i.imgur.com/kmle5O1.jpg"
+    },
+    {
+      "nickname": "Baenre Inner-Circle",
+      "url": "http://i.imgur.com/NDRuHB0.jpg"
+    },
+    {
+      "nickname": "Mizzrym Inner-Circle",
+      "url": "http://i.imgur.com/XohbC6Z.jpg"
+    },
+    {
+      "nickname": "Mizzrym Playmat",
+      "url": "http://i.imgur.com/fgTBRLq.jpg"
+    },
+    {
+      "nickname": "Barrison Del'Armgo Inner-Circle",
+      "url": "http://i.imgur.com/a7ipVDC.jpg"
+    },
+    {
+      "nickname": "Baenre Playmat",
+      "url": "http://i.imgur.com/I9hwcbc.jpg"
+    },
+    {
+      "nickname": "Tsenviilyq Control",
+      "url": "http://i.imgur.com/RSIOdwI.jpg"
+    },
+    {
+      "nickname": "Ss'Zuraass'Nee Control",
+      "url": "http://i.imgur.com/cxkZlsw.jpg"
+    },
+    {
+      "nickname": "The Phaerlin Control",
+      "url": "http://i.imgur.com/rl7sXxg.jpg"
+    },
+    {
+      "nickname": "Menzoberranzan Control",
+      "url": "http://i.imgur.com/eYkNlYD.jpg"
+    },
+    {
+      "nickname": "Gauntlgrym Control",
+      "url": "http://i.imgur.com/Y700v3Y.jpg"
+    },
+    {
+      "nickname": "First Player marker",
+      "url": "http://i.imgur.com/ohN0MYZ.jpg"
+    },
+    {
+      "nickname": "Ch'Chitl Control",
+      "url": "http://i.imgur.com/N16jtWA.jpg"
+    },
+    {
+      "nickname": "Araumycos Control",
+      "url": "http://i.imgur.com/WuV39gS.jpg"
+    },
+    {
+      "nickname": "1 VP",
+      "url": "http://i.imgur.com/ABzLXGL.png"
+    },
+    {
+      "nickname": "5 VP",
+      "url": "http://i.imgur.com/oKKg55F.png"
+    }
+  ],
+  "models": [
+    {
+      "nickname": "Baenre Spy",
+      "url": "http://i.imgur.com/H0C44b3.png"
+    },
+    {
+      "nickname": "Mizzrym Spy",
+      "url": "http://i.imgur.com/U0mO49d.png"
+    },
+    {
+      "nickname": "Xorlarrin Spy",
+      "url": "http://i.imgur.com/UDkIhOY.png"
+    },
+    {
+      "nickname": "Barrison Del'Armgo Spy",
+      "url": "http://i.imgur.com/ajXfUAO.png"
+    },
+    {
+      "nickname": "Unaligned Troops",
+      "url": "http://i.imgur.com/7kFLPuM.png"
+    },
+    {
+      "nickname": "",
+      "url": "http://i.imgur.com/ZdOFOlE.jpg"
+    }
+  ]
+}

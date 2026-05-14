@@ -4,6 +4,7 @@ import { ROUTES, type Route } from '../data/routes';
 import { sitesSpaces } from '../data/troop-spaces';
 import type { TyrantsState, Color } from '../game';
 import COMMITTED_SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
+import { useCachedImage } from '../image-cache';
 
 const COLOR_HEX: Record<Color, string> = {
   // Lifted toward grey so tokens contrast against near-black site boxes.
@@ -61,6 +62,7 @@ function loadRouteOverrides(): Route[] | null {
 function saveRouteOverrides(r: Route[]) { localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(r)); }
 
 export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, clickableSpaces, onSpaceClick }: MapViewProps) {
+  const boardUrl = useCachedImage('assets/board/map.jpg');
   const [overrides, setOverrides] = useState<PositionOverride>(loadOverrides);
   const [slotPositions] = useState<SlotPositions>(loadSlotPositions);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -126,7 +128,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
 
   return (
     <div style={{ position: 'relative', width: '100%', maxWidth: 1200, margin: '0 auto' }}>
-      <img id="totu-board" src="/board/map.jpg" alt="game board" style={{ width: '100%', display: 'block', userSelect: 'none' }} draggable={false} />
+      <img id="totu-board" src={boardUrl} alt="game board" style={{ width: '100%', display: 'block', userSelect: 'none' }} draggable={false} />
 
       {/* Routes overlay — only drawn in editor mode (the printed board already shows them).
           In normal play the route troop spaces along the printed lines are what matter. */}

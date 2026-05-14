@@ -15,7 +15,7 @@
 // fetch, and error-fallback.
 
 import { useEffect, useState } from 'react';
-import { DECK_SHEETS, parseCardPath, type SheetInfo } from './sheet-config';
+import { DECK_SHEETS, ASSET_URLS, parseCardPath, type SheetInfo } from './sheet-config';
 
 const DB_NAME = 'totu.image-cache';
 const STORE = 'blobs';
@@ -77,14 +77,17 @@ export async function clearImageCache(): Promise<void> {
   });
 }
 
-/** Map a relative `assets/cards/foo.jpg` path to its remote source URL. */
+/** Map a relative `assets/*` path to its remote source URL. Lookup order:
+ *  (1) explicit ASSET_URLS entry (e.g. the board image → Imgur),
+ *  (2) optional VITE_TOTU_IMAGE_BASE_URL prefix,
+ *  (3) local dev path under the Vite publicDir.
+ */
 function remoteUrlFor(relativePath: string): string {
+  const mapped = ASSET_URLS[relativePath];
+  if (mapped) return mapped;
   const base = (import.meta.env.VITE_TOTU_IMAGE_BASE_URL as string | undefined)?.replace(/\/$/, '');
-  // Strip the leading "assets/" so the base URL maps to the assets/ tree.
   const trimmed = relativePath.replace(/^assets\//, '');
   if (base) return `${base}/${trimmed}`;
-  // No base configured — fall back to the local dev path (works when the
-  // assets are present on the server / in the dev publicDir).
   return `/${trimmed}`;
 }
 

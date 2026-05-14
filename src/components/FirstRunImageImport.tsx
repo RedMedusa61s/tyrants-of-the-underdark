@@ -25,6 +25,8 @@ function hasRemoteSource(): boolean {
 function uniqueImagePaths(): string[] {
   const set = new Set<string>();
   for (const c of allCards()) if (c.image) set.add(c.image);
+  // Non-card assets we want pre-warmed too.
+  set.add('assets/board/map.jpg');
   return [...set];
 }
 

@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { SITES } from '../data/sites';
+import { useCachedImage } from '../image-cache';
 
 const STORAGE_KEY = 'totu.site-overrides';
 type SiteOverride = { vp?: number; troopSlots?: number; whitesAtStart?: number };
@@ -16,6 +17,7 @@ function load(): AllOverrides {
 }
 
 export function SiteVerify() {
+  const boardUrl = useCachedImage('assets/board/map.jpg');
   const [overrides, setOverrides] = useState<AllOverrides>(load);
   const [editing, setEditing] = useState<{ id: string; field: FieldKey } | null>(null);
   const [draft, setDraft] = useState('');
@@ -104,7 +106,7 @@ export function SiteVerify() {
       </div>
       <div style={{ marginTop: 16 }}>
         <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Board image (for reference):</div>
-        <img src="/board/map.jpg" alt="game board" style={{ width: '100%', maxWidth: 1100, display: 'block' }} />
+        <img src={boardUrl} alt="game board" style={{ width: '100%', maxWidth: 1100, display: 'block' }} />
       </div>
     </div>
   );
