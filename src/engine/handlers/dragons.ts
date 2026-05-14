@@ -1,6 +1,6 @@
 // Dragons half-deck handlers.
 
-import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
+import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, times,
          assassinateChoice, deployChoice, supplantChoice, chooseOne,
          returnOwnSpyChoice, moveEnemyTroopChoice, conditionalGrant,
          ifEnemyTroopAtLastPlacedSpySite, devourMarketChoice,
@@ -11,7 +11,7 @@ import { totalTrophies } from '../../game';
 registerAll({
   'red-wyrmling':         grant({ power: 2, influence: 2 }),
   'severin-silrajin':     grant({ power: 5 }),
-  'rather-modar':         sequence(grant({ draw: 2 }), placeSpyAtChosenSite()),
+  'rather-modar':         sequence(grant({ draw: 2 }), times(2, placeSpyAtChosenSite())),
   'wyrmspeaker':          sequence(grant({ influence: 1 }), flagEotPromote()),
 
   'enchanter-of-thay':    chooseOne(
