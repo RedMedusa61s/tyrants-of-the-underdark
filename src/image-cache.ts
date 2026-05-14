@@ -128,6 +128,69 @@ function loadSheetImage(sheetUrl: string): Promise<HTMLImageElement> {
   return p;
 }
 
+/** Derive the cities-and-routes board map from the workshop mod's table image:
+ *  1. Fetch the public table URL (TABLE_URL).
+ *  2. Downsample to 200×N greyscale → find the bounding box of pixels that
+ *     are NOT the purple background (~RGB 60,25,50, ±40).
+ *  3. Crop full-resolution at that bbox with a 0.005 inset.
+ *  4. Rotate -90° (CCW) so the map is portrait.
+ *  This regenerates a byte-identical map to the one we computed offline, so
+ *  all the calibrated site/slot positions remain valid. */
+async function deriveBoardMap(): Promise<Blob> {
+  const { TABLE_URL } = await import('./sheet-config');
+  const tableBlob = await fetchBlob(TABLE_URL);
+  const bmp = await createImageBitmap(tableBlob);
+  const W = bmp.width, H = bmp.height;
+
+  // Downsample to 200×H' for the purple-detection pass.
+  const downW = 200;
+  const downH = Math.round(H * downW / W);
+  const downCanvas = document.createElement('canvas');
+  downCanvas.width = downW; downCanvas.height = downH;
+  const downCx = downCanvas.getContext('2d');
+  if (!downCx) throw new Error('no 2d context');
+  downCx.drawImage(bmp, 0, 0, downW, downH);
+  const downData = downCx.getImageData(0, 0, downW, downH).data;
+  let minX = downW, maxX = 0, minY = downH, maxY = 0;
+  for (let y = 0; y < downH; y++) {
+    for (let x = 0; x < downW; x++) {
+      const i = (y * downW + x) * 4;
+      const r = downData[i], g = downData[i + 1], b = downData[i + 2];
+      const isPurple = Math.abs(r - 60) < 40 && Math.abs(g - 25) < 40 && Math.abs(b - 50) < 40;
+      if (!isPurple) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const inset = 0.005;
+  const x0 = Math.round(W * (minX / downW + inset));
+  const y0 = Math.round(H * (minY / downH + inset));
+  const x1 = Math.round(W * (maxX / downW - inset));
+  const y1 = Math.round(H * (maxY / downH - inset));
+  const cropW = x1 - x0, cropH = y1 - y0;
+
+  // Crop full-resolution, then rotate -90° (CCW). After rotation, dims swap.
+  const rotCanvas = document.createElement('canvas');
+  rotCanvas.width = cropH;
+  rotCanvas.height = cropW;
+  const rotCx = rotCanvas.getContext('2d');
+  if (!rotCx) throw new Error('no 2d context');
+  rotCx.translate(0, cropW);
+  rotCx.rotate(-Math.PI / 2);
+  rotCx.drawImage(bmp, x0, y0, cropW, cropH, 0, 0, cropW, cropH);
+  bmp.close();
+  return await new Promise<Blob>((resolve, reject) => {
+    rotCanvas.toBlob(
+      b => b ? resolve(b) : reject(new Error('canvas.toBlob returned null')),
+      'image/jpeg',
+      0.92
+    );
+  });
+}
+
 /** Slice a single tile out of the sheet at `slot`, return a JPEG blob. */
 async function sliceTile(sheet: SheetInfo, slot: number): Promise<Blob> {
   const img = await loadSheetImage(sheet.url);
@@ -150,13 +213,23 @@ async function sliceTile(sheet: SheetInfo, slot: number): Promise<Blob> {
   });
 }
 
-/** Fetch (or slice) a single image into the cache. Resolves with the blob. */
+/** Fetch (or slice/derive) a single image into the cache. Resolves with the blob. */
 async function fetchAndStore(relativePath: string): Promise<Blob> {
   // Card paths get sliced out of the deck's sheet.
   const parsed = parseCardPath(relativePath);
   if (parsed && DECK_SHEETS[parsed.deck]) {
     const sheet = DECK_SHEETS[parsed.deck];
     const blob = await sliceTile(sheet, parsed.slot);
+    await dbPut(relativePath, blob);
+    return blob;
+  }
+  // The board map is derived from the workshop mod's table image: auto-crop
+  // out the purple background, then rotate -90° (the table is stored
+  // landscape; the map is portrait). The exact pipeline produces a byte-
+  // identical result to what we computed offline earlier, so all calibrated
+  // slot/site positions stay accurate.
+  if (relativePath === 'assets/board/map.jpg') {
+    const blob = await deriveBoardMap();
     await dbPut(relativePath, blob);
     return blob;
   }

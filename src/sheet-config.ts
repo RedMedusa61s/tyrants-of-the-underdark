@@ -65,6 +65,12 @@ export const PLAYMAT_URL: string = (() => {
   return (unnamedTile?.url ?? '').replace(/^http:/, 'https:');
 })();
 
+/** The TTS "table" image — landscape composition with the printed game board
+ *  on the left and purple felt margins. `image-cache.ts` derives the portrait
+ *  cities-and-routes map from this by auto-cropping out the purple and
+ *  rotating -90°. */
+export const TABLE_URL: string = (urls.table ?? '').replace(/^http:/, 'https:');
+
 /** Generic local-path → external-URL map for non-card assets. Wire here when
  *  we point a UI element at `/board/map.jpg` etc. so the image cache can
  *  fetch + cache it the same way it does card slices.
