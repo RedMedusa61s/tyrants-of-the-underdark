@@ -1,0 +1,10 @@
+{
+  "publishedAt": "2026-05-14T17:07:12.290Z",
+  "source": "dedup-smoke",
+  "hash": "fe13ea6420dbea96a396f9c1880a8f5d47b87ed0256edb4be8d27b7a80e17959",
+  "meta": {},
+  "game": {
+    "sim": "dedup-test",
+    "seed": 12345
+  }
+}
