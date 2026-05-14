@@ -58,8 +58,15 @@ export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
       controlMarkers: Object.fromEntries(Object.entries(G.controlMarkers).filter(([, m]) => m.holder != null)),
     } : undefined;
 
+    // Prefer the deployed Cloudflare Worker when VITE_TOTU_RELAY_URL is set
+    // (production build or dev with the var defined). Falls back to the local
+    // Vite middleware (`/__report-problem`) otherwise, which writes the
+    // report to disk in dev or uses the dev-token GitHub fallback.
+    const relayUrl = import.meta.env.VITE_TOTU_RELAY_URL as string | undefined;
+    const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/problem-report` : '/__report-problem';
+
     try {
-      const resp = await fetch('/__report-problem', {
+      const resp = await fetch(submitUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
