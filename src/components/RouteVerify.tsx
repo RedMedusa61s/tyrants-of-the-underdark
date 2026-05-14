@@ -8,6 +8,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ROUTES } from '../data/routes';
 import { SITES_BY_ID } from '../data/sites';
+import COMMITTED_SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
+import { useCachedImage } from '../image-cache';
+
+const SLOTS_STORAGE_KEY = 'totu.slot-positions';
+type SlotPositions = Record<string, { x: number; y: number }>;
+function loadSlotPositions(): SlotPositions {
+  let local: SlotPositions = {};
+  try { local = JSON.parse(localStorage.getItem(SLOTS_STORAGE_KEY) || '{}'); } catch {}
+  return { ...(COMMITTED_SLOT_POSITIONS as SlotPositions), ...local };
+}
 
 const STORAGE_KEY = 'totu.route-overrides';
 type RouteOverride = { whiteSlots?: number[] };
@@ -76,7 +86,17 @@ export function RouteVerify() {
           Reset
         </button>
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+
+      <RouteWhitesMap
+        overrides={overrides}
+        onToggle={(routeId, slotIdx) => {
+          const r = ROUTES.find(rr => rr.id === routeId);
+          if (!r) return;
+          toggleSlot(routeId, slotIdx, r.whiteSlots ?? []);
+        }}
+      />
+
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
         <thead>
           <tr style={{ borderBottom: '1px solid #3a2055', textAlign: 'left' }}>
             <th style={{ padding: 4 }}>Route</th>
@@ -132,6 +152,75 @@ export function RouteVerify() {
       <div style={{ marginTop: 16, fontSize: 11, opacity: 0.6 }}>
         Reload the page or start a new game for changes to take effect (whites
         are placed only at game setup).
+      </div>
+    </div>
+  );
+}
+
+/** Renders the cached board image with every route slot overlaid as a clickable
+ *  circle. Slots that start with a white troop render filled white; others are
+ *  empty rings. Clicking toggles the slot's white-start status — wired through
+ *  to the same `totu.route-overrides` localStorage backing the table view. */
+function RouteWhitesMap({
+  overrides,
+  onToggle,
+}: {
+  overrides: AllOverrides;
+  onToggle: (routeId: string, slotIdx: number) => void;
+}) {
+  const boardUrl = useCachedImage('assets/board/map.jpg');
+  const [slotPositions] = useState<SlotPositions>(loadSlotPositions);
+
+  // Build the list of every route slot with its (route, idx, x, y, white?).
+  const slots = useMemo(() => {
+    const out: Array<{ routeId: string; slot: number; x: number; y: number; isWhite: boolean }> = [];
+    for (const r of ROUTES) {
+      if (r.spaces < 1) continue;
+      const o = overrides[r.id];
+      const current = o?.whiteSlots ?? r.whiteSlots ?? [];
+      for (let i = 0; i < r.spaces; i++) {
+        const pos = slotPositions[`${r.id}:${i}`];
+        if (!pos) continue;
+        out.push({ routeId: r.id, slot: i, x: pos.x, y: pos.y, isWhite: current.includes(i) });
+      }
+    }
+    return out;
+  }, [overrides, slotPositions]);
+
+  const totalSlots = ROUTES.reduce((s, r) => s + r.spaces, 0);
+  const totalCalibrated = slots.length;
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
+        Click each route slot to toggle whether it starts with a printed white
+        troop. {totalCalibrated} of {totalSlots} slots have calibrated positions.
+        Filled white = starts with a token; empty ring = starts empty.
+      </div>
+      <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', userSelect: 'none' }}>
+        <img src={boardUrl} alt="board" style={{ width: '100%', display: 'block' }} draggable={false} />
+        {slots.map(s => (
+          <div key={`${s.routeId}:${s.slot}`}
+            onClick={() => onToggle(s.routeId, s.slot)}
+            title={`${s.routeId} slot ${s.slot} — ${s.isWhite ? 'WHITE start' : 'empty'} (click to toggle)`}
+            style={{
+              position: 'absolute',
+              left: `${s.x * 100}%`,
+              top: `${s.y * 100}%`,
+              width: 22, height: 22,
+              marginLeft: -11, marginTop: -11,
+              borderRadius: '50%',
+              background: s.isWhite ? '#d0d0d0' : 'transparent',
+              border: s.isWhite
+                ? '2px solid #fff'
+                : '2px solid rgba(255, 204, 68, 0.85)',
+              boxShadow: s.isWhite
+                ? '0 1px 3px rgba(0,0,0,0.6)'
+                : '0 0 6px rgba(255, 204, 68, 0.5)',
+              cursor: 'pointer',
+              zIndex: 5,
+            }} />
+        ))}
       </div>
     </div>
   );
