@@ -20,6 +20,7 @@ import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
 import { publishGameLog } from './publish-game-log';
+import { archiveGame, getAllArchivedGames } from './game-archive';
 import { decideAiMove, type AiMove } from './ai/random-ai';
 import { decideHeuristicMove } from './ai/heuristic-ai';
 import { lookupCard } from './card-data';
@@ -142,6 +143,13 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const [tab, setTab] = useState<'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>('game');
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  // Bulk-upload status: 'idle' default, 'uploading' while POSTing, 'done'
+  // briefly after to show counts to the user. Auto-clears via setTimeout.
+  const [bulkUpload, setBulkUpload] = useState<
+    | { kind: 'idle' }
+    | { kind: 'uploading'; progress: string }
+    | { kind: 'done'; uploaded: number; deduped: number; failed: number }
+  >({ kind: 'idle' });
   const [devMode, setDevModeState] = useState<boolean>(initialDevMode);
   const setDevMode = (v: boolean) => {
     setDevModeState(v);
@@ -177,22 +185,28 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     localStorage.setItem(SAVE_KEY, latest);
   }, [G.snapshots.length, ctx.gameover]);
 
-  // Auto-publish a completed game to the public log repo via the Cloudflare
-  // relay. Fires exactly once per game-over transition; the relay's SHA256
-  // dedup keeps re-mounts (page reload, etc.) from creating duplicate
-  // commits. Falls back to the local Vite middleware in dev when
-  // VITE_TOTU_RELAY_URL is unset.
+  // On game-over: archive the completed game locally (IndexedDB) AND attempt
+  // an auto-publish to the public log relay. The archive is the authoritative
+  // local copy; auto-publish is best-effort. If it fails (network hiccup, no
+  // relay URL configured, etc.), the user can re-submit later via the bulk
+  // "Upload logs" button in the header — the relay's SHA256 dedup means
+  // duplicate uploads are no-ops server-side, so we can be loose about
+  // retries.
   const publishedRef = useRef(false);
   useEffect(() => {
     if (!ctx.gameover) return;
     if (publishedRef.current) return;
     publishedRef.current = true;
-    publishGameLog(G, {
+    const context = {
       numPlayers: Object.keys(G.players).length,
       halfDecks: session?.config.halfDecks ?? [],
       aiStyles: session?.config.aiStyles ?? [],
-      source: 'browser-game',
-    }).then(r => {
+    };
+    archiveGame(G, context).catch(err => {
+      // eslint-disable-next-line no-console
+      console.warn('[archive-game] failed:', err);
+    });
+    publishGameLog(G, { ...context, source: 'browser-game' }).then(r => {
       if (r.ok) {
         // eslint-disable-next-line no-console
         console.info('[publish-game-log]', r.deduped ? 'deduped' : 'published', r.path ?? r.filePath, r.htmlUrl ?? '');
@@ -591,6 +605,61 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           style={{ padding: '6px 14px', background: isNoImagesMode() ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
           {isNoImagesMode() ? '🖼 images off' : '🖼 images on'}
         </button>
+        <button onClick={async () => {
+          // Bulk upload: every archived game + the current in-progress one.
+          // The relay dedups by content, so the user can spam this button
+          // without worrying about duplicate commits server-side.
+          if (bulkUpload.kind === 'uploading') return;
+          const archived = await getAllArchivedGames().catch(() => []);
+          const total = archived.length + 1; // +1 for current game
+          let done = 0, uploaded = 0, deduped = 0, failed = 0;
+          setBulkUpload({ kind: 'uploading', progress: `0 / ${total}` });
+          for (const a of archived) {
+            const meta = {
+              numPlayers: a.context.numPlayers,
+              halfDecks: a.context.halfDecks,
+              aiStyles: a.context.aiStyles,
+              winner: '?', endedAtTurn: null as number | null,
+            };
+            const relayUrl = (import.meta.env.VITE_TOTU_RELAY_URL as string | undefined);
+            const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/game-log` : '/__publish-game-log';
+            const resp = await fetch(submitUrl, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ game: a.record, source: 'browser-bulk-upload', meta }),
+            }).then(r => r.json().catch(() => ({ ok: false }))).catch(() => ({ ok: false }));
+            if (resp.ok) { (resp.deduped ? deduped++ : uploaded++); } else { failed++; }
+            done++;
+            setBulkUpload({ kind: 'uploading', progress: `${done} / ${total}` });
+          }
+          // Plus the current in-progress game.
+          const r = await publishGameLog(G, {
+            numPlayers: Object.keys(G.players).length,
+            halfDecks: session?.config.halfDecks ?? [],
+            aiStyles: session?.config.aiStyles ?? [],
+            source: 'browser-bulk-upload',
+          });
+          if (r.ok) { (r.deduped ? deduped++ : uploaded++); } else { failed++; }
+          setBulkUpload({ kind: 'done', uploaded, deduped, failed });
+          setTimeout(() => setBulkUpload({ kind: 'idle' }), 6000);
+        }}
+          disabled={bulkUpload.kind === 'uploading'}
+          title="Upload every completed game stored locally plus the current in-progress game to the public log relay. Already-uploaded records dedup server-side."
+          style={{
+            padding: '6px 14px',
+            background: bulkUpload.kind === 'done' && bulkUpload.failed === 0 ? '#2a4830'
+              : bulkUpload.kind === 'done' ? '#5a3030'
+              : '#3a2055',
+            color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4,
+            cursor: bulkUpload.kind === 'uploading' ? 'default' : 'pointer',
+            opacity: bulkUpload.kind === 'uploading' ? 0.8 : 1,
+          }}>
+          {bulkUpload.kind === 'uploading' ? `Uploading ${bulkUpload.progress}…`
+            : bulkUpload.kind === 'done'
+              ? (bulkUpload.failed > 0
+                  ? `${bulkUpload.failed} failed · ${bulkUpload.uploaded + bulkUpload.deduped} ok`
+                  : `${bulkUpload.uploaded} new · ${bulkUpload.deduped} deduped`)
+              : 'Upload logs'}
+        </button>
         <button onClick={() => setReportOpen(true)}
           style={{ padding: '6px 14px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
           Report a problem
@@ -696,15 +765,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {tab === 'slots' && <div style={{ marginTop: 16 }}><SlotCalibration /></div>}
       {tab === 'dividers' && <div style={{ marginTop: 16 }}><SectionDividerCalibration /></div>}
       {tab === 'markers' && <div style={{ marginTop: 16 }}><MarkerCalibration /></div>}
-      {tab === 'log' && <div style={{ marginTop: 16 }}>
-        <GameLog G={G}
-          onLoad={(codec) => moves.loadState(codec)}
-          publishContext={session ? {
-            numPlayers: Object.keys(G.players).length,
-            halfDecks: session.config.halfDecks,
-            aiStyles: session.config.aiStyles,
-          } : undefined} />
-      </div>}
+      {tab === 'log' && <div style={{ marginTop: 16 }}><GameLog G={G} onLoad={(codec) => moves.loadState(codec)} /></div>}
 
       {tab === 'game' && <>
         {G.pendingChoice && (

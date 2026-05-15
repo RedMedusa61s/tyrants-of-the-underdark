@@ -4,38 +4,15 @@
 
 import { useState } from 'react';
 import type { TyrantsState } from '../game';
-import { publishGameLog, type PublishContext } from '../publish-game-log';
 
 interface Props {
   G: TyrantsState;
   onLoad: (codec: string) => void;
-  /** Game metadata for the publish-log button. When provided the button is
-   *  enabled; otherwise we still render it but disabled with a hint that
-   *  configuration is missing. */
-  publishContext?: Omit<PublishContext, 'source'>;
 }
 
-type UploadStatus =
-  | { kind: 'idle' }
-  | { kind: 'uploading' }
-  | { kind: 'ok'; deduped: boolean; url?: string }
-  | { kind: 'error'; message: string };
-
-export function GameLog({ G, onLoad, publishContext }: Props) {
+export function GameLog({ G, onLoad }: Props) {
   const [pasted, setPasted] = useState('');
   const [expandedTurn, setExpandedTurn] = useState<number | null>(null);
-  const [upload, setUpload] = useState<UploadStatus>({ kind: 'idle' });
-
-  async function uploadLog() {
-    if (!publishContext) return;
-    setUpload({ kind: 'uploading' });
-    const result = await publishGameLog(G, { ...publishContext, source: 'browser-manual-upload' });
-    if (result.ok) {
-      setUpload({ kind: 'ok', deduped: !!result.deduped, url: result.htmlUrl });
-    } else {
-      setUpload({ kind: 'error', message: result.error ?? 'unknown error' });
-    }
-  }
 
   // Pair each snapshot with its matching turn's log lines (if completed).
   const entries = G.snapshots.map(s => ({
@@ -94,50 +71,15 @@ export function GameLog({ G, onLoad, publishContext }: Props) {
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
         <div style={{ fontSize: 12, opacity: 0.7, flex: 1 }}>
           {entries.length} turn{entries.length === 1 ? '' : 's'} captured.
         </div>
-        <button onClick={uploadLog}
-          disabled={!publishContext || upload.kind === 'uploading'}
-          title={publishContext
-            ? 'Upload this game log to the public log repo. The relay deduplicates by content, so repeat uploads of the same state are no-ops.'
-            : 'Upload disabled — game session context not available.'}
-          style={{
-            fontSize: 12, padding: '4px 10px', borderRadius: 3, border: 'none',
-            background: !publishContext ? '#2a1840' : upload.kind === 'uploading' ? '#3a2055' : '#5a3380',
-            color: '#fff',
-            cursor: !publishContext || upload.kind === 'uploading' ? 'default' : 'pointer',
-            opacity: !publishContext ? 0.5 : 1,
-          }}>
-          {upload.kind === 'uploading' ? 'Uploading…' : 'Upload log'}
-        </button>
         <button onClick={downloadAll}
           style={{ fontSize: 12, padding: '4px 10px', background: '#3a2055', color: '#fff', border: 'none', borderRadius: 3, cursor: 'pointer' }}>
           Download full log (JSON)
         </button>
       </div>
-      {upload.kind === 'ok' && (
-        <div style={{ marginBottom: 8, padding: 6, background: '#1a2a18', border: '1px solid #3a5530', borderRadius: 3, fontSize: 11 }}>
-          {upload.deduped
-            ? 'Already uploaded earlier — server deduped, nothing committed.'
-            : 'Uploaded successfully.'}
-          {upload.url && <> <a href={upload.url} target="_blank" rel="noreferrer" style={{ color: '#9fd' }}>View commit ↗</a></>}
-          <button onClick={() => setUpload({ kind: 'idle' })}
-            style={{ marginLeft: 8, padding: '0 6px', fontSize: 10, background: 'transparent', color: '#9fd', border: '1px solid #3a5530', borderRadius: 2, cursor: 'pointer' }}>
-            dismiss
-          </button>
-        </div>
-      )}
-      {upload.kind === 'error' && (
-        <div style={{ marginBottom: 8, padding: 6, background: '#2a1818', border: '1px solid #553030', borderRadius: 3, fontSize: 11 }}>
-          Upload failed: {upload.message}
-          <button onClick={() => setUpload({ kind: 'idle' })}
-            style={{ marginLeft: 8, padding: '0 6px', fontSize: 10, background: 'transparent', color: '#fcc', border: '1px solid #553030', borderRadius: 2, cursor: 'pointer' }}>
-            dismiss
-          </button>
-        </div>
-      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {entries.map(({ snapshot, log }) => {
