@@ -12,7 +12,7 @@ import { grant, sequence, registerAll, flagEotPromote,
          giveOutcastToEachOpponent, giveOutcastToChosenOpponent,
          devourFromInnerCircleCost, recruitOutcastToSelf, takeTrophyAndPlace,
          giveOutcastToOpponentAdjacentToLastDeploy, returnAllSpiesAndSupplantAtEach,
-         playerHasOwnSpy } from '../handler-helpers';
+         playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 
 registerAll({
   'myconid-adult':        sequence(grant({ influence: 2 }), giveOutcastToChosenOpponent()),
@@ -25,7 +25,8 @@ registerAll({
   'glabrezu':             devourFromHandCost(assassinateChoice({ count: 2 })),
   'mind-flayer':          devourFromHandCost(chooseOne(
                             { label: '+3 Influence', handler: grant({ influence: 3 }) },
-                            { label: 'Assassinate a troop', handler: assassinateChoice() })),
+                            { label: 'Assassinate a troop', handler: assassinateChoice(),
+                              available: (G, a) => playerCanAssassinate(G, a) })),
   'balor':                devourFromHandCost(sequence(
                             supplantChoice({ whiteOnly: true, anywhere: true }),
                             deployChoice({ count: 1 }))),
@@ -38,7 +39,8 @@ registerAll({
   'derro':                sequence(supplantChoice({ whiteOnly: true, anywhere: true }), recruitOutcastToSelf()),
   'ettin':                chooseOne(
                             { label: 'Deploy 3 troops', handler: deployChoice({ count: 3 }) },
-                            { label: 'Assassinate 2 white troops', handler: assassinateChoice({ count: 2, whiteOnly: true }) }),
+                            { label: 'Assassinate 2 white troops', handler: assassinateChoice({ count: 2, whiteOnly: true }),
+                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
   'grazzt':               chooseOne(
                             { label: 'Place 2 spies', handler: sequence(placeSpyAtChosenSite(), placeSpyAtChosenSite()) },
                             { label: 'Return all your spies, supplanting at each site', handler: returnAllSpiesAndSupplantAtEach() }),

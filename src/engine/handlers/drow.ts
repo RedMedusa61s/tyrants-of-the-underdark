@@ -10,7 +10,7 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
          returnOwnSpyChoice, supplantAtLastReturnedSpySite, moveEnemyTroopChoice,
          conditionalGrant, moveDeckToDiscard, promoteFromDiscardChoice,
          returnEnemyTroopOrSpyChoice, ifTroopAtLastPlacedSpySite,
-         playerHasOwnSpy } from '../handler-helpers';
+         playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 
 registerAll({
   'spy-master':           placeSpyAtChosenSite(),
@@ -44,17 +44,20 @@ registerAll({
   'advance-scout':        supplantChoice({ whiteOnly: true }),
   'blackguard':           chooseOne(
                             { label: '+2 Power', handler: grant({ power: 2 }) },
-                            { label: 'Assassinate', handler: assassinateChoice() }),
+                            { label: 'Assassinate', handler: assassinateChoice(),
+                              available: (G, a) => playerCanAssassinate(G, a) }),
   'deathblade':           assassinateChoice({ count: 2 }),
   'doppelganger':         supplantChoice(),
   'inquisitor':           chooseOne(
                             { label: '+2 Influence', handler: grant({ influence: 2 }) },
-                            { label: 'Assassinate', handler: assassinateChoice() }),
+                            { label: 'Assassinate', handler: assassinateChoice(),
+                              available: (G, a) => playerCanAssassinate(G, a) }),
   'master-of-melee-magthere': chooseOne(
                             { label: 'Deploy 4 troops', handler: deployChoice({ count: 4 }) },
                             { label: 'Supplant white anywhere', handler: supplantChoice({ whiteOnly: true, anywhere: true }) }),
   'weaponmaster':         times(3, chooseOne(
                             { label: 'Deploy a troop', handler: deployChoice({ count: 1 }) },
-                            { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }) })),
+                            { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }),
+                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) })),
   'underdark-ranger':     assassinateChoice({ count: 2, whiteOnly: true }),
 });

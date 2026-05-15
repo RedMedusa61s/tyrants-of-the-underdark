@@ -5,7 +5,7 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          returnOwnSpyChoice, moveEnemyTroopChoice, conditionalGrant,
          ifEnemyTroopAtLastPlacedSpySite, devourMarketChoice,
          supplantAtLastPlacedSpySite, supplantAtLastReturnedSpySite,
-         returnEnemyTroopOrSpyChoice, playerHasOwnSpy } from '../handler-helpers';
+         returnEnemyTroopOrSpyChoice, playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 import { totalTrophies } from '../../game';
 
 registerAll({
@@ -33,7 +33,8 @@ registerAll({
   'black-wyrmling':       sequence(grant({ influence: 1 }), assassinateChoice({ whiteOnly: true })),
   'kobold':               chooseOne(
                             { label: 'Deploy a troop', handler: deployChoice({ count: 1 }) },
-                            { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }) }),
+                            { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }),
+                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
   'white-wyrmling':       sequence(deployChoice({ count: 2 }), devourMarketChoice()),
   'dragonclaw':           sequence(
                             assassinateChoice(),
