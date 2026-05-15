@@ -26,6 +26,11 @@ interface ProblemReportPayload {
   state?: unknown;
   log?: string[];
   meta?: Record<string, unknown>;
+  /** Optional auto-captured page screenshot as base64-encoded PNG (no
+   *  data-URL prefix). The worker uploads it to screenshots/<sha>.png in
+   *  the repo via the Contents API and embeds the raw URL in the issue
+   *  body as a markdown image. */
+  screenshot?: string;
 }
 
 interface GameLogPayload {
@@ -77,6 +82,40 @@ async function handleProblemReport(req: Request, env: Env): Promise<Response> {
   const title = description.split('\n')[0].slice(0, 80) || 'Problem report';
   const sections: string[] = [`**What happened**\n\n${description}`];
   if (body.expected?.trim()) sections.push(`**What I expected**\n\n${body.expected.trim()}`);
+
+  // Upload the auto-captured screenshot first (if any) so we can reference
+  // its raw GitHub URL in the issue body. Content-addressable so re-reports
+  // of the same view dedup against an existing screenshot. Failures here
+  // are non-fatal — the report still files without an image.
+  if (body.screenshot && body.screenshot.length > 0) {
+    const hash = await sha256Hex(body.screenshot);
+    const path = `screenshots/${hash}.png`;
+    const ghUrl = `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`;
+    // HEAD-style check: GET returns 200 if the file already exists.
+    const head = await fetch(ghUrl, { headers: githubHeaders(env) });
+    if (head.status !== 200) {
+      const put = await fetch(ghUrl, {
+        method: 'PUT',
+        headers: githubHeaders(env),
+        body: JSON.stringify({
+          message: `Screenshot ${hash.slice(0, 12)} (problem report)`,
+          content: body.screenshot,
+        }),
+      });
+      if (!put.ok) {
+        // 422 / race-condition duplicates: tolerate; otherwise log and
+        // continue without the image — the description still files.
+        const text = await put.text();
+        if (!(put.status === 422 && /sha/i.test(text))) {
+          // eslint-disable-next-line no-console
+          console.warn(`screenshot upload failed: ${put.status} ${text.slice(0, 200)}`);
+        }
+      }
+    }
+    const rawUrl = `https://raw.githubusercontent.com/${env.GITHUB_REPO}/main/${path}`;
+    sections.push(`**Screenshot**\n\n![screenshot](${rawUrl})`);
+  }
+
   if (body.meta) {
     const metaLines = Object.entries(body.meta).map(([k, v]) => `- ${k}: \`${JSON.stringify(v)}\``);
     sections.push(`**Build / context**\n\n${metaLines.join('\n')}`);

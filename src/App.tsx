@@ -24,6 +24,7 @@ import { archiveGame, getAllArchivedGames, payloadForArchivedGame } from './game
 import { LogUploadConsentDialog } from './components/LogUploadConsentDialog';
 import { BugFixResponseDialog } from './components/BugFixResponseDialog';
 import { fetchUnseenFixNotes, markFixNoteSeen, type FixNoteUpdate } from './bug-report-tracker';
+import { capturePageScreenshot } from './screenshot';
 import { decideAiMove, type AiMove } from './ai/random-ai';
 import { decideHeuristicMove } from './ai/heuristic-ai';
 import { lookupCard } from './card-data';
@@ -146,6 +147,9 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const [tab, setTab] = useState<'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>('game');
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  // Auto-captured screenshot for the bug report. Grabbed BEFORE the dialog
+  // mounts so it shows the actual game state, not the modal overlay.
+  const [reportScreenshot, setReportScreenshot] = useState<string | null>(null);
   // Bulk-upload status: 'idle' default, 'uploading' while POSTing, 'done'
   // briefly after to show counts to the user. Auto-clears via setTimeout.
   const [bulkUpload, setBulkUpload] = useState<
@@ -687,7 +691,16 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                   : `${bulkUpload.uploaded} new · ${bulkUpload.deduped} deduped`)
               : 'Upload logs'}
         </button>
-        <button onClick={() => setReportOpen(true)}
+        <button onClick={async () => {
+          // Capture the page BEFORE the modal mounts, so the screenshot
+          // reflects the game state the user was looking at, not the
+          // dialog overlay. The capture is best-effort: failures (CORS,
+          // missing API, lazy-import fail) just leave screenshot null
+          // and the dialog renders without a preview.
+          const shot = await capturePageScreenshot();
+          setReportScreenshot(shot);
+          setReportOpen(true);
+        }}
           style={{ padding: '6px 14px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
           Report a problem
         </button>
@@ -762,7 +775,8 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             halfDecks: session.config.halfDecks,
             aiStyles: session.config.aiStyles,
           } : undefined}
-          onClose={() => setReportOpen(false)}
+          screenshotBase64={reportScreenshot}
+          onClose={() => { setReportOpen(false); setReportScreenshot(null); }}
         />
       )}
       <div style={{ marginTop: 8, opacity: 0.7 }}>

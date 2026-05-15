@@ -12,6 +12,11 @@ interface Props {
   G: TyrantsState;
   ctxInfo: { turn: number; currentPlayer: string; gameover?: unknown };
   config?: { numPlayers: number; halfDecks: string[]; aiStyles: string[] };
+  /** Auto-captured page screenshot, base64-encoded PNG without the data-URL
+   *  prefix. Captured by App.tsx BEFORE this dialog mounts so it shows the
+   *  game state behind the modal, not the modal itself. May be null when
+   *  capture failed (CORS taint, etc.); dialog renders fine without it. */
+  screenshotBase64?: string | null;
   onClose: () => void;
 }
 
@@ -73,11 +78,15 @@ function githubIssueUrl(args: {
   return `https://github.com/${FALLBACK_REPO}/issues/new?${params.toString()}`;
 }
 
-export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
+export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onClose }: Props) {
   const [description, setDescription] = useState('');
   const [expected, setExpected] = useState('');
   const [includeState, setIncludeState] = useState(true);
   const [includeLog, setIncludeLog] = useState(true);
+  // Default on so the screenshot is sent unless the user explicitly opts
+  // out (e.g. their screen contains something they don't want public).
+  // Disabled entirely when capture failed (screenshotBase64 == null).
+  const [includeScreenshot, setIncludeScreenshot] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
 
@@ -161,6 +170,7 @@ export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
           state,
           log: includeLog ? G.log : undefined,
           meta,
+          screenshot: includeScreenshot && screenshotBase64 ? screenshotBase64 : undefined,
         }),
       });
       const data = (await resp.json().catch(() => null)) as SubmitResult | null;
@@ -247,7 +257,7 @@ export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
           }}
         />
 
-        <div style={{ marginTop: 16, display: 'flex', gap: 16, fontSize: 12 }}>
+        <div style={{ marginTop: 16, display: 'flex', gap: 16, fontSize: 12, flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={includeState} onChange={e => setIncludeState(e.target.checked)} />
             Include game state (codec + player summary)
@@ -256,7 +266,24 @@ export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
             <input type="checkbox" checked={includeLog} onChange={e => setIncludeLog(e.target.checked)} />
             Include log (last 40 lines)
           </label>
+          {screenshotBase64 && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={includeScreenshot} onChange={e => setIncludeScreenshot(e.target.checked)} />
+              Include screenshot
+            </label>
+          )}
         </div>
+
+        {screenshotBase64 && includeScreenshot && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>Screenshot preview (will be attached):</div>
+            <img src={`data:image/png;base64,${screenshotBase64}`} alt="Captured screenshot"
+              style={{
+                display: 'block', maxWidth: '100%', maxHeight: 200,
+                border: '1px solid #3a2055', borderRadius: 4,
+              }} />
+          </div>
+        )}
 
         {result && (
           <div style={{
