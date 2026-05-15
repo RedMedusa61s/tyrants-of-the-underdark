@@ -1,0 +1,72 @@
+# Auto-deploy the client to Cloudflare Pages on every push to main.
+#
+# One-time setup before this works (Cloudflare side):
+#   1. Create a Cloudflare account (free) and add a project at
+#      Workers & Pages → Create → Pages → Direct Upload. Name it
+#      `tyrants-of-the-underdark` (this name is referenced below as
+#      projectName). No build settings to configure — this workflow
+#      uploads a pre-built dist directly.
+#   2. Create an API token at
+#      https://dash.cloudflare.com/profile/api-tokens → Create Token →
+#      template "Edit Cloudflare Workers" (which includes Pages:Edit).
+#      Restrict it to your account.
+#   3. Grab the Account ID from the right sidebar of the Cloudflare
+#      dashboard home.
+#
+# One-time setup (GitHub side):
+#   Repo → Settings → Secrets and variables → Actions → New repository
+#   secret, add two:
+#     - CLOUDFLARE_API_TOKEN     (the token from step 2)
+#     - CLOUDFLARE_ACCOUNT_ID    (the account ID from step 3)
+#
+# After that, every push to main builds and deploys automatically.
+# Manual runs are also available via the Actions tab.
+
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Point the in-app problem-report and game-log uploaders at
+          # your Cloudflare Worker relay (the one in worker/). Leave
+          # blank to fall back to localhost dev middleware (which won't
+          # exist in production, so reports just silently no-op).
+          # Override per-environment via GitHub repo variable
+          # VITE_TOTU_RELAY_URL if/when the worker is deployed.
+          VITE_TOTU_RELAY_URL: ${{ vars.VITE_TOTU_RELAY_URL }}
+
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Wrangler 3 syntax: deploy the built dist/ to the named
+          # Pages project. Production branch lives on `main`; pushes
+          # to other branches go to preview deployments at
+          # <branch>.<project>.pages.dev.
+          command: pages deploy dist --project-name=tyrants-of-the-underdark --branch=${{ github.ref_name }}
