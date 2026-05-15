@@ -23,6 +23,55 @@ interface SubmitResult {
   error?: string;
 }
 
+/** GitHub repo to file issues against when no relay is configured (or the
+ *  relay submit fails). Kept in sync with the source repo. */
+const FALLBACK_REPO = 'johnchampaign/tyrants-of-the-underdark';
+
+/** True when we should expect the relay POST to succeed: either a remote
+ *  relay URL is configured, or we're on a dev host where the Vite middleware
+ *  at /__report-problem is available. On production GH Pages with no relay
+ *  configured, the fetch will hit a 404 / index.html and the JSON parse will
+ *  fail — better to surface the GitHub-fallback path immediately. */
+function relayAvailable(): boolean {
+  if (import.meta.env.VITE_TOTU_RELAY_URL) return true;
+  const host = typeof location !== 'undefined' ? location.hostname : '';
+  return host === 'localhost' || host === '127.0.0.1';
+}
+
+/** Build a GitHub "new issue" URL with title and body prefilled so the user
+ *  can submit the report by hand when the API path is unavailable. Body is
+ *  truncated to keep the URL under GitHub's practical limit (~8KB). */
+function githubIssueUrl(args: {
+  description: string;
+  expected?: string;
+  meta: Record<string, unknown>;
+  stateSummary?: string;
+  logTail?: string[];
+}): string {
+  const lines: string[] = [];
+  lines.push(args.description.trim());
+  if (args.expected?.trim()) {
+    lines.push('', '**Expected:**', args.expected.trim());
+  }
+  lines.push('', '**Meta:**', '```json', JSON.stringify(args.meta, null, 2), '```');
+  if (args.stateSummary) {
+    lines.push('', '**State (truncated):**', '```json', args.stateSummary, '```');
+  }
+  if (args.logTail && args.logTail.length) {
+    lines.push('', '**Recent log:**', '```', ...args.logTail, '```');
+  }
+  // Keep the body to ~6000 chars after URL-encoding overhead. Encoded
+  // length is roughly 3x for JSON, so target ~2000 chars of raw text.
+  let body = lines.join('\n');
+  const MAX = 2000;
+  if (body.length > MAX) {
+    body = body.slice(0, MAX) + '\n\n…[truncated — paste full state in a comment after creating the issue]';
+  }
+  const title = args.description.trim().slice(0, 80).replace(/\s+/g, ' ');
+  const params = new URLSearchParams({ title, body });
+  return `https://github.com/${FALLBACK_REPO}/issues/new?${params.toString()}`;
+}
+
 export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
   const [description, setDescription] = useState('');
   const [expected, setExpected] = useState('');
@@ -58,10 +107,44 @@ export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
       controlMarkers: Object.fromEntries(Object.entries(G.controlMarkers).filter(([, m]) => m.holder != null)),
     } : undefined;
 
-    // Prefer the deployed Cloudflare Worker when VITE_TOTU_RELAY_URL is set
-    // (production build or dev with the var defined). Falls back to the local
-    // Vite middleware (`/__report-problem`) otherwise, which writes the
-    // report to disk in dev or uses the dev-token GitHub fallback.
+    const meta = {
+      userAgent: navigator.userAgent,
+      turn: ctxInfo.turn,
+      currentPlayer: ctxInfo.currentPlayer,
+      gameover: ctxInfo.gameover ?? null,
+      ...(config && {
+        numPlayers: config.numPlayers,
+        halfDecks: config.halfDecks,
+        aiStyles: config.aiStyles,
+      }),
+    };
+
+    // No relay configured AND we're not running on a dev host where the
+    // /__report-problem Vite middleware would catch it: skip the fetch
+    // entirely and open a GitHub Issues page with the report prefilled.
+    // The user submits the issue themselves (one click, requires being
+    // logged in to GitHub). This is the fallback that lets iPad / static-
+    // hosting users file bugs without any backend.
+    if (!relayAvailable()) {
+      const url = githubIssueUrl({
+        description: description.trim(),
+        expected: expected.trim(),
+        meta,
+        stateSummary: includeState && state ? JSON.stringify(state, null, 2).slice(0, 1500) : undefined,
+        logTail: includeLog ? G.log.slice(-20) : undefined,
+      });
+      window.open(url, '_blank', 'noopener');
+      setResult({
+        ok: true,
+        url,
+        note: 'Opened a prefilled GitHub Issues tab. Sign in to GitHub and click "Submit new issue" to complete.',
+      });
+      setSubmitting(false);
+      return;
+    }
+
+    // Relay path: POST to either the configured Cloudflare Worker
+    // (production) or the Vite middleware at /__report-problem (dev).
     const relayUrl = import.meta.env.VITE_TOTU_RELAY_URL as string | undefined;
     const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/problem-report` : '/__report-problem';
 
@@ -76,21 +159,29 @@ export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
           includeLog,
           state,
           log: includeLog ? G.log : undefined,
-          meta: {
-            userAgent: navigator.userAgent,
-            turn: ctxInfo.turn,
-            currentPlayer: ctxInfo.currentPlayer,
-            gameover: ctxInfo.gameover ?? null,
-            ...(config && {
-              numPlayers: config.numPlayers,
-              halfDecks: config.halfDecks,
-              aiStyles: config.aiStyles,
-            }),
-          },
+          meta,
         }),
       });
-      const data = (await resp.json().catch(() => ({ ok: false, error: 'non-json response' }))) as SubmitResult;
-      setResult(data);
+      const data = (await resp.json().catch(() => null)) as SubmitResult | null;
+      if (data && typeof data === 'object' && 'ok' in data) {
+        setResult(data);
+      } else {
+        // Relay responded but body wasn't JSON (e.g. GH Pages 404 HTML).
+        // Fall back to the GitHub URL path so the user has a working route.
+        const url = githubIssueUrl({
+          description: description.trim(),
+          expected: expected.trim(),
+          meta,
+          stateSummary: includeState && state ? JSON.stringify(state, null, 2).slice(0, 1500) : undefined,
+          logTail: includeLog ? G.log.slice(-20) : undefined,
+        });
+        window.open(url, '_blank', 'noopener');
+        setResult({
+          ok: true,
+          url,
+          note: 'Relay returned an unexpected response, so we opened a prefilled GitHub Issues tab instead. Sign in to GitHub and click "Submit new issue" to complete.',
+        });
+      }
     } catch (err) {
       setResult({ ok: false, error: String(err) });
     } finally {
