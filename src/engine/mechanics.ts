@@ -104,6 +104,22 @@ export const Mechanics = {
     return true;
   },
 
+  /** Recruit from a permanent aux stack (House Guards or Priestesses). The
+   *  stack must have a card remaining; the resource cost is checked + spent
+   *  by the caller (the move handler in game.ts). Returns false if the
+   *  stack is empty. */
+  recruitFromAuxStack(
+    G: TyrantsState, playerId: string,
+    stack: 'houseGuards' | 'priestesses',
+    card: { deck: string; slot: number; name: string; image: string },
+  ): boolean {
+    if (G.auxStacks[stack] <= 0) return false;
+    p(G, playerId).discard.push(card);
+    G.auxStacks[stack] -= 1;
+    Mechanics.log(G, `P${Number(playerId) + 1} recruited ${card.name} (${G.auxStacks[stack]} left in stack)`);
+    return true;
+  },
+
   // -- map mutations come once we wire occupancy into TyrantsState --
   // deployTroop, assassinateTroop, moveTroop, placeSpy, returnTroop, returnSpy,
   // supplant, recomputeSiteControl

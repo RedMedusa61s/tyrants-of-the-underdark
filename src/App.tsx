@@ -938,6 +938,36 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           })}
         </div>
 
+        {/* Permanent recruitable stacks — separate from the rotating market
+            row. Both stacks always show; once a stack hits 0 the card greys
+            out and the recruit button disables. Recruiting these doesn't
+            trigger end-of-game (only the market deck emptying does). */}
+        <h2 style={{ marginTop: 24 }}>
+          Permanent stacks
+        </h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {(['houseGuards', 'priestesses'] as const).map(stack => {
+            const ref = stack === 'houseGuards'
+              ? { deck: 'house-guards', slot: 40 }
+              : { deck: 'priestesses',  slot: 43 };
+            const data = lookupCard(ref.deck, ref.slot);
+            if (!data) return null;
+            const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
+            const remaining = G.auxStacks?.[stack] ?? 0;
+            const cost = data.cost ?? 999;
+            const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
+            const label = remaining === 0
+              ? `empty · ${data.name}`
+              : `recruit (${cost} Inf) · ${remaining} left`;
+            const onClick = canRecruit ? () => moves.recruitFromAuxStack(stack) : undefined;
+            return (
+              <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
+                <Card card={card} label={label} onClick={onClick} />
+              </div>
+            );
+          })}
+        </div>
+
         {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === ctx.currentPlayer && (
           <>
             <h2 style={{ marginTop: 24 }}>Discard — pick one</h2>

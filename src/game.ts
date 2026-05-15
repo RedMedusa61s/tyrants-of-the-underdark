@@ -98,6 +98,15 @@ export interface TyrantsState {
     deck: CardRef[];
     row: (CardRef | null)[];
   };
+  /** Permanent recruitable stacks separate from the rotating market row.
+   *  Rulebook components: 15 House Guards, 15 Priestesses of Lolth. Each
+   *  player may recruit from these any number of times (until the stack
+   *  empties) for the printed cost; both decrement when recruited but
+   *  emptying them does NOT trigger end-of-game (only the market deck
+   *  emptying or a player's barracks emptying does). Insane Outcasts are
+   *  tracked separately by the card handlers that hand them out — not a
+   *  player-recruitable stack. */
+  auxStacks: { houseGuards: number; priestesses: number };
   players: Record<string, PlayerData>;
   log: string[];
   /** Set while an effect is awaiting a player/AI choice. */
@@ -345,6 +354,8 @@ export const TyrantsGame: Game<TyrantsState> = {
     return {
       firstPlayerId: String(firstSeat),
       market: { deck: marketDeck, row },
+      // Permanent stacks per rulebook components (page 2): 15 of each.
+      auxStacks: { houseGuards: 15, priestesses: 15 },
       players,
       log: [startLog],
       pendingChoice: null,
@@ -395,6 +406,13 @@ export const TyrantsGame: Game<TyrantsState> = {
       // place-spy handlers might never touch directly.
       for (const pid of Object.keys(G.players)) {
         ensureSpiesLeftInitialized(G, G.players[pid].color);
+      }
+      // Backfill auxStacks for legacy saves (added with the recruit-stacks
+      // feature). Idempotent once the field exists. Setting to the rulebook
+      // values assumes nobody recruited from these stacks in the saved
+      // game, which is true for any state from before this commit.
+      if (!G.auxStacks) {
+        G.auxStacks = { houseGuards: 15, priestesses: 15 };
       }
       // Reset the per-turn marker-influence ledger so the current player can
       // claim the bonus once per marker this turn, either from markers they
@@ -655,6 +673,35 @@ export const TyrantsGame: Game<TyrantsState> = {
         return INVALID_MOVE;
       }
       checkEndGameTriggers(G, ctx);
+    },
+
+    /** Recruit from a permanent aux stack (House Guards or Priestesses).
+     *  Cost comes from card-data.json (House Guard = 3 influence,
+     *  Priestess of Lolth = 2 influence). Stack must be non-empty.
+     *  Per rulebook, depletion of these stacks does NOT trigger end-of-
+     *  game (only the main market deck emptying or a player's barracks
+     *  emptying does), so no checkEndGameTriggers call here. */
+    recruitFromAuxStack: ({ G, ctx }, stack: 'houseGuards' | 'priestesses') => {
+      if (G.setupPhase) return INVALID_MOVE;
+      if (G.pendingChoice) return INVALID_MOVE;
+      if (stack !== 'houseGuards' && stack !== 'priestesses') return INVALID_MOVE;
+      if (G.auxStacks[stack] <= 0) return INVALID_MOVE;
+      const pid = ctx.currentPlayer;
+      // The card-data entries live at fixed slots: house-guards/40 and
+      // priestesses/43 (one canonical entry each; the stack count comes
+      // from G.auxStacks rather than per-slot duplication).
+      const ref = stack === 'houseGuards'
+        ? { deck: 'house-guards', slot: 40 }
+        : { deck: 'priestesses',  slot: 43 };
+      const data = lookupCard(ref.deck, ref.slot);
+      if (!data) return INVALID_MOVE;
+      const cost = data.cost ?? 999;
+      if (!Mechanics.expendInfluence(G, pid, cost)) return INVALID_MOVE;
+      const cardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
+      if (!Mechanics.recruitFromAuxStack(G, pid, stack, cardRef)) {
+        Mechanics.gainInfluence(G, pid, cost);
+        return INVALID_MOVE;
+      }
     },
 
     deployTroop: ({ G, ctx }, spaceId: string) => {
