@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SITES, type Site } from '../data/sites';
 import { ROUTES, type Route } from '../data/routes';
 import { sitesSpaces } from '../data/troop-spaces';
@@ -81,12 +81,16 @@ const MARKER_SITES = new Set([
  *  around the disc carries the holder color; total control thickens the
  *  ring and brightens its glow. */
 function ControlMarkerToken(
-  { siteId, x, y, controller, totalControl, totalControlInfluence, totalControlVp, controlInfluence }:
+  { siteId, x, y, controller, totalControl, totalControlInfluence, totalControlVp, controlInfluence, sizePx }:
   { siteId: string; x: number; y: number;
     controller: Color | null;
     totalControl: boolean;
     controlInfluence: number;
-    totalControlInfluence: number; totalControlVp: number }
+    totalControlInfluence: number; totalControlVp: number;
+    /** Pixel size of the disc. The component is otherwise pure SVG so it
+     *  scales naturally; the container size determines on-screen footprint
+     *  and is passed by MapView so iPad / small-viewport renders shrink. */
+    sizePx: number }
 ) {
   if (!MARKER_SITES.has(siteId)) return null;
   // Per revised rulebook the chit transfers (or returns to the map) the
@@ -109,7 +113,7 @@ function ControlMarkerToken(
         left: `${x * 100}%`,
         top: `${y * 100}%`,
         transform: 'translate(-50%, -50%)',
-        width: 110, height: 110,
+        width: sizePx, height: sizePx,
         pointerEvents: 'none', zIndex: 6,
         filter: controller
           ? `drop-shadow(0 0 ${totalControl ? 10 : 6}px ${ringColor})`
@@ -170,6 +174,30 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
   const [routeDraft, setRouteDraft] = useState<Route[]>(() => loadRouteOverrides() ?? ROUTES);
   const [pendingFrom, setPendingFrom] = useState<string | null>(null);
   const [defaultSpaces, setDefaultSpaces] = useState(1);
+  // Track the rendered board width so overlays (slot pips, marker discs,
+  // spy/holder badges, site-pick rings) can scale proportionally. The board
+  // image is width:100% capped at 1200px max; on smaller screens (iPad
+  // portrait ~768px, landscape ~1024px) fixed pixel sizes that look right at
+  // 1200px end up too chunky relative to the board. We track via
+  // ResizeObserver so the sizes also follow window resizes without a reload.
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [boardWidth, setBoardWidth] = useState<number>(1200);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setBoardWidth(el.getBoundingClientRect().width || 1200);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Scale factor relative to the design baseline (1200px wide). All fixed
+  // pixel sizes below are multiplied by this so they shrink on smaller
+  // viewports. Clamped to [0.5, 1.0] so the overlays never become
+  // illegibly tiny on very narrow screens, and never grow past their
+  // design size on monitors that exceed the maxWidth cap.
+  const scale = Math.max(0.5, Math.min(1.0, boardWidth / 1200));
+  const px = (n: number) => Math.round(n * scale);
   // Rulebook p.5: hide sites/routes outside this game's active sections. Calibrate
   // / editRoutes modes ignore this so all sites stay reachable for setup work.
   const activeSites = (G && !calibrate && !editRoutes)
@@ -242,7 +270,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
   const useSchematic = isNoImagesMode() && !calibrate && !editRoutes;
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: 1200, margin: '0 auto' }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', maxWidth: 1200, margin: '0 auto' }}>
       {useSchematic ? (
         <div id="totu-board" style={{
           width: '100%', aspectRatio: '4646 / 4605',
@@ -333,7 +361,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                   {spaces.map((sp, i) => {
                     const occ = G.troops[sp.id];
                     const spClick = !!clickableSpaces?.has(sp.id);
-                    const sz = spClick ? 16 : 14;
+                    const sz = px(spClick ? 16 : 14);
                     return (
                       <div key={sp.id}
                         onClick={(e) => { if (spClick) { e.stopPropagation(); onSpaceClick?.(sp.id); } }}
@@ -497,7 +525,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           }
           const occ = G.troops[spaceId];
           const pickable = clickableSpaces?.has(spaceId);
-          const size = pickable ? 26 : 22;
+          const size = px(pickable ? 26 : 22);
           return (
             <div key={spaceId}
               onClick={() => { if (pickable) onSpaceClick?.(spaceId); }}
@@ -545,7 +573,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
               totalControl={tc}
               controlInfluence={m.controlInfluence}
               totalControlInfluence={m.totalControlInfluence}
-              totalControlVp={m.totalControlVp} />
+              totalControlVp={m.totalControlVp}
+              sizePx={px(110)} />
           );
         });
       })()}
@@ -613,7 +642,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           const onClick = () => {
             if (isSpacePickable) onSpaceClick?.(sp.id);
           };
-          const size = pickable ? 26 : 22;
+          const size = px(pickable ? 26 : 22);
           // While a site-pick is active, let clicks fall through non-pickable
           // slots to the site overlay disc underneath. Otherwise the user has
           // to aim outside the slots to hit the ring.
@@ -674,8 +703,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
               position: 'absolute',
               left: `${cx * 100}%`,
               top: `${cy * 100}%`,
-              width: 88, height: 88,
-              marginLeft: -44, marginTop: -44,
+              width: px(88), height: px(88),
+              marginLeft: -px(44), marginTop: -px(44),
               borderRadius: '50%',
               border: '3px dashed #ffcc44',
               background: 'rgba(255, 204, 68, 0.12)',
@@ -725,7 +754,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
               zIndex: 11, pointerEvents: 'none',
             }}>
             {markerHolder && <span style={{
-              width: 20, height: 20, borderRadius: '50%',
+              width: px(20), height: px(20), borderRadius: '50%',
               background: COLOR_HEX[markerHolder], border: '2px solid #c4a3f5',
               boxShadow: marker?.side === 'total-control'
                 ? '0 0 8px #ffcc44, inset 0 0 0 2px #ffcc44'
@@ -733,7 +762,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
             }} />}
             {spies.map((sp, i) => (
               <span key={i} title={`spy: ${sp}`} style={{
-                width: 24, height: 24, background: COLOR_HEX[sp],
+                width: px(24), height: px(24), background: COLOR_HEX[sp],
                 border: '2px solid #fff',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.7)',
               }} />
