@@ -21,6 +21,7 @@ import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
 import { publishGameLog } from './publish-game-log';
 import { archiveGame, getAllArchivedGames, payloadForArchivedGame } from './game-archive';
+import { LogUploadConsentDialog } from './components/LogUploadConsentDialog';
 import { decideAiMove, type AiMove } from './ai/random-ai';
 import { decideHeuristicMove } from './ai/heuristic-ai';
 import { lookupCard } from './card-data';
@@ -150,6 +151,10 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     | { kind: 'uploading'; progress: string }
     | { kind: 'done'; uploaded: number; deduped: number; failed: number }
   >({ kind: 'idle' });
+  // Pending consent: when the user clicks Upload logs we count the records
+  // first, open the disclosure dialog, and only kick off the actual POST
+  // loop after they confirm.
+  const [pendingConsent, setPendingConsent] = useState<{ recordCount: number } | null>(null);
   const [devMode, setDevModeState] = useState<boolean>(initialDevMode);
   const setDevMode = (v: boolean) => {
     setDevModeState(v);
@@ -629,39 +634,13 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           {isNoImagesMode() ? '🖼 images off' : '🖼 images on'}
         </button>
         <button onClick={async () => {
-          // Bulk upload: every archived game + the current in-progress one.
-          // The relay dedups by content, so the user can spam this button
-          // without worrying about duplicate commits server-side.
+          // Click 1: count records and open the disclosure dialog. Actual
+          // upload only fires after the user confirms in the dialog (see
+          // onConfirm below). The relay dedups by content, so the user can
+          // re-click later without producing duplicate commits server-side.
           if (bulkUpload.kind === 'uploading') return;
           const archived = await getAllArchivedGames().catch(() => []);
-          const total = archived.length + 1; // +1 for current game
-          let done = 0, uploaded = 0, deduped = 0, failed = 0;
-          setBulkUpload({ kind: 'uploading', progress: `0 / ${total}` });
-          const relayUrl = (import.meta.env.VITE_TOTU_RELAY_URL as string | undefined);
-          const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/game-log` : '/__publish-game-log';
-          for (const a of archived) {
-            // payloadForArchivedGame embeds the entry's archivedAt into the
-            // published record so two different sessions of an otherwise
-            // identical state don't dedup against each other.
-            const body = payloadForArchivedGame(a);
-            const resp = await fetch(submitUrl, {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(body),
-            }).then(r => r.json().catch(() => ({ ok: false }))).catch(() => ({ ok: false }));
-            if (resp.ok) { (resp.deduped ? deduped++ : uploaded++); } else { failed++; }
-            done++;
-            setBulkUpload({ kind: 'uploading', progress: `${done} / ${total}` });
-          }
-          // Plus the current in-progress game.
-          const r = await publishGameLog(G, {
-            numPlayers: Object.keys(G.players).length,
-            halfDecks: session?.config.halfDecks ?? [],
-            aiStyles: session?.config.aiStyles ?? [],
-            source: 'browser-bulk-upload',
-          });
-          if (r.ok) { (r.deduped ? deduped++ : uploaded++); } else { failed++; }
-          setBulkUpload({ kind: 'done', uploaded, deduped, failed });
-          setTimeout(() => setBulkUpload({ kind: 'idle' }), 6000);
+          setPendingConsent({ recordCount: archived.length + 1 });
         }}
           disabled={bulkUpload.kind === 'uploading'}
           title="Upload every completed game stored locally plus the current in-progress game to the public log relay. Already-uploaded records dedup server-side."
@@ -707,6 +686,40 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           New game
         </button>
       </div>
+      <LogUploadConsentDialog
+        open={pendingConsent !== null}
+        recordCount={pendingConsent?.recordCount ?? 0}
+        onCancel={() => setPendingConsent(null)}
+        onConfirm={async () => {
+          setPendingConsent(null);
+          if (bulkUpload.kind === 'uploading') return;
+          const archived = await getAllArchivedGames().catch(() => []);
+          const total = archived.length + 1;
+          let done = 0, uploaded = 0, deduped = 0, failed = 0;
+          setBulkUpload({ kind: 'uploading', progress: `0 / ${total}` });
+          const relayUrl = (import.meta.env.VITE_TOTU_RELAY_URL as string | undefined);
+          const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/game-log` : '/__publish-game-log';
+          for (const a of archived) {
+            const body = payloadForArchivedGame(a);
+            const resp = await fetch(submitUrl, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(body),
+            }).then(r => r.json().catch(() => ({ ok: false }))).catch(() => ({ ok: false }));
+            if (resp.ok) { (resp.deduped ? deduped++ : uploaded++); } else { failed++; }
+            done++;
+            setBulkUpload({ kind: 'uploading', progress: `${done} / ${total}` });
+          }
+          const r = await publishGameLog(G, {
+            numPlayers: Object.keys(G.players).length,
+            halfDecks: session?.config.halfDecks ?? [],
+            aiStyles: session?.config.aiStyles ?? [],
+            source: 'browser-bulk-upload',
+          });
+          if (r.ok) { (r.deduped ? deduped++ : uploaded++); } else { failed++; }
+          setBulkUpload({ kind: 'done', uploaded, deduped, failed });
+          setTimeout(() => setBulkUpload({ kind: 'idle' }), 6000);
+        }}
+      />
       {reportOpen && (
         <ProblemReportDialog
           G={G}
