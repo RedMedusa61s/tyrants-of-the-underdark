@@ -7,6 +7,38 @@
 import type { TyrantsState, Color } from '../game';
 import { ROUTES, ADJACENCY } from '../data/routes';
 import { TROOP_SPACES_BY_ID, sitesSpaces, routeSpaces } from '../data/troop-spaces';
+import { SITES_BY_ID } from '../data/sites';
+import SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
+
+/** Per-route geometric mapping of the two endmost slot indices (0 and N-1) to the
+ *  physical endpoint site each one is closer to. Computed once from calibrated
+ *  slot positions vs site positions, because the (a, b) ordering in routes.ts
+ *  is arbitrary — slot 0 isn't guaranteed to be near `r.a`. Used by
+ *  hasPresenceAtRouteSpace so endmost-slot presence checks the right endpoint
+ *  regardless of how the route was authored. Falls back to (slot0→a, slotN→b)
+ *  for routes whose slot positions aren't calibrated. */
+const ROUTE_ENDMOST_ENDPOINTS: Record<string, { first: SiteId; last: SiteId }> = (() => {
+  const out: Record<string, { first: SiteId; last: SiteId }> = {};
+  const slots = SLOT_POSITIONS as Record<string, { x: number; y: number }>;
+  for (const r of ROUTES) {
+    const lastIdx = r.spaces - 1;
+    if (r.spaces === 0) continue;
+    const slot0 = slots[`${r.id}:0`];
+    const slotN = slots[`${r.id}:${lastIdx}`];
+    const a = SITES_BY_ID[r.a], b = SITES_BY_ID[r.b];
+    if (!slot0 || !slotN || !a || !b) {
+      // No calibration → trust authored direction.
+      out[r.id] = { first: r.a, last: r.b };
+      continue;
+    }
+    const dist = (p: { x: number; y: number }, q: { x: number; y: number }) =>
+      (p.x - q.x) ** 2 + (p.y - q.y) ** 2;
+    // Pick whichever endpoint is nearer to slot 0; the other endpoint owns slot N-1.
+    const firstIsA = dist(slot0, a) + dist(slotN, b) <= dist(slot0, b) + dist(slotN, a);
+    out[r.id] = firstIsA ? { first: r.a, last: r.b } : { first: r.b, last: r.a };
+  }
+  return out;
+})();
 
 export type TroopOwner = Color | 'white';
 export type TroopSpaceId = string;
@@ -54,7 +86,11 @@ export function hasPresenceAtSite(G: TyrantsState, color: Color, siteId: SiteId)
       if (hasTroopAtSite(G, color, adj.other)) return true;
       continue;
     }
-    const adjacentIdx = r.a === siteId ? 0 : sp.length - 1;
+    // Use geometric endpoint mapping (slot 0 might be near r.b rather than r.a,
+    // depending on how the route was authored). Same fix as the endmost branch
+    // of hasPresenceAtRouteSpace.
+    const endpoints = ROUTE_ENDMOST_ENDPOINTS[r.id] ?? { first: r.a, last: r.b };
+    const adjacentIdx = endpoints.first === siteId ? 0 : sp.length - 1;
     if (G.troops[sp[adjacentIdx].id] === color) return true;
   }
   return false;
@@ -73,9 +109,15 @@ export function hasPresenceAtRouteSpace(G: TyrantsState, color: Color, spaceId: 
   if (!r) return false;
   const routeSp = routeSpaces(r.id);
   const idx = s.index;
-  // (a) Endmost: requires troop *at* the endpoint site (not just presence).
-  if (idx === 0 && hasTroopAtSite(G, color, r.a)) return true;
-  if (idx === routeSp.length - 1 && hasTroopAtSite(G, color, r.b)) return true;
+  // (a) Endmost: requires troop *at* the physically-adjacent endpoint site
+  // (not just presence). The (a, b) ordering in routes.ts is arbitrary, so we
+  // look up which endpoint each end-slot is geometrically closer to via
+  // ROUTE_ENDMOST_ENDPOINTS (computed from calibrated slot positions). Without
+  // this indirection, routes authored with the "wrong" a/b order silently
+  // rejected legitimate deploys at one end.
+  const endpoints = ROUTE_ENDMOST_ENDPOINTS[r.id] ?? { first: r.a, last: r.b };
+  if (idx === 0 && hasTroopAtSite(G, color, endpoints.first)) return true;
+  if (idx === routeSp.length - 1 && hasTroopAtSite(G, color, endpoints.last)) return true;
   // (b) Troop on the adjacent space along the same route.
   const a = routeSp[idx - 1];
   const b = routeSp[idx + 1];
@@ -96,27 +138,93 @@ export function hasPresence(G: TyrantsState, color: Color, target: { site?: Site
   return false;
 }
 
-/** Recompute the controller of one or more sites and update G.siteControl atomically. */
+/** Recompute the controller of one or more sites and update G.siteControl
+ *  atomically. Per rulebook p.11: a player controls a site only if they have
+ *  strictly MORE troops there than each other faction — including the white
+ *  (unaligned) troops still on the site. White tokens count toward the
+ *  comparison but cannot themselves "control" anything (a white majority
+ *  just means nobody controls). */
 export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
   for (const siteId of siteIds) {
+    // Tally every owner (including 'white') so the white pile competes.
     const counts: Partial<Record<TroopOwner, number>> = {};
     for (const sp of sitesSpaces(siteId)) {
       const t = G.troops[sp.id];
-      if (t && t !== 'white') counts[t] = (counts[t] || 0) + 1;
+      if (t) counts[t] = (counts[t] || 0) + 1;
     }
-    let leader: Color | null = null;
+    // Strict-majority leader: must exceed every other entry, white included.
+    let leader: TroopOwner | null = null;
     let leaderCount = 0;
     let tied = false;
-    for (const [color, c] of Object.entries(counts) as [Color, number][]) {
-      if (c > leaderCount) { leader = color; leaderCount = c; tied = false; }
+    for (const [owner, c] of Object.entries(counts) as [TroopOwner, number][]) {
+      if (c > leaderCount) { leader = owner; leaderCount = c; tied = false; }
       else if (c === leaderCount) { tied = true; }
     }
-    G.siteControl[siteId] = tied || leaderCount === 0 ? null : leader;
-    // NOTE: site-control marker holders are NOT updated here. Per rulebook
-    // p.11 markers are only claimed at end-of-turn for the active player who
-    // controls the site. Once claimed, the marker stays with that player even
-    // if they lose control until someone else claims it on their own end-of-turn.
-    // See game.ts turn.onEnd for the claim step.
+    // Whites can win the count but cannot be a "controller". If white is the
+    // strict leader, or anyone ties (including with whites), nobody controls.
+    const newController: Color | null = tied || leaderCount === 0 || leader === 'white'
+      ? null
+      : (leader as Color);
+    G.siteControl[siteId] = newController;
+
+    // Site-control marker bookkeeping per the revised rulebook:
+    //   "When you take control of a site that has a control marker, take
+    //    that marker from the game map or from the site's previous
+    //    controller and place it in front of you. If control of the site
+    //    becomes tied, return that site's control marker to the game map."
+    // Transfer the chit immediately on every control change. If we now
+    // have no controller, the chit returns to the map (holder = null).
+    const m = G.controlMarkers[siteId];
+    if (m && m.holder !== newController) {
+      const previous = m.holder;
+      m.holder = newController;
+      if (newController) {
+        G.log.push(`${m.siteId} control marker → ${newController}${previous ? ` (from ${previous})` : ' (from map)'}`);
+      } else if (previous) {
+        G.log.push(`${m.siteId} control marker → returned to map (no controller)`);
+      }
+    }
+
+    // Pay the marker's once-per-turn effect immediately on transfer, so the
+    // active player gets the bonus the moment they take the marker (rulebook
+    // "...starting immediately on the turn you take the marker"). Held-from-
+    // a-previous-turn markers are paid at turn.onBegin; the same ledger
+    // (markerInfluenceGrantedThisTurn) guards against double-paying when a
+    // player flips control on/off mid-turn.
+    if (m && newController === G.activeTurnColor && newController != null) {
+      payMarkerEffect(G, m, newController);
+    }
+  }
+}
+
+/** Apply one control-marker's per-turn effect to `color`'s player, guarded by
+ *  the per-turn ledger so it can fire at most once for that marker. The side
+ *  (control vs total control) is determined from the current board state at
+ *  the moment of payment — flipping to total control AFTER the effect was
+ *  already paid this turn does not retroactively upgrade the payout. */
+function payMarkerEffect(G: TyrantsState, m: { siteId: string; controlInfluence: number; controlVp: number; totalControlInfluence: number; totalControlVp: number }, color: Color): void {
+  if (G.markerInfluenceGrantedThisTurn.includes(m.siteId)) return;
+  const tc = hasTotalControl(G, color, m.siteId);
+  const inf = tc ? m.totalControlInfluence : m.controlInfluence;
+  const vp = tc ? m.totalControlVp : m.controlVp;
+  const pid = Object.keys(G.players).find(k => G.players[k].color === color);
+  if (!pid) return;
+  const p = G.players[pid];
+  if (inf > 0) p.influence += inf;
+  if (vp > 0) p.vp += vp;
+  G.markerInfluenceGrantedThisTurn.push(m.siteId);
+  const parts: string[] = [];
+  if (inf > 0) parts.push(`+${inf} influence`);
+  if (vp > 0) parts.push(`+${vp} VP`);
+  G.log.push(`P${Number(pid) + 1} ${parts.join(', ')} from ${m.siteId} control marker${tc ? ' (TOTAL CONTROL)' : ''}`);
+}
+
+/** Used by turn.onBegin to pay markers the active player already held from a
+ *  previous turn. Re-exported so game.ts can drive the start-of-turn payout
+ *  without duplicating the once-per-turn ledger logic. */
+export function payHeldMarkerEffectsAtTurnStart(G: TyrantsState, color: Color): void {
+  for (const m of Object.values(G.controlMarkers)) {
+    if (m.holder === color) payMarkerEffect(G, m, color);
   }
 }
 

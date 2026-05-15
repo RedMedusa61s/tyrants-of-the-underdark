@@ -1,11 +1,12 @@
 // Static site data for the Tyrants of the Underdark map.
 //
-// Confidence levels:
-//   - id, name, section: confident (rulebook appendix p.15-21 + setup p.5)
-//   - vp, troopSlots, hasControlMarker, isStartingSite: SEEDED from setup illustration
-//     (rulebook p.5) and quick-reference; review against the physical board before locking.
-//   - position (x, y): PLACEHOLDER, normalized 0..1 over the board image. Calibrate via the
-//     /calibrate route in dev (drag sites to fit board image), then commit the JSON back here.
+// Confidence levels (after multiple full game playthroughs):
+//   - id, name, section, vp, troopSlots, hasControlMarker, isStartingSite,
+//     whitesAtStart / whiteSlots: validated against the printed board.
+//   - position (x, y): mostly OCR-derived against the calibrated map image
+//     (see assets/site-positions-ocr.json merged at module load). Sites the
+//     OCR missed keep their seed placeholder positions — currently this is
+//     Ch'Chitl. Recalibrate via the /calibrate dev tab and re-export.
 
 export type Section = 'left' | 'center' | 'right';
 
@@ -63,14 +64,14 @@ const seed = (
 export const SITES: Site[] = [
   // Left section (used in 3p with-left, 4p)
   seed('gauntlgrym',    'Gauntlgrym',                'left',   2, 3, { control: true, start: true, whites: 2 }),
-  seed('blingdenstone', 'Blingdenstone',             'left',   4, 2, { whites: 2 }),
+  seed('blingdenstone', 'Blingdenstone',             'center', 4, 2, { whites: 2 }),
   seed('buiyrandyn',    'Buiyrandyn',                'left',   3, 3, { whites: 1 }),
   seed('jhachalkhyn',   'Jhachalkhyn',               'left',   4, 4, { start: true, whites: 0 }),
   seed('stoneshaft',    'Stoneshaft Clanhold',       'left',   4, 2, { whites: 2 }),
-  seed('gracklstugh',   'Gracklstugh',               'left',   3, 4, { whites: 2 }),
+  seed('gracklstugh',   'Gracklstugh',               'center', 3, 4, { whites: 2 }),
   seed('wormwrithings', 'The Wormwrithings',         'left',   3, 3, { whites: 0 }),
-  seed('skullport',     'Skullport',                 'left',   4, 5, { start: true, whites: 2 }),
-  seed('chasmleap',     'Chasmleap Bridge',          'left',   1, 1, { whites: 0 }),
+  seed('skullport',     'Skullport',                 'center', 4, 5, { start: true, whites: 2 }),
+  seed('chasmleap',     'Chasmleap Bridge',          'center', 1, 1, { whites: 0 }),
 
   // Center section (used in 2p, 3p, 4p)
   seed('menzoberranzan','Menzoberranzan',            'center', 5, 6, { control: true, whites: 3 }),
@@ -84,14 +85,14 @@ export const SITES: Site[] = [
   // Right section (used in 3p with-right, 4p)
   seed('chchitl',       "Ch'Chitl",                  'right',  2, 3, { control: true, start: true, whites: 2 }),
   seed('phaerlin',      'The Phaerlin',              'right',  2, 3, { control: true, whites: 2, whiteSlots: [0, 1] }),
-  seed('llacerellyn',   'Llacerellyn',               'right',  2, 2, { whites: 0 }),
+  seed('llacerellyn',   'Llacerellyn',               'center', 2, 2, { whites: 0 }),
   seed('sszuraassnee',  "Ss'zuraass'nee",            'right',  2, 3, { control: true, whites: 2 }),
-  seed('tsenviilyq',    'Tsenviilyq',                'right',  4, 3, { control: true, whites: 3 }),
+  seed('tsenviilyq',    'Tsenviilyq',                'center', 4, 3, { control: true, whites: 3 }),
   seed('yathchol',      'Yathchol',                  'right',  4, 2, { whites: 2 }),
   seed('chaulssin',     'Chaulssin',                 'right',  4, 5, { start: true, whites: 0 }),
   seed('dekanter',      'Ruins of Dekanter',         'right',  5, 6, { whites: 2 }),
-  seed('everfire',      'Everfire',                  'right',  3, 3, { whites: 0 }),
-  seed('kanaglym',      'Kanaglym',                  'right',  3, 3, { whites: 0 }),
+  seed('everfire',      'Everfire',                  'center', 3, 3, { whites: 0 }),
+  seed('kanaglym',      'Kanaglym',                  'center', 3, 3, { whites: 0 }),
 ];
 
 // Auto-derived positions from OCR of the board image (see scripts/ocr-board.mjs).
