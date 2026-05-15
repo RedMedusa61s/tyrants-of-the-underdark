@@ -209,6 +209,11 @@ export default defineConfig(({ mode }) => {
     if (process.env[k] === undefined) process.env[k] = env[k];
   }
   return {
+    // GitHub Pages serves the site under /<repo-name>/, so production
+    // builds need every asset URL to be prefixed with that path. Dev keeps
+    // the default '/'. Override with VITE_BASE_PATH if you ever deploy to
+    // a different sub-path (custom domain, root deploy, etc.).
+    base: mode === 'production' ? (env.VITE_BASE_PATH || '/tyrants-of-the-underdark/') : '/',
     plugins: [react(), liveLogPlugin()],
     server: { port: 5173, open: false },
     resolve: { alias: { '@': path.resolve(__dirname, 'src') } },

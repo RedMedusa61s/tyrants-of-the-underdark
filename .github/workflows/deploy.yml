@@ -1,40 +1,36 @@
-# Auto-deploy the client to Cloudflare Pages on every push to main.
+# Auto-deploy the client to GitHub Pages on every push to main.
 #
-# One-time setup before this works (Cloudflare side):
-#   1. Create a Cloudflare account (free) and add a project at
-#      Workers & Pages → Create → Pages → Direct Upload. Name it
-#      `tyrants-of-the-underdark` (this name is referenced below as
-#      projectName). No build settings to configure — this workflow
-#      uploads a pre-built dist directly.
-#   2. Create an API token at
-#      https://dash.cloudflare.com/profile/api-tokens → Create Token →
-#      template "Edit Cloudflare Workers" (which includes Pages:Edit).
-#      Restrict it to your account.
-#   3. Grab the Account ID from the right sidebar of the Cloudflare
-#      dashboard home.
+# One-time setup before this works:
+#   Repo → Settings → Pages → Source: "GitHub Actions" (NOT "Deploy from a
+#   branch"). After the first workflow run the site will be available at
+#     https://<user>.github.io/<repo>/
+#   which for this repo is
+#     https://johnchampaign.github.io/tyrants-of-the-underdark/
 #
-# One-time setup (GitHub side):
-#   Repo → Settings → Secrets and variables → Actions → New repository
-#   secret, add two:
-#     - CLOUDFLARE_API_TOKEN     (the token from step 2)
-#     - CLOUDFLARE_ACCOUNT_ID    (the account ID from step 3)
-#
-# After that, every push to main builds and deploys automatically.
-# Manual runs are also available via the Actions tab.
+# That's it — no API tokens or secrets to add. Every push to main builds and
+# deploys automatically; you can also run it on demand via the Actions tab.
 
-name: Deploy to Cloudflare Pages
+name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
+# GitHub Pages requires these specific permissions to publish from Actions.
 permissions:
   contents: read
-  deployments: write
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deploy; queue new runs but cancel in-progress
+# ones so the most recent push wins.
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repo
@@ -52,21 +48,27 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Point the in-app problem-report and game-log uploaders at
-          # your Cloudflare Worker relay (the one in worker/). Leave
-          # blank to fall back to localhost dev middleware (which won't
-          # exist in production, so reports just silently no-op).
-          # Override per-environment via GitHub repo variable
-          # VITE_TOTU_RELAY_URL if/when the worker is deployed.
+          # The in-app problem-report and game-log uploaders look for a
+          # Cloudflare-Worker relay URL here. Leave it unset and those
+          # uploaders just no-op in production (which is fine — they're
+          # nice-to-have telemetry, not core gameplay).
           VITE_TOTU_RELAY_URL: ${{ vars.VITE_TOTU_RELAY_URL }}
 
-      - name: Publish to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload built artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Wrangler 3 syntax: deploy the built dist/ to the named
-          # Pages project. Production branch lives on `main`; pushes
-          # to other branches go to preview deployments at
-          # <branch>.<project>.pages.dev.
-          command: pages deploy dist --project-name=tyrants-of-the-underdark --branch=${{ github.ref_name }}
+          path: dist
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

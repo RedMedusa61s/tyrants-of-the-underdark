@@ -1,21 +1,48 @@
 # Tyrants of the Underdark
 
-A TypeScript + React + boardgame.io port of the original (2016) edition of *Tyrants
-of the Underdark* by Wizards of the Coast. Single-player hot-seat: P1 is the human,
-P2–P4 are configurable AI opponents (random or heuristic).
+An unofficial, fan-made digital port of the deck-building / area-control board game
+*Tyrants of the Underdark* (original 2016 edition by Wizards of the Coast). Built
+with TypeScript, React, and [boardgame.io](https://boardgame.io). Single-player
+hot-seat: one human seat plus configurable AI opponents (random or heuristic) for
+2-, 3-, and 4-player games.
 
-## Status
+## Play it
 
-Playable scaffold with substantial card-effect coverage. Active development; see
-"Report a problem" in-app for filing bugs.
+→ **<https://johnchampaign.github.io/tyrants-of-the-underdark/>**
 
-## Quick start
+→ **Source code:** <https://github.com/johnchampaign/tyrants-of-the-underdark>
+
+The site auto-deploys from `main` via the GitHub Actions workflow in
+`.github/workflows/deploy.yml`. No account or download required — just open the URL.
+
+### First-run image download (one time, ~25 MB)
+
+The first time you load the page you'll be asked whether to import card and board
+images. These art assets are owned by Wizards of the Coast and aren't redistributed
+from this repo. The importer fetches them from the original publisher-uploaded
+images hosted on imgur (the same set used by the public Tabletop Simulator workshop
+mod), slices the deck sheets into individual cards in your browser, and stores
+everything in IndexedDB so subsequent loads are instant.
+
+If you'd rather not download the art, **click "Skip — play with placeholders"** on
+the import dialog (or toggle "Images: off" in the header at any time). The game
+runs in a no-images schematic mode: cards are rendered as text panels showing the
+same name, cost, aspect, and effect text; the map is drawn as a node-and-edge
+diagram with site cards and route lines. Gameplay is fully identical between modes;
+only the visuals change.
+
+## Local development
 
 ```bash
 npm install
-npm run extract-assets   # see "Assets" below
 npm run dev              # http://localhost:5173
 ```
+
+The dev build also supports the optional `npm run extract-assets` flow if you have
+the [TTS Workshop mod 881660322](https://steamcommunity.com/sharedfiles/filedetails/?id=881660322)
+installed locally — it pulls images out of the mod's cached files and writes them
+to `assets/`. This is only needed if you want to work on art/calibration tooling;
+the in-app importer covers normal use.
 
 ## Assets (copyright)
 
