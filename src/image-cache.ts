@@ -231,9 +231,24 @@ async function fetchAndStore(relativePath: string): Promise<Blob> {
  *  the page unload clean it up). */
 const blobUrlCache = new Map<string, string>();
 
+/** Minimum plausible size for a sliced card blob. The old buggy slicer (which
+ *  ran on Safari iOS's downsampled sheet) wrote near-empty JPEGs to
+ *  IndexedDB for tiles in the lower-right of the sheet — typically under
+ *  3KB of mostly-transparent data. Real card slices are 40-150KB. Any
+ *  cached entry under this threshold is presumed corrupt and re-sliced. */
+const MIN_VALID_CARD_BLOB_BYTES = 5_000;
+
 export async function getImageBlobUrl(relativePath: string): Promise<string> {
   if (blobUrlCache.has(relativePath)) return blobUrlCache.get(relativePath)!;
   let blob = await dbGet(relativePath);
+  // Detect blobs that were saved by the pre-fix slicer (Safari iOS, sheet
+  // downsampled past its decode cap, lower-right tiles cropped from outside
+  // the actually-decoded pixel data). They roundtripped to IndexedDB as
+  // tiny near-empty JPEGs. Treat them as a miss and re-slice with the new
+  // createImageBitmap crop pipeline.
+  if (blob && parseCardPath(relativePath) && blob.size < MIN_VALID_CARD_BLOB_BYTES) {
+    blob = undefined;
+  }
   if (!blob) blob = await fetchAndStore(relativePath);
   const url = URL.createObjectURL(blob);
   blobUrlCache.set(relativePath, url);
