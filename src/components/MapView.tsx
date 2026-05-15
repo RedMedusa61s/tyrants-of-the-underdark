@@ -6,6 +6,9 @@ import type { TyrantsState, Color } from '../game';
 import COMMITTED_SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
 import { useCachedImage } from '../image-cache';
 import { isNoImagesMode } from '../App';
+import { loadSectionDividers } from './SectionDividerCalibration';
+import { loadMarkerPositions } from './MarkerCalibration';
+import { hasTotalControl } from '../engine/map-state';
 
 const COLOR_HEX: Record<Color, string> = {
   // Lifted toward grey so tokens contrast against near-black site boxes.
@@ -61,6 +64,103 @@ function loadRouteOverrides(): Route[] | null {
   } catch { return null; }
 }
 function saveRouteOverrides(r: Route[]) { localStorage.setItem(ROUTES_STORAGE_KEY, JSON.stringify(r)); }
+
+/** Sites with a printed control marker. The visual is rendered procedurally
+ *  in `ControlMarkerToken` from each site's values, so no per-site asset
+ *  files are required. */
+const MARKER_SITES = new Set([
+  'gauntlgrym', 'menzoberranzan', 'araumycos', 'chchitl',
+  'phaerlin', 'sszuraassnee', 'tsenviilyq',
+]);
+
+/** Anchored overlay for a control marker on the image-mode board. Rendered
+ *  entirely as inline SVG from the site's values — no image assets. Mimics
+ *  the physical marker's visual hierarchy (decorative purple disc, central
+ *  bonus glyph, side label at bottom) while giving us pixel-perfect control
+ *  of which side is up and which per-site VP value is printed. The ring
+ *  around the disc carries the holder color; total control thickens the
+ *  ring and brightens its glow. */
+function ControlMarkerToken(
+  { siteId, x, y, controller, totalControl, totalControlInfluence, totalControlVp, controlInfluence }:
+  { siteId: string; x: number; y: number;
+    controller: Color | null;
+    totalControl: boolean;
+    controlInfluence: number;
+    totalControlInfluence: number; totalControlVp: number }
+) {
+  if (!MARKER_SITES.has(siteId)) return null;
+  // Per revised rulebook the chit transfers (or returns to the map) the
+  // instant control changes — so the holder always equals the controller.
+  // One visual state per case: a solid coloured ring (with thicker stroke
+  // and brighter halo on total control) for whoever currently controls, or
+  // a thin gold "unclaimed" ring when nobody does.
+  const ringColor = controller ? COLOR_HEX[controller] : 'rgba(255,204,68,0.65)';
+  const borderWidth = !controller ? 2 : totalControl ? 6 : 3;
+  const sideLabel = totalControl ? 'TOTAL CONTROL' : 'CONTROL';
+  const inf = totalControl ? totalControlInfluence : controlInfluence;
+  const vp = totalControl ? totalControlVp : 0;
+  // Two-line center stack: "+N inf" (always) then "+N VP" (total-control only).
+  return (
+    <div title={`Control: +${controlInfluence} influence/turn. Total control: +${totalControlInfluence} influence/turn + ${totalControlVp} VP/turn.\n${
+      controller ? `Held by ${controller}${totalControl ? ' (TOTAL CONTROL)' : ''}.` : 'On the map — unclaimed.'
+    }`}
+      style={{
+        position: 'absolute',
+        left: `${x * 100}%`,
+        top: `${y * 100}%`,
+        transform: 'translate(-50%, -50%)',
+        width: 110, height: 110,
+        pointerEvents: 'none', zIndex: 6,
+        filter: controller
+          ? `drop-shadow(0 0 ${totalControl ? 10 : 6}px ${ringColor})`
+          : 'drop-shadow(0 1px 3px rgba(0,0,0,0.6))',
+      }}>
+      <svg viewBox="0 0 100 100" width="100%" height="100%">
+        {/* Disc with the marker's signature deep-purple fill and a thin
+            decorative inner ring to read as a chip, not a flat circle. */}
+        <circle cx="50" cy="50" r="48" fill={totalControl ? '#3a2055' : '#241638'}
+          stroke={ringColor} strokeWidth={borderWidth} />
+        <circle cx="50" cy="50" r="42" fill="none"
+          stroke="rgba(196,163,245,0.25)" strokeWidth="1" />
+        {/* Center value stack. "+N" + drawn cobweb icon (influence); the VP
+            line is drawn only on the total-control face. The cobweb is built
+            from concentric arcs + radial spokes so it renders identically
+            across browsers regardless of emoji-font coverage. */}
+        <text x="42" y={vp > 0 ? 46 : 58} textAnchor="middle"
+          fontSize="22" fontWeight="700" fill="#fff"
+          fontFamily="Georgia, serif">+{inf}</text>
+        <g transform={`translate(58, ${vp > 0 ? 40 : 52}) scale(1)`}>
+          <circle cx="0" cy="0" r="6" fill="none" stroke="#fff" strokeWidth="0.7" />
+          <circle cx="0" cy="0" r="4" fill="none" stroke="#fff" strokeWidth="0.6" />
+          <circle cx="0" cy="0" r="2" fill="none" stroke="#fff" strokeWidth="0.5" />
+          <line x1="-6" y1="0"    x2="6"  y2="0"    stroke="#fff" strokeWidth="0.5" />
+          <line x1="0"  y1="-6"   x2="0"  y2="6"    stroke="#fff" strokeWidth="0.5" />
+          <line x1="-4.2" y1="-4.2" x2="4.2" y2="4.2"  stroke="#fff" strokeWidth="0.5" />
+          <line x1="-4.2" y1="4.2"  x2="4.2" y2="-4.2" stroke="#fff" strokeWidth="0.5" />
+        </g>
+        {vp > 0 && (
+          <text x="50" y="68" textAnchor="middle"
+            fontSize="18" fontWeight="700" fill="#ffd966"
+            fontFamily="Georgia, serif">
+            +{vp} VP
+          </text>
+        )}
+        {/* Bottom arc label: which side is up. SVG textPath curving along an
+            invisible arc near the marker's bottom rim, matching the printed
+            marker's "CONTROL" / "TOTAL CONTROL" wraparound. */}
+        <defs>
+          <path id={`arc-${siteId}`} d="M 14 64 A 38 38 0 0 0 86 64" fill="none" />
+        </defs>
+        <text fontSize={totalControl ? 9 : 10} fontWeight="700"
+          fill="rgba(255,255,255,0.85)" letterSpacing="1.5">
+          <textPath href={`#arc-${siteId}`} startOffset="50%" textAnchor="middle">
+            {sideLabel}
+          </textPath>
+        </text>
+      </svg>
+    </div>
+  );
+}
 
 export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, clickableSpaces, onSpaceClick }: MapViewProps) {
   const boardUrl = useCachedImage('assets/board/map.jpg');
@@ -162,22 +262,97 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 stroke="rgba(196,163,245,0.35)" strokeWidth={2} />;
             })}
           </svg>
-          {/* Site labels — same position the printed art would have used. */}
-          {SITES.filter(s => isSiteActive(s.id)).map(s => {
+          {/* Site cards — name + slots enclosed by a single border. Schematic
+              mode lays site spaces out inside the card itself so the user
+              sees the slot pips as part of the site instead of as floating
+              dots near where the printed art would have been. The full card
+              is clickable for site-pick prompts; each slot dot is
+              individually clickable for space-pick prompts. */}
+          {G && SITES.filter(s => isSiteActive(s.id)).map(s => {
             const p = pos(s);
+            const isClickable = !!clickableSites?.has(s.id);
+            const controller = G.siteControl[s.id] ?? null;
+            const spaces = sitesSpaces(s.id);
             return (
               <div key={s.id} style={{
                 position: 'absolute', left: `${p.x * 100}%`, top: `${p.y * 100}%`,
                 transform: 'translate(-50%, -50%)',
-                padding: '4px 10px', fontSize: 11, fontWeight: 600,
-                background: 'rgba(20, 14, 40, 0.85)',
+                padding: '4px 8px',
+                background: 'rgba(20, 14, 40, 0.92)',
                 color: '#e6e1f2',
-                border: '1px solid #5a3380',
-                borderRadius: 12,
+                border: isClickable ? '2px solid #ffcc44'
+                  : controller ? `2px solid ${COLOR_HEX[controller]}`
+                  : s.isStartingSite ? '1px solid #ffcc44'
+                  : '1px solid #5a3380',
+                borderRadius: 8,
+                boxShadow: isClickable ? '0 0 10px #ffcc44' : undefined,
+                cursor: isClickable ? 'pointer' : 'default',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-              }}>
-                {s.name} <span style={{ opacity: 0.6 }}>({s.vp})</span>
+                zIndex: 5,
+              }}
+                onClick={() => { if (isClickable) onSiteClick?.(s.id); }}>
+                <div style={{ fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>{s.name}</span>
+                  <span style={{ opacity: 0.6 }}>({s.vp})</span>
+                  {/* Schematic marker stack: a two-row chip pair mirroring
+                      the two faces of the physical marker. The active face
+                      (current control state) gets the holder color and a
+                      bright border; the inactive face is dimmed. Mirrors the
+                      image-mode SVG marker's information without requiring
+                      a circular disc on a text-based site card. */}
+                  {s.hasControlMarker && G.controlMarkers[s.id] && (() => {
+                    const m = G.controlMarkers[s.id];
+                    // Chit holder == current controller per the revised
+                    // rulebook (immediate transfer / return-to-map on tie),
+                    // so a single state drives both chips.
+                    const controller = G.siteControl[s.id] ?? null;
+                    const tc = controller ? hasTotalControl(G, controller, s.id) : false;
+                    const activeColor = controller ? COLOR_HEX[controller] : '#ffcc44';
+                    const fontText = controller === 'black' ? '#fff' : '#1a1228';
+                    const dim = { background: 'rgba(20,14,40,0.85)', color: 'rgba(230,225,242,0.7)', border: '1px solid #5a3380' };
+                    const lit = { background: activeColor, color: fontText, border: '1px solid #fff' };
+                    const cStyle = (controller && !tc) ? lit : dim;
+                    const tcStyle = tc ? lit : dim;
+                    return (
+                      <span title={`Control face: +${m.controlInfluence} influence (and +${m.controlVp} VP) when paid this turn.\nTotal-control face: +${m.totalControlInfluence} influence + ${m.totalControlVp} VP when paid this turn.\n${
+                        controller ? `Held by ${controller}${tc ? ' (TOTAL CONTROL)' : ''}.` : 'On the map — unclaimed.'
+                      }`}
+                        style={{ display: 'inline-flex', flexDirection: 'column', gap: 1, fontSize: 8, fontWeight: 700, lineHeight: 1.1 }}>
+                        <span style={{ ...cStyle, borderRadius: 2, padding: '0 4px', letterSpacing: 0.3 }}>
+                          C +{m.controlInfluence}inf
+                        </span>
+                        <span style={{ ...tcStyle, borderRadius: 2, padding: '0 4px', letterSpacing: 0.3 }}>
+                          TC +{m.totalControlInfluence}inf{m.totalControlVp > 0 ? ` +${m.totalControlVp}VP` : ''}
+                        </span>
+                      </span>
+                    );
+                  })()}
+                </div>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {spaces.map((sp, i) => {
+                    const occ = G.troops[sp.id];
+                    const spClick = !!clickableSpaces?.has(sp.id);
+                    const sz = spClick ? 16 : 14;
+                    return (
+                      <div key={sp.id}
+                        onClick={(e) => { if (spClick) { e.stopPropagation(); onSpaceClick?.(sp.id); } }}
+                        title={`${s.name} — slot ${i + 1}${occ ? ` · ${occ}` : ''}`}
+                        style={{
+                          width: sz, height: sz, borderRadius: '50%',
+                          background: occ === 'white' ? WHITE_TOKEN
+                            : occ ? COLOR_HEX[occ]
+                            : 'transparent',
+                          border: spClick ? '2px solid #ffcc44'
+                            : occ === 'black' ? '2px solid #e6e1f2'
+                            : occ ? '2px solid #fff'
+                            : '1px dashed rgba(255,255,255,0.35)',
+                          boxShadow: spClick ? '0 0 6px #ffcc44' : undefined,
+                          cursor: spClick ? 'pointer' : 'default',
+                        }} />
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
@@ -185,6 +360,103 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
       ) : (
         <img id="totu-board" src={boardUrl} alt="game board" style={{ width: '100%', display: 'block', userSelect: 'none' }} draggable={false} />
       )}
+
+      {/* Inactive-section dimmer. The printed board image is always the whole map,
+          but in 2P (center only) and 3P (center + one outer) some sections are
+          out of play. We darken those regions using calibrated polylines that
+          follow the printed dashed-purple section boundaries. Falls back to a
+          vertical midpoint cut if a polyline has fewer than 2 points (i.e.
+          hasn't been calibrated yet). */}
+      {G && !calibrate && !editRoutes && (() => {
+        const sectionsInPlay = new Set(SITES.filter(s => activeSites.has(s.id)).map(s => s.section));
+        if (sectionsInPlay.size >= 3) return null;
+        const inactive = (['left','center','right'] as const).filter(sec => !sectionsInPlay.has(sec));
+        const dividers = loadSectionDividers();
+        // Build x-fallback midpoints if we need them.
+        const bounds: Record<'left'|'center'|'right', { min: number; max: number } | null> = {
+          left: null, center: null, right: null,
+        };
+        for (const s of SITES) {
+          const p = pos(s);
+          const b = bounds[s.section];
+          if (!b) bounds[s.section] = { min: p.x, max: p.x };
+          else { b.min = Math.min(b.min, p.x); b.max = Math.max(b.max, p.x); }
+        }
+        const midLC = bounds.left && bounds.center ? (bounds.left.max + bounds.center.min) / 2 : 0.33;
+        const midCR = bounds.center && bounds.right ? (bounds.center.max + bounds.right.min) / 2 : 0.66;
+        // Extend a polyline to span y=0..1 by clamping (vertical line from
+        // first/last point) so the polygon always closes against board edges.
+        function extendVertical(pts: { x: number; y: number }[]): { x: number; y: number }[] {
+          if (pts.length === 0) return [];
+          const sorted = [...pts].sort((a, b) => a.y - b.y);
+          const out: { x: number; y: number }[] = [];
+          if (sorted[0].y > 0) out.push({ x: sorted[0].x, y: 0 });
+          out.push(...sorted);
+          if (sorted[sorted.length - 1].y < 1) out.push({ x: sorted[sorted.length - 1].x, y: 1 });
+          return out;
+        }
+        // Build the polygon (in normalized 0..1) covering `sec`. The polygon
+        // goes top-down along the left edge (board edge or LC divider), then
+        // bottom-up along the right edge (CR divider or board edge).
+        function polygonFor(sec: 'left'|'center'|'right'): string {
+          const lc = extendVertical(dividers.leftCenter);
+          const cr = extendVertical(dividers.centerRight);
+          const useLC = lc.length >= 2;
+          const useCR = cr.length >= 2;
+          // left edge of this section's polygon, top→bottom
+          let leftEdge: { x: number; y: number }[];
+          // right edge, top→bottom (we'll reverse for polygon traversal)
+          let rightEdge: { x: number; y: number }[];
+          if (sec === 'left') {
+            leftEdge = [{ x: 0, y: 0 }, { x: 0, y: 1 }];
+            rightEdge = useLC ? lc : [{ x: midLC, y: 0 }, { x: midLC, y: 1 }];
+          } else if (sec === 'right') {
+            leftEdge = useCR ? cr : [{ x: midCR, y: 0 }, { x: midCR, y: 1 }];
+            rightEdge = [{ x: 1, y: 0 }, { x: 1, y: 1 }];
+          } else {
+            leftEdge = useLC ? lc : [{ x: midLC, y: 0 }, { x: midLC, y: 1 }];
+            rightEdge = useCR ? cr : [{ x: midCR, y: 0 }, { x: midCR, y: 1 }];
+          }
+          const ring = [...leftEdge, ...[...rightEdge].reverse()];
+          return ring.map(p => `${p.x * 100}% ${p.y * 100}%`).join(', ');
+        }
+        // Pick an interior point of the polygon for the "OUT OF PLAY" label.
+        // Use the centroid of the polygon's points.
+        function labelPosition(sec: 'left'|'center'|'right'): { x: number; y: number } {
+          const poly = polygonFor(sec).split(', ').map(s => {
+            const [xs, ys] = s.split(' ');
+            return { x: parseFloat(xs) / 100, y: parseFloat(ys) / 100 };
+          });
+          const cx = poly.reduce((a, p) => a + p.x, 0) / poly.length;
+          const cy = poly.reduce((a, p) => a + p.y, 0) / poly.length;
+          return { x: cx, y: cy };
+        }
+        return inactive.map(sec => {
+          const clip = polygonFor(sec);
+          const lp = labelPosition(sec);
+          return (
+            <div key={`dim-${sec}`} style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(8, 4, 18, 0.72)',
+              clipPath: `polygon(${clip})`,
+              WebkitClipPath: `polygon(${clip})`,
+              pointerEvents: 'none',
+              zIndex: 4,
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: `${lp.y * 100}%`, left: `${lp.x * 100}%`,
+                transform: 'translate(-50%, -50%)',
+                padding: '4px 10px', fontSize: 11, color: '#c4a3f5',
+                background: 'rgba(20, 14, 40, 0.85)', border: '1px solid #3a2055', borderRadius: 4,
+                letterSpacing: 1, textTransform: 'uppercase',
+              }}>
+                out of play
+              </div>
+            </div>
+          );
+        });
+      })()}
 
       {/* Routes overlay — only drawn in editor mode (the printed board already shows them).
           In normal play the route troop spaces along the printed lines are what matter. */}
@@ -210,7 +482,11 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
         const pa = pos(a), pb = pos(b);
         return Array.from({ length: r.spaces }, (_, i) => {
           const spaceId = `${r.id}:${i}`;
-          const calibrated = slotPositions[spaceId];
+          // Schematic mode: ignore calibrated positions (they were authored
+          // against the printed board's curvy routes). Pin slots evenly along
+          // the straight schematic line so they sit exactly on the rendered
+          // route, instead of floating off it.
+          const calibrated = useSchematic ? undefined : slotPositions[spaceId];
           let x: number, y: number;
           if (calibrated) {
             x = calibrated.x; y = calibrated.y;
@@ -239,6 +515,40 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           );
         });
       })}
+
+      {/* Control-marker overlay (image mode only). For each control-marker
+          site, anchor the marker token image to the upper-left of the site
+          position. If a player holds the marker, ring it in their color and
+          show "X/Y" VP underneath. The schematic mode shows the same info
+          inline on the site card, so this overlay is skipped there. */}
+      {!editRoutes && !useSchematic && G && (() => {
+        // Per-site marker overrides from the markers calibration tab. Falls
+        // back to (site position + small y nudge) when not set.
+        const markerPositions = loadMarkerPositions();
+        return SITES.filter(s => isSiteActive(s.id) && s.hasControlMarker).map(s => {
+          const m = G.controlMarkers[s.id];
+          if (!m) return null;
+          const sp = pos(s);
+          const override = markerPositions[s.id];
+          const mx = override?.x ?? sp.x;
+          const my = override?.y ?? (sp.y + 0.025);
+          // Controller is now the single source of truth: the chit moves
+          // to the controller immediately on every control change, and
+          // returns to the map if the site becomes uncontrolled. So
+          // m.holder == G.siteControl[s.id] always (no stale holder state).
+          const controller = G.siteControl[s.id] ?? null;
+          const tc = controller ? hasTotalControl(G, controller, s.id) : false;
+          return (
+            <ControlMarkerToken key={`marker-${s.id}`}
+              siteId={s.id} x={mx} y={my}
+              controller={controller}
+              totalControl={tc}
+              controlInfluence={m.controlInfluence}
+              totalControlInfluence={m.totalControlInfluence}
+              totalControlVp={m.totalControlVp} />
+          );
+        });
+      })()}
 
       {/* Calibrate/route-edit mode keeps the labeled site rectangle visible for dragging
           and route picking. Normal play hides it; tokens render directly on calibrated
@@ -277,8 +587,10 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
       })}
 
       {/* Site-slot tokens: one per space, positioned exactly on the printed slot.
-          Falls back to an offset cluster around the site center if not calibrated. */}
-      {!editRoutes && G && SITES.filter(s => isSiteActive(s.id)).flatMap(s => {
+          Falls back to an offset cluster around the site center if not calibrated.
+          Suppressed in schematic mode — the in-card slot dots above handle both
+          rendering and clicks. */}
+      {!editRoutes && !useSchematic && G && SITES.filter(s => isSiteActive(s.id)).flatMap(s => {
         const sitePos = pos(s);
         const controller = G.siteControl[s.id] ?? null;
         return sitesSpaces(s.id).map((sp, i) => {
@@ -342,7 +654,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           satisfy troop-space picks. Prevents the slot/site click conflation that made
           Spellspinner-style supplant chains require two clicks (one for spy-return
           site, one for supplant troop) on the same visual location. */}
-      {!editRoutes && G && clickableSites && clickableSites.size > 0 && SITES.filter(s => isSiteActive(s.id)).map(s => {
+      {!editRoutes && !useSchematic && G && clickableSites && clickableSites.size > 0 && SITES.filter(s => isSiteActive(s.id)).map(s => {
         if (!clickableSites.has(s.id)) return null;
         const p = pos(s);
         const spaces = sitesSpaces(s.id);

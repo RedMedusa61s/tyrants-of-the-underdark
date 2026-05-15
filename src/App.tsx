@@ -7,6 +7,8 @@ import { CardCalibration } from './components/CardCalibration';
 import { CostVerify } from './components/CostVerify';
 import { SiteVerify } from './components/SiteVerify';
 import { SlotCalibration } from './components/SlotCalibration';
+import { SectionDividerCalibration } from './components/SectionDividerCalibration';
+import { MarkerCalibration } from './components/MarkerCalibration';
 import { GameLog } from './components/GameLog';
 import { CardTextVerify } from './components/CardTextVerify';
 import { RouteVerify } from './components/RouteVerify';
@@ -137,7 +139,7 @@ type BaseAction = null | { kind: 'deploy' | 'assassinate' } | { kind: 'return-sp
 
 function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const session = useContext(SessionContext);
-  const [tab, setTab] = useState<'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'log'>('game');
+  const [tab, setTab] = useState<'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>('game');
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [devMode, setDevModeState] = useState<boolean>(initialDevMode);
@@ -641,7 +643,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
         {(devMode
-          ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'log'] as const
+          ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'dividers', 'markers', 'log'] as const
           : ['game', 'map', 'log'] as const
         ).map(t => (
           <button key={t} onClick={() => {
@@ -692,6 +694,8 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {tab === 'sites' && <div style={{ marginTop: 16 }}><SiteVerify /></div>}
       {tab === 'whites' && <div style={{ marginTop: 16 }}><RouteVerify /></div>}
       {tab === 'slots' && <div style={{ marginTop: 16 }}><SlotCalibration /></div>}
+      {tab === 'dividers' && <div style={{ marginTop: 16 }}><SectionDividerCalibration /></div>}
+      {tab === 'markers' && <div style={{ marginTop: 16 }}><MarkerCalibration /></div>}
       {tab === 'log' && <div style={{ marginTop: 16 }}><GameLog G={G} onLoad={(codec) => moves.loadState(codec)} /></div>}
 
       {tab === 'game' && <>
