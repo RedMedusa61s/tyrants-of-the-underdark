@@ -696,7 +696,15 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {tab === 'slots' && <div style={{ marginTop: 16 }}><SlotCalibration /></div>}
       {tab === 'dividers' && <div style={{ marginTop: 16 }}><SectionDividerCalibration /></div>}
       {tab === 'markers' && <div style={{ marginTop: 16 }}><MarkerCalibration /></div>}
-      {tab === 'log' && <div style={{ marginTop: 16 }}><GameLog G={G} onLoad={(codec) => moves.loadState(codec)} /></div>}
+      {tab === 'log' && <div style={{ marginTop: 16 }}>
+        <GameLog G={G}
+          onLoad={(codec) => moves.loadState(codec)}
+          publishContext={session ? {
+            numPlayers: Object.keys(G.players).length,
+            halfDecks: session.config.halfDecks,
+            aiStyles: session.config.aiStyles,
+          } : undefined} />
+      </div>}
 
       {tab === 'game' && <>
         {G.pendingChoice && (
