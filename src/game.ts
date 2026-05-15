@@ -31,6 +31,10 @@ export interface PlayerData {
   trophyHall: Record<Color | 'white', number>;
   /** Troops remaining in your barracks (start 40, rulebook p.2). When 0, deploys give 1 VP. */
   barracksLeft: number;
+  /** Spy figures left in your supply (start 5, rulebook). When 0, a "place
+   *  a spy" effect either skips entirely or lets you return one of your
+   *  already-placed spies to the supply and place it elsewhere. */
+  spiesLeft: number;
   power: number;
   influence: number;
   vp: number;
@@ -297,6 +301,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         innerCircle: [],
         trophyHall: { black: 0, red: 0, orange: 0, blue: 0, white: 0 },
         barracksLeft: 40,
+        spiesLeft: 5,
         power: 0,
         influence: 0,
         vp: 0,
@@ -702,8 +707,12 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (!hasPresence(G, p.color, { site: siteId })) return INVALID_MOVE;
       if (!(G.spies[siteId] ?? []).includes(targetColor)) return INVALID_MOVE;
       if (!Mechanics.expendPower(G, pid, 3)) return INVALID_MOVE;
-      returnSpy(G, targetColor, siteId);
-      Mechanics.log(G, `P${Number(pid) + 1} returned ${targetColor} spy from ${siteId}`);
+      if (returnSpy(G, targetColor, siteId)) {
+        // Returned spy goes back to ITS OWNER's supply (not yours).
+        const ownerPid = Object.keys(G.players).find(k => G.players[k].color === targetColor);
+        if (ownerPid) G.players[ownerPid].spiesLeft += 1;
+        Mechanics.log(G, `P${Number(pid) + 1} returned ${targetColor} spy from ${siteId}`);
+      }
     },
 
     /** Rewind to a previously captured snapshot. The codec string is whatever the

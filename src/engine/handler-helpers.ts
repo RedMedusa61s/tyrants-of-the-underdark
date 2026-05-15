@@ -50,31 +50,131 @@ export function flagEotPromote(opts?: { count?: number }): EffectHandler {
 
 export function placeSpyAtChosenSite(opts?: { optional?: boolean }): EffectHandler {
   return ctx => {
-    if (!ctx.pendingChoice) {
-      const myColor = ctx.G.players[ctx.actorId].color;
-      const eligible = SITES
-        .filter(s => s.id in ctx.G.siteControl && !(ctx.G.spies[s.id] ?? []).includes(myColor))
-        .map(s => s.id);
+    const me = ctx.G.players[ctx.actorId];
+    const myColor = me.color;
+    type Phase = 'init' | 'place' | 'empty-choice' | 'empty-return' | 'empty-place';
+    const state = (ctx.handlerState as { phase: Phase } | null) ?? { phase: 'init' as Phase };
+
+    // Helper: list of sites where a fresh spy could land. Must be in play
+    // and not already have one of my spies.
+    const placeableSites = () => SITES
+      .filter(s => s.id in ctx.G.siteControl && !(ctx.G.spies[s.id] ?? []).includes(myColor))
+      .map(s => s.id);
+    // Helper: sites where I currently have a spy (eligible to return).
+    const ownSpySites = () => SITES
+      .filter(s => (ctx.G.spies[s.id] ?? []).includes(myColor))
+      .map(s => s.id);
+
+    // ---- Phase 0: entry. Branch on whether the supply has any spies left.
+    if (state.phase === 'init') {
+      if (me.spiesLeft > 0) {
+        // Normal path: prompt for the site to place at.
+        ctx.pendingChoice = {
+          kind: 'select-site',
+          prompt: 'Place a spy at which site?',
+          options: placeableSites(),
+          optional: opts?.optional,
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = { phase: 'place' };
+        return false;
+      }
+      // Supply empty (rulebook: "either do nothing OR first return one of
+      // your existing spies and then place it"). Offer the choice. If the
+      // player has no own spies on the board either — somehow — only the
+      // skip path is available, so we skip silently.
+      if (ownSpySites().length === 0) {
+        Mechanics.log(ctx.G, `(place spy: supply empty and no spies on board — skipped)`);
+        ctx.handlerState = null;
+        return true;
+      }
       ctx.pendingChoice = {
-        kind: 'select-site',
-        prompt: 'Place a spy at which site?',
-        options: eligible,
-        optional: opts?.optional,
+        kind: 'choose-one',
+        prompt: 'Your spy supply is empty. What would you like to do?',
+        options: ['Do nothing', 'Return a placed spy, then place it at a new site'],
       } as PendingChoice;
       ctx.paused = true;
+      ctx.handlerState = { phase: 'empty-choice' };
       return false;
     }
-    const siteId = ctx.pendingChoice.response as string | null;
-    ctx.pendingChoice = null;
-    ctx.paused = false;
-    if (siteId) {
-      const myColor = ctx.G.players[ctx.actorId].color;
-      if (placeSpy(ctx.G, myColor, siteId)) {
-        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} placed spy at ${siteId}`);
-        // Stash for any chained handlers that target the spy's site.
+
+    // ---- Phase: normal place — resume from the place-site prompt.
+    if (state.phase === 'place') {
+      const siteId = ctx.pendingChoice?.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      ctx.handlerState = null;
+      if (siteId && placeSpy(ctx.G, myColor, siteId)) {
+        me.spiesLeft -= 1;
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} placed spy at ${siteId} (spies left: ${me.spiesLeft})`);
         (ctx.G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite = siteId;
       }
+      return true;
     }
+
+    // ---- Phase: empty-supply skip-vs-return choice.
+    if (state.phase === 'empty-choice') {
+      const idx = ctx.pendingChoice?.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (idx == null || idx === 0) {
+        // "Do nothing" or implicit dismissal.
+        Mechanics.log(ctx.G, `(place spy: supply empty, declined to return-and-replace)`);
+        ctx.handlerState = null;
+        return true;
+      }
+      // Picked "return a placed spy, then place". Prompt for the return site.
+      ctx.pendingChoice = {
+        kind: 'select-site',
+        prompt: 'Return a spy from which site?',
+        options: ownSpySites(),
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { phase: 'empty-return' };
+      return false;
+    }
+
+    // ---- Phase: empty-supply return-site picked, now do the return and
+    // immediately re-prompt for the new place-site.
+    if (state.phase === 'empty-return') {
+      const siteId = ctx.pendingChoice?.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (!siteId) {
+        // User dismissed the return picker — back out gracefully.
+        ctx.handlerState = null;
+        return true;
+      }
+      if (returnSpy(ctx.G, myColor, siteId)) {
+        me.spiesLeft += 1;
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} to refill supply (spies left: ${me.spiesLeft})`);
+      }
+      ctx.pendingChoice = {
+        kind: 'select-site',
+        prompt: 'Place the spy at which site?',
+        options: placeableSites(),
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { phase: 'empty-place' };
+      return false;
+    }
+
+    // ---- Phase: empty-supply place site picked.
+    if (state.phase === 'empty-place') {
+      const siteId = ctx.pendingChoice?.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      ctx.handlerState = null;
+      if (siteId && placeSpy(ctx.G, myColor, siteId)) {
+        me.spiesLeft -= 1;
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} placed spy at ${siteId} (spies left: ${me.spiesLeft})`);
+        (ctx.G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite = siteId;
+      }
+      return true;
+    }
+
+    // Defensive: unknown phase. Reset.
+    ctx.handlerState = null;
     return true;
   };
 }
@@ -246,7 +346,8 @@ export function returnOwnSpyChoice(opts?: { optional?: boolean }): EffectHandler
       if (eligible.length === 1 && !opts?.optional) {
         const siteId = eligible[0];
         if (returnSpy(ctx.G, me.color, siteId)) {
-          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} (auto: only one)`);
+          me.spiesLeft += 1;
+          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} (auto: only one) (spies left: ${me.spiesLeft})`);
           (ctx.G as unknown as { _lastReturnedSpySite?: string })._lastReturnedSpySite = siteId;
         }
         return true;
@@ -266,7 +367,8 @@ export function returnOwnSpyChoice(opts?: { optional?: boolean }): EffectHandler
     if (!siteId) return true;
     const me = ctx.G.players[ctx.actorId];
     if (returnSpy(ctx.G, me.color, siteId)) {
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId}`);
+      me.spiesLeft += 1;
+      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} (spies left: ${me.spiesLeft})`);
       // Stash the site for any chained handlers that need it.
       (ctx.G as unknown as { _lastReturnedSpySite?: string })._lastReturnedSpySite = siteId;
     }
@@ -1116,9 +1218,12 @@ export function returnEnemySpyChoice(): EffectHandler {
     const arr = ctx.G.spies[siteId] ?? [];
     const enemyColor = arr.find(c => c !== me.color);
     if (enemyColor) {
-      const idx = arr.indexOf(enemyColor);
-      if (idx >= 0) arr.splice(idx, 1);
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${enemyColor} spy from ${siteId}`);
+      if (returnSpy(ctx.G, enemyColor, siteId)) {
+        // The returned spy goes back to its owner's supply, not yours.
+        const ownerPid = Object.keys(ctx.G.players).find(k => ctx.G.players[k].color === enemyColor);
+        if (ownerPid) ctx.G.players[ownerPid].spiesLeft += 1;
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${enemyColor} spy from ${siteId}`);
+      }
     }
     return true;
   };
@@ -1388,8 +1493,10 @@ export function returnAllSpiesAndSupplantAtEach(): EffectHandler {
       // Start a new site: return the spy, then prompt for supplant.
       const me = ctx.G.players[ctx.actorId];
       if ((ctx.G.spies[siteId] ?? []).includes(me.color)) {
-        returnSpy(ctx.G, me.color, siteId);
-        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId}`);
+        if (returnSpy(ctx.G, me.color, siteId)) {
+          me.spiesLeft += 1;
+          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} (spies left: ${me.spiesLeft})`);
+        }
       }
       const eligible = TROOP_SPACES.filter(t => t.parentSite === siteId).map(t => t.id)
         .filter(id => {
