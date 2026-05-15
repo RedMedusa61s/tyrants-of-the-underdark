@@ -96,6 +96,19 @@ interface SessionCtx {
 }
 const SessionContext = createContext<SessionCtx | null>(null);
 
+/** True when the primary input can hover — i.e. mouse / trackpad. False on
+ *  touch-only devices like iPad / phones. We use this to gate the card
+ *  enlarge-on-hover effect: on touch devices, tapping to recruit a card
+ *  was leaving the next card pre-enlarged because the synthetic mouseenter
+ *  that fires after a tap stayed latched on the slot under the player's
+ *  finger. Evaluated once at module load; the result is stable for the
+ *  session — if a user pairs a bluetooth mouse mid-game they'd need a
+ *  reload to re-enable hover-scaling, which is an acceptable trade. */
+const HOVER_CAPABLE =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(hover: hover)').matches;
+
 function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; label?: string }) {
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
@@ -103,11 +116,16 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
   // No-images mode forces the placeholder regardless of cache state. Also
   // falls back to placeholder if the image actually 404s at runtime.
   const showPlaceholder = isNoImagesMode() || imgFailed;
+  // Touch-only devices: never set hover from synthetic mouse events, so the
+  // post-tap enlarge bug can't fire. The visual stays the same as the
+  // resting state.
+  const onMouseEnter = HOVER_CAPABLE ? () => setHover(true) : undefined;
+  const onMouseLeave = HOVER_CAPABLE ? () => setHover(false) : undefined;
   return (
     <div
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         width: 120, margin: 4, borderRadius: 8,
         cursor: onClick ? 'pointer' : 'default',
