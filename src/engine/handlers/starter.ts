@@ -19,6 +19,20 @@ CardRegistry.register('soldier', ctx => {
   return true;
 });
 
+// House Guard — recruitable from the permanent stack for 3 influence;
+// when played, grants 2 power.
+CardRegistry.register('house-guard', ctx => {
+  Mechanics.gainPower(ctx.G, ctx.actorId, 2);
+  return true;
+});
+
+// Priestess of Lolth — recruitable from the permanent stack for 2 influence;
+// when played, grants 2 influence.
+CardRegistry.register('priestess-of-lolth', ctx => {
+  Mechanics.gainInfluence(ctx.G, ctx.actorId, 2);
+  return true;
+});
+
 // Insane Outcast — no resources; optional "discard a card → return to supply" ability.
 // Self-eject rules (return to supply if would be devoured/promoted) live in Mechanics.
 // effectKey slugified from "Insane Outcast" → "insane-outcast".
