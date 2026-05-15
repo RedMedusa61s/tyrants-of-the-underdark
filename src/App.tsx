@@ -933,6 +933,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck</span>
         </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {/* Rotating market row (6 slots from the chosen half-decks). */}
           {G.market.row.map((c, i) => {
             if (!c) return <div key={i} style={{ width: 120, height: 168, margin: 4, border: '1px dashed #444', borderRadius: 8 }} />;
             const inPickMode = !!clickableMarketSlots;
@@ -946,16 +947,10 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
             return <Card key={i} card={c} label={label} onClick={onClick} />;
           })}
-        </div>
-
-        {/* Permanent recruitable stacks — separate from the rotating market
-            row. Both stacks always show; once a stack hits 0 the card greys
-            out and the recruit button disables. Recruiting these doesn't
-            trigger end-of-game (only the market deck emptying does). */}
-        <h2 style={{ marginTop: 24 }}>
-          Permanent stacks
-        </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {/* Permanent stacks (House Guards, Priestesses of Lolth) — always
+              recruitable while non-empty; once empty, greyed out and the
+              button is disabled. Recruiting these doesn't trigger end-of-
+              game (only the rotating deck emptying does). */}
           {(['houseGuards', 'priestesses'] as const).map(stack => {
             const ref = stack === 'houseGuards'
               ? { deck: 'house-guards', slot: 40 }
