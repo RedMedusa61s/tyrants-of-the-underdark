@@ -43,15 +43,21 @@ export const Mechanics = {
     Mechanics.log(G, `P${Number(playerId) + 1} +${n} VP`);
   },
 
-  draw(G: TyrantsState, playerId: string, n: number) {
+  draw(G: TyrantsState, playerId: string, n: number, random?: { Number(): number }) {
     const pl = p(G, playerId);
+    const rng = random ? () => random.Number() : () => Math.random();
     for (let i = 0; i < n; i++) {
       if (pl.deck.length === 0) {
         if (pl.discard.length === 0) return;
-        // Note: real determinism requires a seeded shuffle. Mechanics receives a shuffle
-        // function via plugin once we wire boardgame.io's `random` through; for now this
-        // is non-deterministic and will be replaced.
-        pl.deck = pl.discard.slice().sort(() => Math.random() - 0.5);
+        // Deterministic reshuffle via the seeded boardgame.io RNG when passed
+        // through. Callers in move handlers should pass ctx.random. Fenwick-
+        // free Fisher-Yates on a copy so we don't mutate discard mid-loop.
+        const deck = pl.discard.slice();
+        for (let k = deck.length - 1; k > 0; k--) {
+          const j = Math.floor(rng() * (k + 1));
+          [deck[k], deck[j]] = [deck[j], deck[k]];
+        }
+        pl.deck = deck;
         pl.discard = [];
       }
       const c = pl.deck.shift();

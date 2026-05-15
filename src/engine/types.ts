@@ -42,6 +42,10 @@ export interface EffectContext {
   paused: boolean;
   /** Opaque slot for multi-stage handlers to stash progress between resumptions. */
   handlerState: unknown;
+  /** Seeded RNG from the boardgame.io random plugin, if available. Handlers
+   *  that need randomness (notably deck reshuffles on draw/promote) MUST use
+   *  this rather than Math.random so replay / save-load is deterministic. */
+  random?: { Number(): number };
 }
 
 /**

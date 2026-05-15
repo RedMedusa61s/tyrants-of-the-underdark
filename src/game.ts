@@ -8,7 +8,7 @@ import type { EffectContext, PendingChoice } from './engine/types';
 import { SITES } from './data/sites';
 import { TROOP_SPACES, sitesSpaces } from './data/troop-spaces';
 import { ROUTES } from './data/routes';
-import { deployTroop, assassinateTroop, hasPresence, returnSpy, hasTotalControl } from './engine/map-state';
+import { deployTroop, assassinateTroop, hasPresence, returnSpy, payHeldMarkerEffectsAtTurnStart } from './engine/map-state';
 
 export type Color = 'black' | 'red' | 'orange' | 'blue';
 
@@ -56,14 +56,37 @@ export interface ControlMarker {
   siteId: string;
   /** Color currently holding the marker, or null if on the board. */
   holder: Color | null;
-  /** Side facing up: 'control' (basic) or 'total-control' (when player has total control). */
+  /** Last-computed face of the chit at end-of-turn scoring. Kept for save
+   *  back-compat and audit logs; the live UI derives the displayed face from
+   *  hasTotalControl() against G.troops directly, so this field doesn't drive
+   *  rendering. */
   side: 'control' | 'total-control';
-  /** VP per turn for the 'control' side. Per-marker values vary on the printed markers; we
-   *  use a default of 1 until per-site values are loaded. */
+  /** Per-turn bonus when the holder has plain control. Every printed marker
+   *  gives +1 influence on this face (the spider-web icon). */
+  controlInfluence: number;
   controlVp: number;
-  /** VP per turn for the 'total-control' side. Default 2; refine when we have real values. */
+  /** Per-turn bonus when the holder has total control. All seven markers give
+   *  +1 influence + N VP on this face — N varies per site (Araumycos = 3,
+   *  Menzoberranzan = 2, every other = 1). Verified by reading both faces
+   *  from the scripted TTS mod (2745860709). */
+  totalControlInfluence: number;
   totalControlVp: number;
 }
+
+/** Printed per-site values for both faces of each control marker. Sourced
+ *  directly from assets/tokens/<site>-control.jpg and -total-control.jpg. */
+const MARKER_VALUES: Record<string, {
+  controlInfluence: number; controlVp: number;
+  totalControlInfluence: number; totalControlVp: number;
+}> = {
+  gauntlgrym:     { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 1 },
+  menzoberranzan: { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 2 },
+  araumycos:      { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 3 },
+  chchitl:        { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 1 },
+  phaerlin:       { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 1 },
+  sszuraassnee:   { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 1 },
+  tsenviilyq:     { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 1 },
+};
 
 export interface TyrantsState {
   market: {
@@ -93,6 +116,18 @@ export interface TyrantsState {
   /** Per-turn tally of card aspects played by the current player. Reset each turn.
    *  Used by the Focus keyword to detect "another card of this aspect this turn." */
   turnAspectsPlayed: Record<string, number>;
+
+  /** SiteIds of control-marker sites that have already paid out their
+   *  control-side influence bonus to the current player this turn. Prevents
+   *  flipping control on/off mid-turn from farming repeated +1 influence
+   *  from the same marker. Cleared each turn at onBegin. */
+  markerInfluenceGrantedThisTurn: string[];
+
+  /** Color of the player whose turn it currently is. Mirrors
+   *  G.players[ctx.currentPlayer].color so engine code that doesn't get ctx
+   *  (notably recomputeSiteControl in map-state.ts) can still know who's
+   *  acting. Set in turn.onBegin, cleared at turn.onEnd. */
+  activeTurnColor: Color | null;
 
   /** Cards played by the current player this turn (in order). Reset each turn.
    *  Used by end-of-turn promote-a-played-card effects. */
@@ -284,10 +319,16 @@ export const TyrantsGame: Game<TyrantsState> = {
     const controlMarkers: Record<string, ControlMarker> = {};
     for (const s of SITES) {
       if (!activeSiteSet.has(s.id)) continue;
-      if (s.hasControlMarker) controlMarkers[s.id] = {
-        siteId: s.id, holder: null, side: 'control',
-        controlVp: 1, totalControlVp: 2,  // placeholder defaults; refine with per-marker values
-      };
+      if (s.hasControlMarker) {
+        const v = MARKER_VALUES[s.id] ?? { controlInfluence: 1, controlVp: 0, totalControlInfluence: 1, totalControlVp: 1 };
+        controlMarkers[s.id] = {
+          siteId: s.id, holder: null, side: 'control',
+          controlInfluence: v.controlInfluence,
+          controlVp: v.controlVp,
+          totalControlInfluence: v.totalControlInfluence,
+          totalControlVp: v.totalControlVp,
+        };
+      }
     }
 
     // Randomly choose who acts first. Re-log it so the player can see who
@@ -312,6 +353,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       turnAspectsPlayed: {},
       cardsPlayedThisTurn: [],
       pendingEotPromotions: [],
+      markerInfluenceGrantedThisTurn: [],
+      activeTurnColor: null,
       turnLogStart: 0,
       turnLogs: [],
       snapshots: [],
@@ -339,6 +382,20 @@ export const TyrantsGame: Game<TyrantsState> = {
       G.log.push(`Turn: P${Number(ctx.currentPlayer) + 1} (${G.players[ctx.currentPlayer].color})`);
       G.cardsPlayedThisTurn = [];
       G.pendingEotPromotions = [];
+      G.activeTurnColor = G.players[ctx.currentPlayer].color;
+      // Reset the per-turn marker-influence ledger so the current player can
+      // claim the bonus once per marker this turn, either from markers they
+      // already hold (below) or from markers they take control of during the
+      // turn (granted live by Mechanics.claimMarkerInfluenceIfControlled).
+      G.markerInfluenceGrantedThisTurn = [];
+
+      // Per-turn marker effect for chits the active player held coming into
+      // this turn. Pays both the influence (cobweb) and any VP printed on
+      // whichever side is currently up (control or total-control). Mid-turn
+      // marker grabs are handled live inside recomputeSiteControl, both
+      // sharing the once-per-marker-per-turn ledger so a player who already
+      // got the effect this turn can't double-dip.
+      payHeldMarkerEffectsAtTurnStart(G, G.players[ctx.currentPlayer].color);
       // Capture a snapshot of the game state at turn start (excluding the snapshots
       // field itself to prevent recursive bloat). loadState can rewind here.
       G.snapshots.push({
@@ -348,7 +405,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         codec: encodeSnapshot(G),
       });
     },
-    onEnd: ({ G, ctx }) => {
+    onEnd: ({ G, ctx, random }) => {
       // Capture this turn's log slice for the per-turn summary modal. We do this for
       // every turn (including setup deploys) so the human can review what happened.
       const lines = G.log.slice(G.turnLogStart);
@@ -366,38 +423,13 @@ export const TyrantsGame: Game<TyrantsState> = {
         return;
       }
       const p = G.players[ctx.currentPlayer];
-      // Rulebook p.11 end-of-turn step 1: CLAIM the control marker at any site
-      // you control (if you don't already hold it). Once claimed, you keep it
-      // even if you lose control later; only another player claiming it at the
-      // end of THEIR turn moves it. This is why we don't update marker.holder
-      // in recomputeSiteControl.
-      const claimed: string[] = [];
-      for (const m of Object.values(G.controlMarkers)) {
-        if (G.siteControl[m.siteId] === p.color && m.holder !== p.color) {
-          m.holder = p.color;
-          claimed.push(m.siteId);
-        }
-      }
-      if (claimed.length > 0) {
-        Mechanics.log(G, `P${Number(ctx.currentPlayer) + 1} claimed control marker(s): ${claimed.join(', ')}`);
-      }
-      // Rulebook p.8 end-of-turn step 2: gain VP for site-control markers you hold.
-      // Each marker flips to its total-control side if you currently have total control
-      // of the site; otherwise its control side. Then add the appropriate VP.
-      let siteVp = 0;
-      const siteVpBreakdown: string[] = [];
-      for (const m of Object.values(G.controlMarkers)) {
-        if (m.holder !== p.color) continue;
-        const tc = hasTotalControl(G, p.color, m.siteId);
-        m.side = tc ? 'total-control' : 'control';
-        const gained = tc ? m.totalControlVp : m.controlVp;
-        siteVp += gained;
-        siteVpBreakdown.push(`${m.siteId}${tc ? ' (TC)' : ''}: +${gained}`);
-      }
-      if (siteVp > 0) {
-        p.vp += siteVp;
-        Mechanics.log(G, `P${Number(ctx.currentPlayer) + 1} end-of-turn +${siteVp} VP from sites — ${siteVpBreakdown.join(', ')}`);
-      }
+      // Site-control markers no longer need an end-of-turn claim or scoring
+      // step: per the revised rulebook the chit transfers immediately on
+      // control change, returns to the map immediately when control becomes
+      // tied, and the per-turn effect (influence + any VP) is paid either at
+      // turn start (held-over markers) or live when the marker is taken
+      // during the turn. See engine/map-state.ts → recomputeSiteControl /
+      // payMarkerEffect / payHeldMarkerEffectsAtTurnStart.
 
       p.discard.push(...p.hand);
       p.hand = [];
@@ -407,12 +439,20 @@ export const TyrantsGame: Game<TyrantsState> = {
       // Refill hand
       for (let i = 0; i < HAND_SIZE; i++) {
         if (p.deck.length === 0) {
-          p.deck = shuffle(p.discard, () => Math.random()); // TODO: use ctx random; scaffold only
+          // Use the seeded boardgame.io RNG so reshuffles are deterministic
+          // across replays / save-load. Falls back to Math.random only if
+          // random is somehow unavailable (e.g. very old saves replayed
+          // outside a bgio context).
+          p.deck = shuffle(p.discard, random ? () => random.Number() : () => Math.random());
           p.discard = [];
         }
         if (p.deck.length === 0) break;
         p.hand.push(p.deck.shift()!);
       }
+      // Done with this player's turn — clear the active-turn marker so that
+      // any state mutation in between turns (saves, replays) doesn't
+      // accidentally grant influence to a player who isn't currently active.
+      G.activeTurnColor = null;
     },
   },
 
@@ -442,7 +482,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       events.endTurn();
     },
 
-    playCard: ({ G, ctx }, handIndex: number) => {
+    playCard: ({ G, ctx, random }, handIndex: number) => {
       if (G.setupPhase) return INVALID_MOVE;
       if (G.pendingChoice) return INVALID_MOVE;
       const pid = ctx.currentPlayer;
@@ -479,6 +519,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         pendingChoice: null,
         paused: false,
         handlerState: null,
+        random: random ?? undefined,
       };
       const done = handler(ctx2);
       if (!done && ctx2.pendingChoice) {
@@ -497,7 +538,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       }
     },
 
-    resolveChoice: ({ G, ctx, events }, response: unknown) => {
+    resolveChoice: ({ G, ctx, events, random }, response: unknown) => {
       if (!G.pendingChoice) return INVALID_MOVE;
       const pc = G.pendingChoice;
 
@@ -562,6 +603,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         pendingChoice: { ...pc, response },
         paused: true,
         handlerState: G.pausedHandlerState,
+        random: random ?? undefined,
       };
       const done = handler(ctx2);
       if (!done) {

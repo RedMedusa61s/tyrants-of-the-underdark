@@ -20,7 +20,7 @@ export function grant(opts: { power?: number; influence?: number; draw?: number 
   return ctx => {
     if (opts.power) Mechanics.gainPower(ctx.G, ctx.actorId, opts.power);
     if (opts.influence) Mechanics.gainInfluence(ctx.G, ctx.actorId, opts.influence);
-    if (opts.draw) Mechanics.draw(ctx.G, ctx.actorId, opts.draw);
+    if (opts.draw) Mechanics.draw(ctx.G, ctx.actorId, opts.draw, ctx.random);
     return true;
   };
 }
@@ -790,8 +790,16 @@ export function promoteTopOfDeck(opts?: { count?: number }): EffectHandler {
     for (let i = 0; i < count; i++) {
       if (me.deck.length === 0) {
         if (me.discard.length === 0) break;
-        // TODO: use the seeded boardgame.io RNG for deterministic reshuffles. Tracked in Mechanics.draw.
-        me.deck = me.discard.slice().sort(() => Math.random() - 0.5);
+        // Deterministic Fisher-Yates with the boardgame.io seeded RNG when
+        // available. Mirrors the shuffle in Mechanics.draw so promote-on-empty
+        // and draw-on-empty behave the same way under replay.
+        const rng = ctx.random ? () => ctx.random!.Number() : () => Math.random();
+        const deck = me.discard.slice();
+        for (let k = deck.length - 1; k > 0; k--) {
+          const j = Math.floor(rng() * (k + 1));
+          [deck[k], deck[j]] = [deck[j], deck[k]];
+        }
+        me.deck = deck;
         me.discard = [];
       }
       const card = me.deck.shift();
@@ -1131,6 +1139,28 @@ export function playerCanReturnEnemyTroop(G: import('../game').TyrantsState, act
   for (const t of TROOP_SPACES) {
     const occ = G.troops[t.id];
     if (!occ || occ === me.color || occ === 'white') continue;
+    if (t.parentSite && hasPresence(G, me.color, { site: t.parentSite })) return true;
+    if (t.parentRoute && hasPresence(G, me.color, { space: t.id })) return true;
+  }
+  return false;
+}
+
+/** True when the player has at least one troop they could legally assassinate
+ *  — a non-self, non-empty troop in a space where they have presence.
+ *  `whiteOnly` restricts the eligible-target set to the white pile (used by
+ *  Weaponmaster's "Assassinate a white troop" option so it doesn't surface
+ *  when no whites are within reach). */
+export function playerCanAssassinate(
+  G: import('../game').TyrantsState,
+  actorId: string,
+  opts?: { whiteOnly?: boolean },
+): boolean {
+  const me = G.players[actorId];
+  for (const t of TROOP_SPACES) {
+    if (!(t.id in G.troops)) continue; // outside active sections
+    const occ = G.troops[t.id];
+    if (!occ || occ === me.color) continue;
+    if (opts?.whiteOnly && occ !== 'white') continue;
     if (t.parentSite && hasPresence(G, me.color, { site: t.parentSite })) return true;
     if (t.parentRoute && hasPresence(G, me.color, { space: t.id })) return true;
   }
@@ -1505,18 +1535,6 @@ export function conditionalGrant(
       Mechanics.log(ctx.G, `Conditional met: ${description}.`);
       return bonus(ctx);
     }
-    return true;
-  };
-}
-
-// ---------- TODO stub (still unimplemented) ----------
-//
-// Use for cards whose effect requires map/UI infrastructure we haven't built yet.
-// Logs a warning and resolves as a no-op so playing the card doesn't crash the game.
-
-export function todoStub(reason: string): EffectHandler {
-  return ctx => {
-    Mechanics.log(ctx.G, `[unimplemented] ${ctx.card.name}: ${reason}`);
     return true;
   };
 }
