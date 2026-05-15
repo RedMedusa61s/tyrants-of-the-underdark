@@ -57,6 +57,9 @@ export default {
       if (url.pathname === '/game-log') {
         return await handleGameLog(req, env);
       }
+      if (url.pathname === '/report-status') {
+        return await handleReportStatus(req, env);
+      }
       return jsonResponse(env, { error: `unknown route ${url.pathname}` }, 404);
     } catch (err) {
       return jsonResponse(env, { error: String(err) }, 500);
@@ -106,6 +109,93 @@ async function handleProblemReport(req: Request, env: Env): Promise<Response> {
   }
   const issue = await resp.json() as { html_url: string; number: number };
   return jsonResponse(env, { ok: true, url: issue.html_url, number: issue.number }, 200);
+}
+
+// ---------- /report-status ----------
+//
+// Clients (the in-game app) maintain a localStorage list of issue numbers
+// they've filed via /problem-report. On each app load they POST that list
+// here and we ask GitHub which of those issues are now closed and have a
+// "fix note" comment for the reporter. The dev's workflow is:
+//
+//   1. App user files a bug → /problem-report opens a GitHub issue.
+//   2. Dev investigates, ships a fix.
+//   3. Dev posts a comment on the issue whose body starts with the marker
+//      `**Fix note:**` (case-insensitive) explaining the cause / fix in
+//      user-friendly terms.
+//   4. Dev closes the issue.
+//   5. Next time the app loads, the user sees a thank-you modal with the
+//      explanation. Dismissing it marks it locally as seen so it doesn't
+//      pop up again.
+//
+// The contract intentionally only surfaces CLOSED issues — open issues with
+// an in-progress fix note shouldn't pop a "thanks, we fixed it" dialog.
+
+const FIX_NOTE_MARKER_RE = /^\*\*fix note:\*\*\s*/i;
+
+async function handleReportStatus(req: Request, env: Env): Promise<Response> {
+  const body = await req.json() as { issueNumbers?: number[] };
+  const requested = Array.isArray(body.issueNumbers)
+    ? body.issueNumbers.filter(n => typeof n === 'number' && Number.isFinite(n)).slice(0, 50)
+    : [];
+  const updates: Array<{
+    number: number;
+    title: string;
+    fixNote: string;
+    closedAt: string | null;
+    commentCreatedAt: string;
+    issueUrl: string;
+    commentUrl: string;
+  }> = [];
+
+  for (const number of requested) {
+    // Issue metadata first — cheap, lets us skip comment fetches for issues
+    // still open. GitHub returns 404 for repos we can't see; we tolerate it.
+    const issueResp = await fetch(
+      `https://api.github.com/repos/${env.GITHUB_REPO}/issues/${number}`,
+      { headers: githubHeaders(env) },
+    );
+    if (!issueResp.ok) continue;
+    const issue = await issueResp.json() as {
+      state: string;
+      title: string;
+      closed_at: string | null;
+      html_url: string;
+    };
+    if (issue.state !== 'closed') continue;
+
+    // Find the first comment that starts with the fix-note marker. Listing
+    // issues comments returns oldest-first per the GitHub API, which is
+    // what we want — if a dev writes multiple fix notes, the first one wins
+    // and the rest are just refinements they can include inline.
+    const commentsResp = await fetch(
+      `https://api.github.com/repos/${env.GITHUB_REPO}/issues/${number}/comments?per_page=100`,
+      { headers: githubHeaders(env) },
+    );
+    if (!commentsResp.ok) continue;
+    const comments = await commentsResp.json() as Array<{
+      body: string;
+      created_at: string;
+      html_url: string;
+    }>;
+    const fixNoteComment = comments.find(c => FIX_NOTE_MARKER_RE.test(c.body ?? ''));
+    if (!fixNoteComment) continue;
+
+    const fixNote = fixNoteComment.body.replace(FIX_NOTE_MARKER_RE, '').trim();
+    if (!fixNote) continue;
+
+    updates.push({
+      number,
+      title: issue.title,
+      fixNote,
+      closedAt: issue.closed_at,
+      commentCreatedAt: fixNoteComment.created_at,
+      issueUrl: issue.html_url,
+      commentUrl: fixNoteComment.html_url,
+    });
+  }
+
+  return jsonResponse(env, { updates }, 200);
 }
 
 // ---------- /game-log ----------

@@ -22,6 +22,8 @@ import { hasPresence, checkTokenConservation } from './engine/map-state';
 import { publishGameLog } from './publish-game-log';
 import { archiveGame, getAllArchivedGames, payloadForArchivedGame } from './game-archive';
 import { LogUploadConsentDialog } from './components/LogUploadConsentDialog';
+import { BugFixResponseDialog } from './components/BugFixResponseDialog';
+import { fetchUnseenFixNotes, markFixNoteSeen, type FixNoteUpdate } from './bug-report-tracker';
 import { decideAiMove, type AiMove } from './ai/random-ai';
 import { decideHeuristicMove } from './ai/heuristic-ai';
 import { lookupCard } from './card-data';
@@ -155,6 +157,31 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // first, open the disclosure dialog, and only kick off the actual POST
   // loop after they confirm.
   const [pendingConsent, setPendingConsent] = useState<{ recordCount: number } | null>(null);
+  // Queue of fix-note updates fetched from the relay on mount. We surface
+  // them one at a time via BugFixResponseDialog; dismissing one shifts the
+  // next into view and persists the seen-marker in localStorage so neither
+  // pops up on the next load.
+  const [fixNoteQueue, setFixNoteQueue] = useState<FixNoteUpdate[]>([]);
+
+  // Poll once per app mount for closed bug reports with a "Fix note"
+  // comment the player hasn't seen yet. The poll is a single network call
+  // (worker dedups + filters server-side); failures are silent so the
+  // thank-you flow can't break gameplay.
+  useEffect(() => {
+    let cancelled = false;
+    fetchUnseenFixNotes().then(updates => {
+      if (!cancelled && updates.length > 0) setFixNoteQueue(updates);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  function dismissCurrentFixNote() {
+    setFixNoteQueue(prev => {
+      const [head, ...rest] = prev;
+      if (head) markFixNoteSeen(head.number, head.commentCreatedAt);
+      return rest;
+    });
+  }
   const [devMode, setDevModeState] = useState<boolean>(initialDevMode);
   const setDevMode = (v: boolean) => {
     setDevModeState(v);
@@ -686,6 +713,12 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           New game
         </button>
       </div>
+      {fixNoteQueue.length > 0 && (
+        <BugFixResponseDialog
+          update={fixNoteQueue[0]}
+          onDismiss={dismissCurrentFixNote}
+        />
+      )}
       <LogUploadConsentDialog
         open={pendingConsent !== null}
         recordCount={pendingConsent?.recordCount ?? 0}

@@ -6,6 +6,7 @@
 
 import { useState } from 'react';
 import type { TyrantsState } from '../game';
+import { recordFiledReport } from '../bug-report-tracker';
 
 interface Props {
   G: TyrantsState;
@@ -165,6 +166,16 @@ export function ProblemReportDialog({ G, ctxInfo, config, onClose }: Props) {
       const data = (await resp.json().catch(() => null)) as SubmitResult | null;
       if (data && typeof data === 'object' && 'ok' in data) {
         setResult(data);
+        // Stash the issue number locally so the next app load can poll the
+        // relay for a "fix note" comment and pop the thank-you modal once
+        // this report is resolved. Only fires on relay-success (the GitHub-
+        // redirect fallback below doesn't yield a number we can track).
+        if (data.ok && typeof data.number === 'number') {
+          recordFiledReport({
+            number: data.number,
+            title: description.trim().slice(0, 80),
+          });
+        }
       } else {
         // Relay responded but body wasn't JSON (e.g. GH Pages 404 HTML).
         // Fall back to the GitHub URL path so the user has a working route.
