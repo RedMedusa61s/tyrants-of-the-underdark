@@ -20,7 +20,7 @@ import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
 import { publishGameLog } from './publish-game-log';
-import { archiveGame, getAllArchivedGames } from './game-archive';
+import { archiveGame, getAllArchivedGames, payloadForArchivedGame } from './game-archive';
 import { decideAiMove, type AiMove } from './ai/random-ai';
 import { decideHeuristicMove } from './ai/heuristic-ai';
 import { lookupCard } from './card-data';
@@ -184,6 +184,29 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     const latest = G.snapshots[G.snapshots.length - 1].codec;
     localStorage.setItem(SAVE_KEY, latest);
   }, [G.snapshots.length, ctx.gameover]);
+
+  // Best-effort archive on page unload (tab close, refresh, navigate away).
+  // IndexedDB writes are not guaranteed to flush before the page is killed,
+  // but in practice browsers give the write a brief window — and since this
+  // is purely additive (it can't lose data, only fail to capture some), it's
+  // worth attempting. Skip when the game is in setup phase (nothing useful
+  // to capture) or has reached gameover (already archived in the gameover
+  // effect below).
+  useEffect(() => {
+    function onUnload() {
+      if (!session) return;
+      if (G.setupPhase) return;
+      if (ctx.gameover) return;
+      // Fire-and-forget. We don't await; the browser may kill us mid-write.
+      void archiveGame(G, {
+        numPlayers: Object.keys(G.players).length,
+        halfDecks: session.config.halfDecks,
+        aiStyles: session.config.aiStyles,
+      });
+    }
+    window.addEventListener('beforeunload', onUnload);
+    return () => window.removeEventListener('beforeunload', onUnload);
+  }, [G, ctx.gameover, session]);
 
   // On game-over: archive the completed game locally (IndexedDB) AND attempt
   // an auto-publish to the public log relay. The archive is the authoritative
@@ -614,18 +637,16 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           const total = archived.length + 1; // +1 for current game
           let done = 0, uploaded = 0, deduped = 0, failed = 0;
           setBulkUpload({ kind: 'uploading', progress: `0 / ${total}` });
+          const relayUrl = (import.meta.env.VITE_TOTU_RELAY_URL as string | undefined);
+          const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/game-log` : '/__publish-game-log';
           for (const a of archived) {
-            const meta = {
-              numPlayers: a.context.numPlayers,
-              halfDecks: a.context.halfDecks,
-              aiStyles: a.context.aiStyles,
-              winner: '?', endedAtTurn: null as number | null,
-            };
-            const relayUrl = (import.meta.env.VITE_TOTU_RELAY_URL as string | undefined);
-            const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/game-log` : '/__publish-game-log';
+            // payloadForArchivedGame embeds the entry's archivedAt into the
+            // published record so two different sessions of an otherwise
+            // identical state don't dedup against each other.
+            const body = payloadForArchivedGame(a);
             const resp = await fetch(submitUrl, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ game: a.record, source: 'browser-bulk-upload', meta }),
+              body: JSON.stringify(body),
             }).then(r => r.json().catch(() => ({ ok: false }))).catch(() => ({ ok: false }));
             if (resp.ok) { (resp.deduped ? deduped++ : uploaded++); } else { failed++; }
             done++;
@@ -664,8 +685,24 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           style={{ padding: '6px 14px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
           Report a problem
         </button>
-        <button onClick={() => {
-          if (confirm('Start a new game? Current progress will be lost.')) session?.onNewGame();
+        <button onClick={async () => {
+          if (!confirm('Start a new game? Current progress will be lost.')) return;
+          // Archive the current playthrough before discarding it, so it
+          // doesn't get lost between sessions. The bulk Upload-logs button
+          // picks it up on the next click.
+          if (session) {
+            try {
+              await archiveGame(G, {
+                numPlayers: Object.keys(G.players).length,
+                halfDecks: session.config.halfDecks,
+                aiStyles: session.config.aiStyles,
+              });
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.warn('[archive-game] new-game archive failed:', err);
+            }
+          }
+          session?.onNewGame();
         }} style={{ padding: '6px 14px', background: '#5a1f1f', color: '#fdd', border: '1px solid #802626', borderRadius: 4, cursor: 'pointer' }}>
           New game
         </button>

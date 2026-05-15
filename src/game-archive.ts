@@ -43,18 +43,18 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-/** Append one finished game to the archive. Safe to call multiple times for
- *  the same game; the relay will dedup on re-upload. */
+/** Append one game to the archive. Safe to call multiple times for the same
+ *  game (game-over, "new game" click, page unload, etc.) — each call writes a
+ *  distinct entry stamped with its own timestamp, and uploads embed that
+ *  timestamp into the published record so the relay's content-hash dedup
+ *  doesn't collapse separate sessions into one another. */
 export async function archiveGame(
   G: TyrantsState,
   context: Omit<PublishContext, 'source'>,
 ): Promise<void> {
+  const archivedAt = new Date().toISOString();
   const record = buildGameRecord(G, { ...context, source: 'browser-archive' });
-  const entry: ArchivedGame = {
-    archivedAt: new Date().toISOString(),
-    context,
-    record,
-  };
+  const entry: ArchivedGame = { archivedAt, context, record };
   const db = await openDb();
   return new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
@@ -62,6 +62,24 @@ export async function archiveGame(
     tx.oncomplete = () => { db.close(); resolve(); };
     tx.onerror = () => { db.close(); reject(tx.error); };
   });
+}
+
+/** Build the payload that gets POSTed to the relay for one archive entry.
+ *  Splices the entry's archivedAt into the inner game record so two archive
+ *  entries from different sessions don't dedup against each other on content
+ *  hash, even when the underlying game state was identical (e.g., the user
+ *  hit "New game" twice in a row without playing). */
+export function payloadForArchivedGame(entry: ArchivedGame): { game: unknown; source: string; meta: unknown } {
+  return {
+    game: { ...(entry.record as Record<string, unknown>), archivedAt: entry.archivedAt },
+    source: 'browser-bulk-upload',
+    meta: {
+      numPlayers: entry.context.numPlayers,
+      halfDecks: entry.context.halfDecks,
+      aiStyles: entry.context.aiStyles,
+      archivedAt: entry.archivedAt,
+    },
+  };
 }
 
 /** Return every archived game, oldest first. */
