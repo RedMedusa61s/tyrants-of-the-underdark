@@ -48,10 +48,28 @@ export function flagEotPromote(opts?: { count?: number }): EffectHandler {
 // (placement is mandatory in rulebook terms; we keep it optional via PendingChoice
 // only for cards that explicitly offer it as a choice).
 
+/** Self-heal the spiesLeft count for games saved before the spy-supply
+ *  field was added. If me.spiesLeft is missing (undefined), back-fill it
+ *  from the current board: 5 minus the player's spies currently placed.
+ *  Cap at >= 0 so an over-spied legacy save doesn't go negative.
+ *  Idempotent — once the field is a real number, this is a no-op. */
+export function ensureSpiesLeftInitialized(G: import('../game').TyrantsState, color: import('../game').Color): void {
+  const pid = Object.keys(G.players).find(k => G.players[k].color === color);
+  if (!pid) return;
+  const me = G.players[pid];
+  if (typeof me.spiesLeft === 'number') return;
+  let onBoard = 0;
+  for (const arr of Object.values(G.spies)) {
+    if (arr.includes(color)) onBoard++;
+  }
+  me.spiesLeft = Math.max(0, 5 - onBoard);
+}
+
 export function placeSpyAtChosenSite(opts?: { optional?: boolean }): EffectHandler {
   return ctx => {
     const me = ctx.G.players[ctx.actorId];
     const myColor = me.color;
+    ensureSpiesLeftInitialized(ctx.G, myColor);
     type Phase = 'init' | 'place' | 'empty-choice' | 'empty-return' | 'empty-place';
     const state = (ctx.handlerState as { phase: Phase } | null) ?? { phase: 'init' as Phase };
 
@@ -332,6 +350,7 @@ export function returnOwnSpyChoice(opts?: { optional?: boolean }): EffectHandler
   return ctx => {
     if (!ctx.pendingChoice) {
       const me = ctx.G.players[ctx.actorId];
+      ensureSpiesLeftInitialized(ctx.G, me.color);
       const eligible = SITES
         .filter(s => (ctx.G.spies[s.id] ?? []).includes(me.color))
         .map(s => s.id);
@@ -366,6 +385,7 @@ export function returnOwnSpyChoice(opts?: { optional?: boolean }): EffectHandler
     ctx.paused = false;
     if (!siteId) return true;
     const me = ctx.G.players[ctx.actorId];
+    ensureSpiesLeftInitialized(ctx.G, me.color);
     if (returnSpy(ctx.G, me.color, siteId)) {
       me.spiesLeft += 1;
       Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} (spies left: ${me.spiesLeft})`);
@@ -1220,6 +1240,7 @@ export function returnEnemySpyChoice(): EffectHandler {
     if (enemyColor) {
       if (returnSpy(ctx.G, enemyColor, siteId)) {
         // The returned spy goes back to its owner's supply, not yours.
+        ensureSpiesLeftInitialized(ctx.G, enemyColor);
         const ownerPid = Object.keys(ctx.G.players).find(k => ctx.G.players[k].color === enemyColor);
         if (ownerPid) ctx.G.players[ownerPid].spiesLeft += 1;
         Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${enemyColor} spy from ${siteId}`);
@@ -1492,6 +1513,7 @@ export function returnAllSpiesAndSupplantAtEach(): EffectHandler {
 
       // Start a new site: return the spy, then prompt for supplant.
       const me = ctx.G.players[ctx.actorId];
+      ensureSpiesLeftInitialized(ctx.G, me.color);
       if ((ctx.G.spies[siteId] ?? []).includes(me.color)) {
         if (returnSpy(ctx.G, me.color, siteId)) {
           me.spiesLeft += 1;

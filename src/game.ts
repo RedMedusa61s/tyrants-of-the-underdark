@@ -9,6 +9,7 @@ import { SITES } from './data/sites';
 import { TROOP_SPACES, sitesSpaces } from './data/troop-spaces';
 import { ROUTES } from './data/routes';
 import { deployTroop, assassinateTroop, hasPresence, returnSpy, payHeldMarkerEffectsAtTurnStart } from './engine/map-state';
+import { ensureSpiesLeftInitialized } from './engine/handler-helpers';
 
 export type Color = 'black' | 'red' | 'orange' | 'blue';
 
@@ -388,6 +389,13 @@ export const TyrantsGame: Game<TyrantsState> = {
       G.cardsPlayedThisTurn = [];
       G.pendingEotPromotions = [];
       G.activeTurnColor = G.players[ctx.currentPlayer].color;
+      // Backfill spiesLeft for every player whose state predates the spy-
+      // supply field (legacy saves). Safe to call every turn — idempotent
+      // once the field is a real number. Also covers AI players that the
+      // place-spy handlers might never touch directly.
+      for (const pid of Object.keys(G.players)) {
+        ensureSpiesLeftInitialized(G, G.players[pid].color);
+      }
       // Reset the per-turn marker-influence ledger so the current player can
       // claim the bonus once per marker this turn, either from markers they
       // already hold (below) or from markers they take control of during the
@@ -708,7 +716,10 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (!(G.spies[siteId] ?? []).includes(targetColor)) return INVALID_MOVE;
       if (!Mechanics.expendPower(G, pid, 3)) return INVALID_MOVE;
       if (returnSpy(G, targetColor, siteId)) {
-        // Returned spy goes back to ITS OWNER's supply (not yours).
+        // Returned spy goes back to ITS OWNER's supply (not yours). Backfill
+        // a missing spiesLeft for the owner first (legacy saves predate the
+        // spy-supply field, so undefined + 1 would become NaN).
+        ensureSpiesLeftInitialized(G, targetColor);
         const ownerPid = Object.keys(G.players).find(k => G.players[k].color === targetColor);
         if (ownerPid) G.players[ownerPid].spiesLeft += 1;
         Mechanics.log(G, `P${Number(pid) + 1} returned ${targetColor} spy from ${siteId}`);
