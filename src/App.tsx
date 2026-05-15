@@ -113,6 +113,16 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   const imgUrl = useCachedImage(card.image);
+  // Reset the failed flag whenever the URL changes. useCachedImage starts
+  // out returning the virtual /cards/<deck>/<slot>-<slug>.jpg path which
+  // 404s on a static host like GH Pages (no such file exists — it's a
+  // logical path serviced by the slice cache). The 404 fires onError →
+  // imgFailed=true → PlaceholderCard. A few hundred ms later useCachedImage
+  // resolves the actual blob URL via createImageBitmap-on-cached-sheet,
+  // but the latched imgFailed kept us stuck on the placeholder. Resetting
+  // here gives the resolved blob URL a fresh try; if it ALSO fails (real
+  // network error) onError will re-set the flag.
+  useEffect(() => { setImgFailed(false); }, [imgUrl]);
   // No-images mode forces the placeholder regardless of cache state. Also
   // falls back to placeholder if the image actually 404s at runtime.
   const showPlaceholder = isNoImagesMode() || imgFailed;
