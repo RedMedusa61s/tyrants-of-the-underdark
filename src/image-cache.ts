@@ -98,33 +98,27 @@ async function fetchBlob(url: string): Promise<Blob> {
   return await resp.blob();
 }
 
-/** Cache of in-memory Image objects per sheet URL — slicing reuses one decoded
- *  bitmap for the 40 cards on that sheet rather than re-decoding each time.
- *  Caches the in-flight Promise so concurrent slice requests don't all race
- *  to fetch the same sheet. */
-const sheetImagePromises = new Map<string, Promise<HTMLImageElement>>();
+/** Cache the sheet blob (from IndexedDB or fresh fetch) per sheet URL. The
+ *  blob itself is small enough to keep in memory; the expensive part is
+ *  fetching it over the network. We deliberately do NOT cache a full
+ *  decoded ImageBitmap — Safari iOS caps per-image decodes at ~32MP, and
+ *  the workshop sheets are 7490×5230 ≈ 39MP. Instead, each slice request
+ *  asks createImageBitmap to decode JUST the tile region (region-only
+ *  decode), which dodges the cap entirely. */
+const sheetBlobPromises = new Map<string, Promise<Blob>>();
 
-function loadSheetImage(sheetUrl: string): Promise<HTMLImageElement> {
-  const cached = sheetImagePromises.get(sheetUrl);
+function loadSheetBlob(sheetUrl: string): Promise<Blob> {
+  const cached = sheetBlobPromises.get(sheetUrl);
   if (cached) return cached;
   const p = (async () => {
-    // Pull the sheet blob (from IndexedDB if previously cached; else fetch).
     let blob = await dbGet(sheetUrl);
     if (!blob) {
       blob = await fetchBlob(sheetUrl);
       await dbPut(sheetUrl, blob);
     }
-    const objectUrl = URL.createObjectURL(blob);
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error(`decode failed: ${sheetUrl}`));
-      img.src = objectUrl;
-    });
-    return img;
+    return blob;
   })();
-  sheetImagePromises.set(sheetUrl, p);
+  sheetBlobPromises.set(sheetUrl, p);
   return p;
 }
 
@@ -174,19 +168,27 @@ async function deriveBoardMap(): Promise<Blob> {
   });
 }
 
-/** Slice a single tile out of the sheet at `slot`, return a JPEG blob. */
+/** Slice a single tile out of the sheet at `slot`, return a JPEG blob.
+ *
+ *  Uses createImageBitmap with a crop rect — region-only decode — so we
+ *  never have to decode the full 7490×5230 sheet as one image. Safari iOS
+ *  silently clips full-sheet decodes (~32MP cap) which manifested as
+ *  blank tiles in the lower-right of the sheet (e.g. drow slot 39,
+ *  Weaponmaster). Crop-decode sidesteps that limit entirely. */
 async function sliceTile(sheet: SheetInfo, slot: number): Promise<Blob> {
-  const img = await loadSheetImage(sheet.url);
-  const tileW = Math.floor(img.naturalWidth / sheet.cols);
-  const tileH = Math.floor(img.naturalHeight / sheet.rows);
+  const blob = await loadSheetBlob(sheet.url);
+  const tileW = Math.floor(sheet.width / sheet.cols);
+  const tileH = Math.floor(sheet.height / sheet.rows);
   const row = Math.floor(slot / sheet.cols);
   const col = slot % sheet.cols;
+  const bmp = await createImageBitmap(blob, col * tileW, row * tileH, tileW, tileH);
   const canvas = document.createElement('canvas');
   canvas.width = tileW;
   canvas.height = tileH;
   const cx = canvas.getContext('2d');
-  if (!cx) throw new Error('no 2d context');
-  cx.drawImage(img, col * tileW, row * tileH, tileW, tileH, 0, 0, tileW, tileH);
+  if (!cx) { bmp.close(); throw new Error('no 2d context'); }
+  cx.drawImage(bmp, 0, 0);
+  bmp.close();
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
       b => b ? resolve(b) : reject(new Error('canvas.toBlob returned null')),
