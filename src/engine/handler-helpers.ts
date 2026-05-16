@@ -1343,11 +1343,15 @@ export function playerCanReturnEnemySpy(G: import('../game').TyrantsState, actor
   return false;
 }
 
-// ---------- Conditional grant gated on the last placed spy site ----------
+// ---------- Conditional grants gated on the last placed spy site ----------
 //
-// Reads the transient `_lastPlacedSpySite` slot that `placeSpyAtChosenSite` stashes.
-// Used by Infiltrator (+1 Power) and Green Wyrmling (+2 Influence) when the placer
-// already has a troop at the spy's site.
+// Three variants over `_lastPlacedSpySite` (stashed by placeSpyAtChosenSite):
+//   - ifTroopAtLastPlacedSpySite           — your own troop at the site
+//   - ifEnemyTroopAtLastPlacedSpySite      — any non-self troop (incl. white)
+//   - ifAnotherPlayerTroopAtLastPlacedSpySite
+//       — strictly another PLAYER's troop (non-self, non-white). This is the
+//         exact phrasing on Infiltrator's printed card ("another player's
+//         troop"), and white/unaligned troops don't satisfy "another player".
 
 export function ifTroopAtLastPlacedSpySite(bonus: EffectHandler): EffectHandler {
   return ctx => {
@@ -1356,7 +1360,26 @@ export function ifTroopAtLastPlacedSpySite(bonus: EffectHandler): EffectHandler 
     const me = ctx.G.players[ctx.actorId];
     const hasTroop = TROOP_SPACES.some(t => t.parentSite === siteId && ctx.G.troops[t.id] === me.color);
     if (!hasTroop) return true;
-    Mechanics.log(ctx.G, `(spy-site bonus triggered at ${siteId})`);
+    Mechanics.log(ctx.G, `(spy-site own-troop bonus triggered at ${siteId})`);
+    return bonus(ctx);
+  };
+}
+
+/** Bonus only fires if at least one space at the spy's site has a troop
+ *  owned by another PLAYER (i.e. an enemy color — white doesn't count, since
+ *  white is unaligned, not "another player"). */
+export function ifAnotherPlayerTroopAtLastPlacedSpySite(bonus: EffectHandler): EffectHandler {
+  return ctx => {
+    const siteId = (ctx.G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite;
+    if (!siteId) return true;
+    const me = ctx.G.players[ctx.actorId];
+    const hasOpponent = TROOP_SPACES.some(t => {
+      if (t.parentSite !== siteId) return false;
+      const occ = ctx.G.troops[t.id];
+      return !!occ && occ !== me.color && occ !== 'white';
+    });
+    if (!hasOpponent) return true;
+    Mechanics.log(ctx.G, `(spy-site another-player-troop bonus triggered at ${siteId})`);
     return bonus(ctx);
   };
 }

@@ -9,7 +9,7 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
          assassinateChoice, deployChoice, supplantChoice, chooseOne, times,
          returnOwnSpyChoice, supplantAtLastReturnedSpySite, moveEnemyTroopChoice,
          conditionalGrant, moveDeckToDiscard, promoteFromDiscardChoice,
-         returnEnemyTroopOrSpyChoice, ifTroopAtLastPlacedSpySite,
+         returnEnemyTroopOrSpyChoice, ifAnotherPlayerTroopAtLastPlacedSpySite,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 
 registerAll({
@@ -30,7 +30,7 @@ registerAll({
   'chosen-of-lolth':      sequence(returnEnemyTroopOrSpyChoice(), flagEotPromote()),
   'council-member':       sequence(flagEotPromote(), moveEnemyTroopChoice({ count: 2 })),
 
-  'infiltrator':          sequence(placeSpyAtChosenSite(), ifTroopAtLastPlacedSpySite(grant({ power: 1 }))),
+  'infiltrator':          sequence(placeSpyAtChosenSite(), ifAnotherPlayerTroopAtLastPlacedSpySite(grant({ power: 1 }))),
   'information-broker':   chooseOne(
                             { label: 'Place a spy', handler: placeSpyAtChosenSite() },
                             { label: 'Return a spy → draw 3', handler: sequence(returnOwnSpyChoice(), grant({ draw: 3 })), available: playerHasOwnSpy }),
