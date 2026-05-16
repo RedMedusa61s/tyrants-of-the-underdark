@@ -11,7 +11,7 @@ import { grant, sequence, registerAll, flagEotPromote,
          returnOwnSpyChoice, moveEnemyTroopChoice, promoteTopOfDeck,
          giveOutcastToEachOpponent, giveOutcastToChosenOpponent,
          devourFromInnerCircleCost, recruitOutcastToSelf, takeTrophyAndPlace,
-         giveOutcastToOpponentAdjacentToLastDeploy, returnAllSpiesAndSupplantAtEach,
+         giveOutcastToOpponentAdjacentToLastDeploy, returnAnySpiesAndSupplantAtEach, playerHasUsefulSpyForSupplant,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 
 registerAll({
@@ -43,7 +43,9 @@ registerAll({
                               available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
   'grazzt':               chooseOne(
                             { label: 'Place 2 spies', handler: sequence(placeSpyAtChosenSite(), placeSpyAtChosenSite()) },
-                            { label: 'Return all your spies, supplanting at each site', handler: returnAllSpiesAndSupplantAtEach() }),
+                            { label: 'Return any number of your spies (supplant at each site)',
+                              handler: returnAnySpiesAndSupplantAtEach(),
+                              available: playerHasUsefulSpyForSupplant }),
   'demogorgon':           devourFromHandCost(sequence(
                             supplantChoice({ whiteOnly: true, anywhere: true }),
                             supplantChoice({ whiteOnly: true, anywhere: true }),

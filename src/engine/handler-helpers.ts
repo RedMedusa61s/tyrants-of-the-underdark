@@ -730,6 +730,25 @@ export function chooseOne(...opts: ChoiceOption[]): EffectHandler {
 
 // ---------- Common availability predicates ----------
 
+/** True when the player has at least one spy on the board AND at least one of
+ *  those spy sites has a troop the player could supplant (i.e. an enemy or
+ *  white troop in any slot of that site). Used to gate Graz'zt's
+ *  "return-spies-and-supplant" option so it isn't offered when no spy can
+ *  produce a benefit. */
+export function playerHasUsefulSpyForSupplant(G: import('../game').TyrantsState, actorId: string): boolean {
+  const color = G.players[actorId].color;
+  for (const s of SITES) {
+    if (!(G.spies[s.id] ?? []).includes(color)) continue;
+    // Site has my spy; does it have a troop I could supplant?
+    for (const t of TROOP_SPACES) {
+      if (t.parentSite !== s.id) continue;
+      const occ = G.troops[t.id];
+      if (occ && occ !== color) return true;
+    }
+  }
+  return false;
+}
+
 export function playerHasOwnSpy(G: import('../game').TyrantsState, actorId: string): boolean {
   const color = G.players[actorId].color;
   for (const arr of Object.values(G.spies)) if (arr.includes(color)) return true;
@@ -1482,85 +1501,169 @@ export function giveOutcastToOpponentAdjacentToLastDeploy(): EffectHandler {
 
 // ---------- Return ALL your spies, supplanting at each (Graz'zt) ----------
 //
-// Iterates through every site where the player has a spy; returns the spy and prompts
-// for an optional supplant at that site. State machine resumes through one site at a
-// time, so the user (or AI) can decide each supplant independently.
+// User chooses ANY NUMBER of their placed spies; for each one they pick, the spy
+// returns to their supply and they supplant a troop at that spy's site. They can
+// stop at any point. If a chosen spy's site has no supplantable troops, we
+// surface a confirmation before returning it for no benefit (the user can either
+// confirm "yes, return anyway" or back out and pick a different spy).
+//
+// State machine:
+//   - phase 'pick-spy-or-stop': chooseOne over remaining spy sites + "Stop".
+//   - phase 'confirm-empty':    confirm returning a spy at a site with no
+//                               supplantable troops (no benefit).
+//   - phase 'supplant':         select-troop-space picker for the supplant.
 
 interface GrazztState {
-  queue: string[];            // sites still to process
-  supplantPending: boolean;   // true while waiting on the supplant prompt
+  phase: 'pick-spy-or-stop' | 'confirm-empty' | 'supplant';
+  /** Sites the player has spies at right now. Refreshed each pass so a
+   *  mid-card effect that moves spies stays consistent. */
+  remaining: string[];
+  /** Which site the player most recently picked — relevant during
+   *  'confirm-empty' and 'supplant' phases. */
+  picked?: string;
 }
 
-export function returnAllSpiesAndSupplantAtEach(): EffectHandler {
+function grazztRefreshRemaining(G: import('../game').TyrantsState, color: import('../game').Color): string[] {
+  return SITES.filter(s => (G.spies[s.id] ?? []).includes(color)).map(s => s.id);
+}
+
+function grazztSupplantTargets(G: import('../game').TyrantsState, color: import('../game').Color, siteId: string): string[] {
+  return TROOP_SPACES.filter(t => t.parentSite === siteId).map(t => t.id).filter(id => {
+    const occ = G.troops[id];
+    return occ && occ !== color;
+  });
+}
+
+export function returnAnySpiesAndSupplantAtEach(): EffectHandler {
   return ctx => {
+    const me = ctx.G.players[ctx.actorId];
+    const myColor = me.color;
     let state = ctx.handlerState as GrazztState | null;
+
+    // First entry — open the pick-spy-or-stop prompt.
     if (!state) {
-      const me = ctx.G.players[ctx.actorId];
-      const queue = SITES.filter(s => (ctx.G.spies[s.id] ?? []).includes(me.color)).map(s => s.id);
-      if (queue.length === 0) return true;
-      state = { queue, supplantPending: false };
-    }
-
-    while (state.queue.length > 0) {
-      const siteId = state.queue[0];
-
-      if (state.supplantPending) {
-        // Resume from a supplant prompt; apply or skip.
-        const spaceId = ctx.pendingChoice?.response as string | null;
-        ctx.pendingChoice = null;
-        ctx.paused = false;
-        if (spaceId) {
-          const me = ctx.G.players[ctx.actorId];
-          const killed = assassinateTroop(ctx.G, spaceId);
-          if (killed) {
-            if (killed === 'white') me.trophyHall.white += 1;
-            else if (killed !== me.color) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
-            if (me.barracksLeft > 0) {
-              if (deployTroop(ctx.G, me.color, spaceId)) {
-                me.barracksLeft -= 1;
-                Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`);
-              }
-            } else {
-              me.vp += 1;
-              Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`);
-            }
-          }
-        }
-        state.queue.shift();
-        state.supplantPending = false;
-        continue;
-      }
-
-      // Start a new site: return the spy, then prompt for supplant.
-      const me = ctx.G.players[ctx.actorId];
-      ensureSpiesLeftInitialized(ctx.G, me.color);
-      if ((ctx.G.spies[siteId] ?? []).includes(me.color)) {
-        if (returnSpy(ctx.G, me.color, siteId)) {
-          me.spiesLeft += 1;
-          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} (spies left: ${me.spiesLeft})`);
-        }
-      }
-      const eligible = TROOP_SPACES.filter(t => t.parentSite === siteId).map(t => t.id)
-        .filter(id => {
-          const occ = ctx.G.troops[id];
-          return occ && occ !== me.color;
-        });
-      if (eligible.length === 0) {
-        state.queue.shift();
-        continue;
+      ensureSpiesLeftInitialized(ctx.G, myColor);
+      const remaining = grazztRefreshRemaining(ctx.G, myColor);
+      if (remaining.length === 0) {
+        Mechanics.log(ctx.G, `(Graz'zt return: no spies on the board — skipped)`);
+        return true;
       }
       ctx.pendingChoice = {
-        kind: 'select-troop-space',
-        prompt: `Supplant a troop at ${siteId}? (returned spy)`,
-        options: eligible,
-        optional: true,
+        kind: 'choose-one',
+        prompt: 'Return a spy and supplant at its site (or stop).',
+        options: [...remaining.map(s => `Return spy from ${s}`), 'Stop'],
       } as PendingChoice;
-      state.supplantPending = true;
-      ctx.handlerState = state;
       ctx.paused = true;
+      ctx.handlerState = { phase: 'pick-spy-or-stop', remaining };
       return false;
     }
 
+    // Phase: user just picked a spy site (or stop).
+    if (state.phase === 'pick-spy-or-stop') {
+      const idx = ctx.pendingChoice?.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (idx == null || idx >= state.remaining.length) {
+        // Picked "Stop" (or response invalid).
+        ctx.handlerState = null;
+        return true;
+      }
+      const picked = state.remaining[idx];
+      const targets = grazztSupplantTargets(ctx.G, myColor, picked);
+      if (targets.length === 0) {
+        // No supplantable troops — confirm before wasting the spy.
+        ctx.pendingChoice = {
+          kind: 'choose-one',
+          prompt: `${picked} has no enemy / white troops to supplant. Return this spy anyway (no benefit)?`,
+          options: ['Yes, return the spy', 'No, pick a different spy'],
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = { phase: 'confirm-empty', remaining: state.remaining, picked };
+        return false;
+      }
+      // Eligible supplant targets — return the spy now and prompt the supplant pick.
+      ensureSpiesLeftInitialized(ctx.G, myColor);
+      if (returnSpy(ctx.G, myColor, picked)) {
+        me.spiesLeft += 1;
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${picked} (spies left: ${me.spiesLeft})`);
+      }
+      ctx.pendingChoice = {
+        kind: 'select-troop-space',
+        prompt: `Supplant a troop at ${picked}.`,
+        options: targets,
+        optional: true,
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { phase: 'supplant', remaining: state.remaining, picked };
+      return false;
+    }
+
+    // Phase: confirm-empty (the spy's site has no supplantable troops).
+    if (state.phase === 'confirm-empty') {
+      const idx = ctx.pendingChoice?.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (idx === 0 && state.picked) {
+        // User confirmed — return the spy with no supplant.
+        ensureSpiesLeftInitialized(ctx.G, myColor);
+        if (returnSpy(ctx.G, myColor, state.picked)) {
+          me.spiesLeft += 1;
+          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${state.picked} (no supplant — site had no targets) (spies left: ${me.spiesLeft})`);
+        }
+      }
+      // Either way, re-open the pick-spy-or-stop loop with refreshed remaining.
+      const remaining = grazztRefreshRemaining(ctx.G, myColor);
+      if (remaining.length === 0) {
+        ctx.handlerState = null;
+        return true;
+      }
+      ctx.pendingChoice = {
+        kind: 'choose-one',
+        prompt: 'Return another spy and supplant at its site (or stop).',
+        options: [...remaining.map(s => `Return spy from ${s}`), 'Stop'],
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { phase: 'pick-spy-or-stop', remaining };
+      return false;
+    }
+
+    // Phase: supplant pick at the just-returned spy's site.
+    if (state.phase === 'supplant') {
+      const spaceId = ctx.pendingChoice?.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (spaceId) {
+        const killed = assassinateTroop(ctx.G, spaceId);
+        if (killed) {
+          if (killed === 'white') me.trophyHall.white += 1;
+          else if (killed !== myColor) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
+          if (me.barracksLeft > 0) {
+            if (deployTroop(ctx.G, myColor, spaceId)) {
+              me.barracksLeft -= 1;
+              Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`);
+            }
+          } else {
+            me.vp += 1;
+            Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`);
+          }
+        }
+      }
+      const remaining = grazztRefreshRemaining(ctx.G, myColor);
+      if (remaining.length === 0) {
+        ctx.handlerState = null;
+        return true;
+      }
+      ctx.pendingChoice = {
+        kind: 'choose-one',
+        prompt: 'Return another spy and supplant at its site (or stop).',
+        options: [...remaining.map(s => `Return spy from ${s}`), 'Stop'],
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { phase: 'pick-spy-or-stop', remaining };
+      return false;
+    }
+
+    // Defensive: unknown phase.
     ctx.handlerState = null;
     return true;
   };
