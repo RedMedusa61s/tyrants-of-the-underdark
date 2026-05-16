@@ -809,7 +809,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       )}
       <div style={{ marginTop: 8, opacity: 0.7 }}>
         Player P{Number(me) + 1} ({p.color}) — Turn: P{Number(ctx.currentPlayer) + 1} {myTurn ? '(your turn)' : ''}
-        {' · '}Power: {p.power} · Influence: {p.influence} · Deck: {p.deck.length} · Discard: {p.discard.length} · Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
+        {' · '}Power: {p.power} · Influence: {p.influence} · Deck: {p.deck.length} · Discard: {p.discard.length} · Inner Circle: {p.innerCircle.length} · Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
         {' · '}<b style={{ color: '#ffcc44' }}>VP: {p.vp}</b>
         {G.endGameTriggeredAtTurn !== null && <span style={{ color: '#ffcc44', marginLeft: 8 }}>· Final round!</span>}
       </div>
@@ -819,6 +819,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             P{Number(pid) + 1} ({pl.color}): {pl.vp} VP tokens
             {' · '}{Object.values(G.controlMarkers).filter(m => m.holder === pl.color).length} markers
             {' · '}{Object.values(pl.trophyHall).reduce((s, n) => s + n, 0)} trophies
+            {' · '}{pl.innerCircle.length} inner-circle
           </span>
         ))}
       </div>

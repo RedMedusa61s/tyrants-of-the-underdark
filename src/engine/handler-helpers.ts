@@ -253,9 +253,16 @@ export function supplantAtLastPlacedSpySite(): EffectHandler {
 export function assassinateAtLastPlacedSpySite(): EffectHandler {
   return ctx => {
     const Gx = ctx.G as unknown as { _lastPlacedSpySite?: string };
-    const siteId = Gx._lastPlacedSpySite;
-    Gx._lastPlacedSpySite = undefined;
-    if (!siteId) return true;
+    // Stash the target site in handlerState on first entry so it survives
+    // the pause for the user's troop-pick. The earlier implementation read
+    // _lastPlacedSpySite AND cleared it on every entry, so on re-entry
+    // after the user picked a target the siteId was undefined and the
+    // assassinate silently bailed out (Succubus place-then-assassinate
+    // chain visibly skipped the assassinate step).
+    const stashed = ctx.handlerState as { siteId?: string } | null;
+    const siteId = stashed?.siteId ?? Gx._lastPlacedSpySite;
+    if (!siteId) { ctx.handlerState = null; return true; }
+
     if (!ctx.pendingChoice) {
       const me = ctx.G.players[ctx.actorId];
       const eligible = TROOP_SPACES.filter(t => t.parentSite === siteId).map(t => t.id)
@@ -263,7 +270,12 @@ export function assassinateAtLastPlacedSpySite(): EffectHandler {
           const occ = ctx.G.troops[id];
           return occ && occ !== me.color;
         });
-      if (eligible.length === 0) return true;
+      if (eligible.length === 0) {
+        Mechanics.log(ctx.G, `(assassinate at ${siteId}: no enemy/white troops to target — skipped)`);
+        Gx._lastPlacedSpySite = undefined;
+        ctx.handlerState = null;
+        return true;
+      }
       ctx.pendingChoice = {
         kind: 'select-troop-space',
         prompt: `Assassinate a troop at ${siteId}.`,
@@ -271,11 +283,17 @@ export function assassinateAtLastPlacedSpySite(): EffectHandler {
         optional: true,
       } as PendingChoice;
       ctx.paused = true;
+      ctx.handlerState = { siteId };
       return false;
     }
     const spaceId = ctx.pendingChoice.response as string | null;
     ctx.pendingChoice = null;
     ctx.paused = false;
+    // The site has been consumed by either path (target chosen or declined),
+    // so clear the transient stash for any downstream handlers and our own
+    // handlerState ledger.
+    Gx._lastPlacedSpySite = undefined;
+    ctx.handlerState = null;
     if (!spaceId) return true;
     const me = ctx.G.players[ctx.actorId];
     const killed = assassinateTroop(ctx.G, spaceId);
