@@ -7,6 +7,8 @@
 import { useState } from 'react';
 import { useCachedImage } from '../image-cache';
 import BAKED from '../../assets/section-dividers.json';
+import { SITES } from '../data/sites';
+import SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
 
 type Point = { x: number; y: number };
 export interface SectionDividers {
@@ -96,6 +98,25 @@ export function SectionDividerCalibration() {
         </div>
       </div>
 
+      {/* Legend for the section-colored dots overlaid on the board. */}
+      <div style={{ marginBottom: 8, fontSize: 12, display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span style={{ opacity: 0.7 }}>Section colors:</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: SECTION_COLOR.left }} /> left
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: SECTION_COLOR.center }} /> center
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: SECTION_COLOR.right }} /> right
+        </span>
+        <span style={{ opacity: 0.6, marginLeft: 8, fontSize: 11 }}>
+          Sites colored by their declared section; slots colored by which section their position
+          falls into per the dividers. A dot in a colored zone that doesn't match the surrounding
+          zone means the divider line passes on the wrong side of that point.
+        </span>
+      </div>
+
       <div style={{ position: 'relative', width: '100%', maxWidth: 1200 }}>
         <img src={boardUrl} alt="board" onClick={addPoint}
           style={{ width: '100%', display: 'block', cursor: 'crosshair', userSelect: 'none' }}
@@ -117,8 +138,65 @@ export function SectionDividerCalibration() {
               </g>
             );
           })}
+          {/* Section-colored dots — one per site (declared section) and one
+              per calibrated slot (position-derived section). A site whose
+              dot sits in the visual zone of a different color signals a
+              section/position mismatch; a slot whose dot sits in a zone
+              that doesn't match its colour signals a divider polyline
+              that needs nudging. */}
+          {SITES.map(s => (
+            <circle key={`site-${s.id}`} cx={s.x} cy={s.y} r={0.008}
+              fill={SECTION_COLOR[s.section]}
+              stroke="rgba(0,0,0,0.6)" strokeWidth={0.001}>
+              <title>{`${s.name} — declared ${s.section}`}</title>
+            </circle>
+          ))}
+          {Object.entries(SLOT_POSITIONS as Record<string, { x: number; y: number }>).map(([id, p]) => {
+            const sec = classifyByDividers(p.x, p.y, dividers);
+            return (
+              <circle key={`slot-${id}`} cx={p.x} cy={p.y} r={0.004}
+                fill={SECTION_COLOR[sec]}
+                opacity={0.85}>
+                <title>{`${id} — by position: ${sec}`}</title>
+              </circle>
+            );
+          })}
         </svg>
       </div>
     </div>
   );
+}
+
+/** Color per section. Cyan/yellow/magenta picked to be (a) mutually
+ *  distinguishable, (b) high-contrast on the dark printed board, and
+ *  (c) not colliding with the player-colors (black/red/orange/blue). */
+const SECTION_COLOR: Record<'left' | 'center' | 'right', string> = {
+  left:   '#3ee8a8', // cool green
+  center: '#ffcc44', // gold
+  right:  '#ff5e9c', // magenta
+};
+
+/** Read the divider polylines and report which section (x, y) falls into.
+ *  Same algorithm the MapView dimmer uses — mirrored here so the divider
+ *  tab's audit dots agree with what gameplay actually does. */
+function classifyByDividers(
+  x: number, y: number,
+  dividers: SectionDividers,
+): 'left' | 'center' | 'right' {
+  const xOnLine = (line: { x: number; y: number }[]): number | null => {
+    if (line.length === 0) return null;
+    const sorted = [...line].sort((a, b) => a.y - b.y);
+    if (y <= sorted[0].y) return sorted[0].x;
+    if (y >= sorted[sorted.length - 1].y) return sorted[sorted.length - 1].x;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const a = sorted[i], b = sorted[i + 1];
+      if (y >= a.y && y <= b.y) return a.x + (b.x - a.x) * ((y - a.y) / (b.y - a.y));
+    }
+    return sorted[sorted.length - 1].x;
+  };
+  const lc = xOnLine(dividers.leftCenter);
+  const cr = xOnLine(dividers.centerRight);
+  if (lc != null && x < lc) return 'left';
+  if (cr != null && x > cr) return 'right';
+  return 'center';
 }
