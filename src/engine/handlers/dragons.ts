@@ -3,7 +3,7 @@
 import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, times,
          assassinateChoice, deployChoice, supplantChoice, chooseOne,
          returnOwnSpyChoice, moveEnemyTroopChoice, conditionalGrant,
-         ifEnemyTroopAtLastPlacedSpySite, devourMarketChoice,
+         ifAnotherPlayerTroopAtLastPlacedSpySite, devourMarketChoice,
          supplantAtLastPlacedSpySite, supplantAtLastReturnedSpySite,
          returnEnemyTroopOrSpyChoice, playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 import { totalTrophies } from '../../game';
@@ -17,7 +17,7 @@ registerAll({
   'enchanter-of-thay':    chooseOne(
                             { label: 'Place a spy', handler: placeSpyAtChosenSite() },
                             { label: 'Return a spy → +4 Power', handler: sequence(returnOwnSpyChoice(), grant({ power: 4 })), available: playerHasOwnSpy }),
-  'green-wyrmling':       sequence(placeSpyAtChosenSite(), ifEnemyTroopAtLastPlacedSpySite(grant({ influence: 2 }))),
+  'green-wyrmling':       sequence(placeSpyAtChosenSite(), ifAnotherPlayerTroopAtLastPlacedSpySite(grant({ influence: 2 }))),
   'watcher-of-thay':      chooseOne(
                             { label: 'Place a spy', handler: placeSpyAtChosenSite() },
                             { label: 'Return a spy → +3 Influence', handler: sequence(returnOwnSpyChoice(), grant({ influence: 3 })), available: playerHasOwnSpy }),
