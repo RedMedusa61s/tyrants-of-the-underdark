@@ -83,7 +83,7 @@ export const SITES: Site[] = [
   seed('ched-nasad',    'Ched Nasad',                'center', 3, 4, { start: true, whites: 0 }),
 
   // Right section (used in 3p with-right, 4p)
-  seed('chchitl',       "Ch'Chitl",                  'right',  2, 3, { control: true, start: true, whites: 2 }),
+  seed('chchitl',       "Ch'Chitl",                  'left',   2, 3, { control: true, start: true, whites: 2 }),
   seed('phaerlin',      'The Phaerlin',              'right',  2, 3, { control: true, whites: 2, whiteSlots: [0, 1] }),
   seed('llacerellyn',   'Llacerellyn',               'center', 2, 2, { whites: 0 }),
   seed('sszuraassnee',  "Ss'zuraass'nee",            'right',  2, 3, { control: true, whites: 2 }),
