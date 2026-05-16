@@ -7,7 +7,7 @@
 import { CardRegistry } from './registry';
 import { Mechanics } from './mechanics';
 import type { EffectContext, EffectHandler, PendingChoice } from './types';
-import { placeSpy, assassinateTroop, deployTroop, hasPresence, returnSpy, moveTroop } from './map-state';
+import { placeSpy, assassinateTroop, deployTroop, hasPresence, returnSpy, returnTroop, moveTroop } from './map-state';
 import { SITES } from '../data/sites';
 import { ROUTES } from '../data/routes';
 import { TROOP_SPACES } from '../data/troop-spaces';
@@ -1193,16 +1193,18 @@ export function returnEnemyTroopChoice(): EffectHandler {
     if (!spaceId) return true;
     const occ = ctx.G.troops[spaceId];
     if (occ && occ !== 'white') {
-      ctx.G.troops[spaceId] = null;
-      const ownerEntry = Object.entries(ctx.G.players).find(([, p]) => p.color === occ);
-      if (ownerEntry) ownerEntry[1].barracksLeft += 1;
-      // Recompute control for the affected site.
-      const sp = TROOP_SPACES.find(t => t.id === spaceId);
-      if (sp?.parentSite) {
-        const m = ctx.G.controlMarkers[sp.parentSite];
-        if (m) m.holder = null; // will be recomputed downstream
+      // Use returnTroop so the site-control recompute fires (and the
+      // marker transfer / return-to-map logic runs). The earlier
+      // implementation null'd the slot directly, which left
+      // G.siteControl and the marker holder stale until the next mutation
+      // triggered a recompute — visible as "I returned the enemy's
+      // troop but the marker still says they control the site".
+      const returned = returnTroop(ctx.G, spaceId);
+      if (returned && returned !== 'white') {
+        const ownerEntry = Object.entries(ctx.G.players).find(([, p]) => p.color === returned);
+        if (ownerEntry) ownerEntry[1].barracksLeft += 1;
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${returned} troop from ${spaceId}`);
       }
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${occ} troop from ${spaceId}`);
     }
     return true;
   };
