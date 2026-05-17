@@ -797,12 +797,19 @@ export function moveEnemyTroopChoice(opts?: { count?: number }): EffectHandler {
 
     const me = ctx.G.players[ctx.actorId];
     if (state.from === null) {
+      // Rulebook p.12 "Move a Troop": you may move a troop ONLY from a
+      // space where you have Presence. Destination is unrestricted (any
+      // empty troop space) — that part the handler already gets right.
       const eligible = TROOP_SPACES.filter(t => {
+        if (!(t.id in ctx.G.troops)) return false;
         const occ = ctx.G.troops[t.id];
-        return occ && occ !== me.color;
+        if (!occ || occ === me.color) return false;
+        if (t.parentSite) return hasPresence(ctx.G, me.color, { site: t.parentSite });
+        if (t.parentRoute) return hasPresence(ctx.G, me.color, { space: t.id });
+        return false;
       }).map(t => t.id);
       if (eligible.length === 0) {
-        Mechanics.log(ctx.G, '(move enemy troop: no enemy or white troops on the board — skipped)');
+        Mechanics.log(ctx.G, '(move enemy troop: no enemy / white troops at any space where you have presence — skipped)');
         ctx.handlerState = null;
         return true;
       }
