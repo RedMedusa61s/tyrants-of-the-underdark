@@ -453,7 +453,11 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   })();
 
   const startingClickable = G.setupPhase && myTurn
-    ? new Set(SITES.filter(s => s.isStartingSite && s.id in G.siteControl && sitesSpaces(s.id).every(sp => sp.id in G.troops && !G.troops[sp.id])).map(s => s.id))
+    // Per rulebook setup: each player picks ANY of the printed starting
+    // sites in play. White troops printed at a starting site don't block
+    // it — the player drops into the next empty slot. So we only require
+    // at least one empty slot (not all empty).
+    ? new Set(SITES.filter(s => s.isStartingSite && s.id in G.siteControl && sitesSpaces(s.id).some(sp => !G.troops[sp.id])).map(s => s.id))
     : humanSitePick
       ? new Set((humanSitePick.options as string[] | undefined) ?? SITES.map(s => s.id))
       : baseActionClickableSites;
