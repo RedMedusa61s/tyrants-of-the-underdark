@@ -276,6 +276,7 @@ export function assassinateAtLastPlacedSpySite(): EffectHandler {
         ctx.handlerState = null;
         return true;
       }
+      Mechanics.log(ctx.G, `(assassinate at ${siteId}: choose a troop or dismiss to skip — ${eligible.length} eligible)`);
       ctx.pendingChoice = {
         kind: 'select-troop-space',
         prompt: `Assassinate a troop at ${siteId}.`,
@@ -294,7 +295,10 @@ export function assassinateAtLastPlacedSpySite(): EffectHandler {
     // handlerState ledger.
     Gx._lastPlacedSpySite = undefined;
     ctx.handlerState = null;
-    if (!spaceId) return true;
+    if (!spaceId) {
+      Mechanics.log(ctx.G, `(assassinate at ${siteId}: declined)`);
+      return true;
+    }
     const me = ctx.G.players[ctx.actorId];
     const killed = assassinateTroop(ctx.G, spaceId);
     if (killed === 'white') me.trophyHall.white += 1;
