@@ -9,7 +9,8 @@ import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { TyrantsGame, type TyrantsState } from '../game';
 import { decideHeuristicMoveWithWeights } from './heuristic-ai';
 import type { HeuristicWeights } from './heuristic-weights';
-import type { SimulateMoveFn } from './lookahead';
+import type { SimulateMoveFn, RolloutToTurnEndFn } from './lookahead';
+import { decideHeuristicMoveWithWeights as decideMoveBare } from './heuristic-ai';
 import { scoreAll } from '../engine/scoring';
 
 export interface TournamentOpts {
@@ -86,13 +87,51 @@ function runOneGame(
     return next.G;
   };
 
+  // Turn-end rollout: apply the candidate move, then continue playing
+  // heuristically (no recursive lookahead) until either the player's turn
+  // ends or the game is over. Returns the end-of-turn G. Used by tactical-
+  // phase decision points (assassinate / deploy / supplant / spy site)
+  // where end-of-turn consequences differ from the immediate post-move
+  // state — e.g. "Master of Melee → unlocks Advance Scout → 2 trophies."
+  const rollout: RolloutToTurnEndFn = (G, playerId, moveName, args) => {
+    let s: BgState = { ...state, G };
+    s = reducer(s, makeMoveAction(moveName, args, playerId));
+    if (s.G === G) return null; // INVALID_MOVE (reducer rejected)
+    // Continue with pure heuristic (no simulator/rollout passed) until
+    // the player's turn ends or game over. Safety cap on the inner loop
+    // to bound rollout cost.
+    let innerSafety = 50;
+    while (innerSafety-- > 0) {
+      if (s.ctx.gameover) break;
+      if (s.ctx.currentPlayer !== playerId) break; // turn rolled to next player
+      // Use the SAME weights this player is using; pass undefined for
+      // simulate + rollout so the recursive call uses pure heuristic.
+      // We need this player's weights — peek at the current seat.
+      const seatOfPid = seats[Number(playerId)];
+      const w = seatOfPid === 'A' ? weightsA : weightsB;
+      const m = decideMoveBare(s.G, playerId, w);
+      if (!m) {
+        s = reducer(s, makeMoveAction('endTurn', [], playerId));
+        continue;
+      }
+      const next = reducer(s, makeMoveAction(m.name, m.args as unknown[], playerId));
+      if (next === s) {
+        // Heuristic produced an invalid move — bail out via endTurn.
+        s = reducer(s, makeMoveAction('endTurn', [], playerId));
+      } else {
+        s = next;
+      }
+    }
+    return s.G;
+  };
+
   let safety = opts.safetyLimit ?? 20000;
   while (safety-- > 0) {
     if (state.ctx.gameover) break;
     const pid = state.ctx.currentPlayer;
     const seat = seats[Number(pid)];
     const weights = seat === 'A' ? weightsA : weightsB;
-    const move = decideHeuristicMoveWithWeights(state.G, pid, weights, simulate);
+    const move = decideHeuristicMoveWithWeights(state.G, pid, weights, simulate, rollout);
     if (!move) {
       state = reducer(state, makeMoveAction('endTurn', [], pid));
       continue;

@@ -36,6 +36,24 @@ export type SimulateMoveFn = (
   args: unknown[],
 ) => TyrantsState | null;
 
+/** Apply one move AND continue playing the rest of the turn heuristically
+ *  (no recursive lookahead), returning the state at end-of-turn. Returns
+ *  null if the initial move was rejected. The "rest of turn" is simulated
+ *  with the same heuristic the AI uses, called WITHOUT a simulator — so
+ *  rollouts don't trigger deeper lookahead and blow up combinatorially.
+ *
+ *  Used by tactical-phase decision points (assassinate target, deploy
+ *  target, supplant target, spy site) where the end-of-turn consequence
+ *  of a choice differs meaningfully from the immediate result — e.g.
+ *  "play Master of Melee here → unlock Advance Scout at the new site →
+ *  finish the turn with two trophies instead of one." */
+export type RolloutToTurnEndFn = (
+  G: TyrantsState,
+  playerId: string,
+  moveName: string,
+  args: unknown[],
+) => TyrantsState | null;
+
 /** Value of a state from `pid`'s perspective: own total VP minus the
  *  strongest opponent's total VP. Positive means we're ahead. Uses the
  *  full scoreAll so trophies, control markers, inner-circle VP, and

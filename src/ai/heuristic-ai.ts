@@ -14,7 +14,7 @@ import { hasPresence } from '../engine/map-state';
 import type { AiMove } from './random-ai';
 import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
 import { takePhaseSnapshot, type PhaseSnapshot } from './game-phase';
-import { lookaheadPick, type SimulateMoveFn } from './lookahead';
+import { lookaheadPick, type SimulateMoveFn, type RolloutToTurnEndFn } from './lookahead';
 import { categoryOfCard, categoryRank } from './card-classes';
 
 // Module-level pointer to the currently active weights. Per-call entrypoints
@@ -34,6 +34,12 @@ let PHASE: PhaseSnapshot | null = null;
 // provides one. Null when no simulator is available (e.g. the live web
 // client) — the heuristic falls back to score-only ranking in that case.
 let SIMULATE: SimulateMoveFn | null = null;
+
+// Module-level pointer to the turn-end rollout function. When non-null,
+// tactical-phase decision points use this for richer lookahead — apply
+// move + rollout remaining actions of the turn with the heuristic + score
+// at end-of-turn. Set null inside rollouts to prevent recursive blow-up.
+let ROLLOUT: RolloutToTurnEndFn | null = null;
 
 function cyclingDeckSize(G: TyrantsState, pid: string): number {
   const p = G.players[pid];
@@ -301,11 +307,15 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
         return occ && occ !== me.color;
       });
       if (enemies.length > 0) {
-        if (SIMULATE) {
+        // Prefer rollout-based lookahead (sees end-of-turn consequences)
+        // over 1-ply (sees only the immediate post-move state). Fall back
+        // to 1-ply when no rollout is available, then to pure heuristic.
+        const lookaheadFn = ROLLOUT ?? SIMULATE;
+        if (lookaheadFn) {
           const pick = lookaheadPick(
             enemies,
             id => ({ name: 'resolveChoice', args: [id] }),
-            G, pid, SIMULATE,
+            G, pid, lookaheadFn,
             id => scoreAssassinateSpace(G, pid, id),
           );
           return { name: 'resolveChoice', args: [pick] };
@@ -315,11 +325,12 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       }
       const empties = ids.filter(id => !G.troops[id]);
       if (empties.length > 0) {
-        if (SIMULATE) {
+        const lookaheadFn = ROLLOUT ?? SIMULATE;
+        if (lookaheadFn) {
           const pick = lookaheadPick(
             empties,
             id => ({ name: 'resolveChoice', args: [id] }),
-            G, pid, SIMULATE,
+            G, pid, lookaheadFn,
             id => scoreDeploySpace(G, pid, id),
           );
           return { name: 'resolveChoice', args: [pick] };
@@ -337,7 +348,8 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       // triggers (denying total control, drawing/grant chains on the
       // playing card, etc.). Fall through to heuristic-only ranking when
       // no simulator is available.
-      if (SIMULATE) {
+      const lookaheadFn = ROLLOUT ?? SIMULATE;
+      if (lookaheadFn) {
         // Heuristic tiebreak for site picks: same components used by the
         // pure-heuristic fallback below (control-marker, VP, denial, own-spy
         // penalty) flattened to a single score.
@@ -348,7 +360,7 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
           if ((G.spies[id] ?? []).includes(me.color)) v -= WEIGHTS.siteOwnSpyPenalty;
           return v;
         };
-        const pick = lookaheadPick(ids, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE, heuScore);
+        const pick = lookaheadPick(ids, id => ({ name: 'resolveChoice', args: [id] }), G, pid, lookaheadFn, heuScore);
         return { name: 'resolveChoice', args: [pick] };
       }
       // Site-pick scoring components:
@@ -406,20 +418,24 @@ export function decideHeuristicMoveWithWeights(
   currentPlayer: string,
   weights: HeuristicWeights,
   simulate?: SimulateMoveFn,
+  rollout?: RolloutToTurnEndFn,
 ): AiMove | null {
   const prevW = WEIGHTS;
   const prevS = SIMULATE;
+  const prevR = ROLLOUT;
   WEIGHTS = weights;
   // Respect the weight-level toggle so a weight file can opt OUT of
   // lookahead even when the harness offers one — used by the validation
   // tournament to compare lookahead-on vs lookahead-off variants under
   // the same engine + same RNG.
   SIMULATE = (simulate && weights.useLookahead > 0) ? simulate : null;
+  ROLLOUT = (rollout && weights.useLookahead > 0) ? rollout : null;
   try {
     return decideHeuristicMove(G, currentPlayer);
   } finally {
     WEIGHTS = prevW;
     SIMULATE = prevS;
+    ROLLOUT = prevR;
   }
 }
 
@@ -535,11 +551,12 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     if (me.power < assassinateThreshold) return null;
     const targets = legalAssassinateTargets(G, currentPlayer);
     if (targets.length === 0) return null;
-    if (SIMULATE) {
+    const lookaheadFn = ROLLOUT ?? SIMULATE;
+    if (lookaheadFn) {
       const pick = lookaheadPick(
         targets,
         id => ({ name: 'assassinateTroop', args: [id] }),
-        G, currentPlayer, SIMULATE,
+        G, currentPlayer, lookaheadFn,
         id => scoreAssassinateSpace(G, currentPlayer, id),
       );
       return { name: 'assassinateTroop', args: [pick] };
@@ -560,11 +577,12 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     if (behind && isEndgame && WEIGHTS.behindEndgameDeploySuppression > 0) return null;
     const targets = legalDeployTargets(G, currentPlayer);
     if (targets.length === 0) return null;
-    if (SIMULATE) {
+    const lookaheadFn = ROLLOUT ?? SIMULATE;
+    if (lookaheadFn) {
       const pick = lookaheadPick(
         targets,
         id => ({ name: 'deployTroop', args: [id] }),
-        G, currentPlayer, SIMULATE,
+        G, currentPlayer, lookaheadFn,
         id => scoreDeploySpace(G, currentPlayer, id),
       );
       return { name: 'deployTroop', args: [pick] };
