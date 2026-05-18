@@ -1,0 +1,17 @@
+{
+  "_comment": "Approximates the pre-strategic AI (before phase awareness, aux stack support, and spy denial). Used as the baseline for the cumulative-validation tournament. Cannot fully revert all changes via weights alone — the Outcast trashScore=-10 and the play-Outcast-first hand-ordering are hardcoded and remain active. So this baseline is 'pre-phase + pre-aux + pre-denial' but still includes the Outcast improvements.",
+
+  "phaseLeadThreshold": 9999,
+  "endgamePromoteByVp": 0,
+  "behindEndgameDeploySuppression": 0,
+  "behindAssassinateMultiplier": 1,
+  "aheadDeployUrgencyMultiplier": 1,
+
+  "siteDenialBonus": 0,
+
+  "recruitAuxStackBonus": -9999,
+  "recruitIcVpWeight": 2,
+  "recruitDeckVpWeight": 1,
+  "recruitCostWeight": 2,
+  "recruitPerInfluenceBlend": 0
+}
