@@ -387,9 +387,30 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       return { name: 'resolveChoice', args: [ranked[0]] };
     }
     case 'choose-one': {
-      // Without semantic info, default to option 0 (typically the "primary" effect).
       const arr = opts as string[];
       if (arr.length === 0) return { name: 'resolveChoice', args: [null] };
+      // Per replay-divergence finding: the old "always pick option 0"
+      // policy was the AI's single biggest leak. On chooseOne cards like
+      // Information Broker, Enchanter of Thay, Watcher of Thay, Vrock,
+      // Night Hag, etc., humans REPEATEDLY pick option 1 ("return spy →
+      // +draws / +power / +supplant") when they have spies on the board,
+      // converting presence into immediate resources that fuel multi-card
+      // combos. The AI was leaving that value on the table every turn.
+      //
+      // Use lookahead (rollout preferred over 1-ply) to simulate each
+      // option and pick the one whose resulting state (or end-of-turn
+      // state) is best. Falls back to option 0 only when no simulator is
+      // available (the live web client).
+      const lookaheadFn = ROLLOUT ?? SIMULATE;
+      if (lookaheadFn && arr.length > 1) {
+        const candidates = arr.map((_, i) => i);
+        const pick = lookaheadPick(
+          candidates,
+          i => ({ name: 'resolveChoice', args: [i] }),
+          G, pid, lookaheadFn,
+        );
+        return { name: 'resolveChoice', args: [pick] };
+      }
       return { name: 'resolveChoice', args: [0] };
     }
     case 'select-player': {
