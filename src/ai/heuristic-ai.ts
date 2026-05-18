@@ -425,17 +425,61 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     if (m) return m;
   }
 
-  // 3c. Recruit: highest-cost affordable card (concentrate influence).
-  const affordable: Array<{ idx: number; cost: number }> = [];
+  // 3c. Recruit — pick the highest-scoring affordable purchase across the
+  // market row AND the permanent aux stacks (Priestess of Lolth, House
+  // Guard). The aux stacks were previously ignored entirely, which left
+  // the AI ending turns with 2-3 unspent influence whenever the market
+  // had nothing cheap. Per competitive-play notes, Priestess at 2 inf
+  // is a strong buy and worth recruiting repeatedly.
+  type Cand =
+    | { kind: 'market'; idx: number; cost: number; icVp: number; deckVp: number; isAux: false }
+    | { kind: 'aux'; stack: 'houseGuards' | 'priestesses'; cost: number; icVp: number; deckVp: number; isAux: true };
+  const candidates: Cand[] = [];
+
   for (let i = 0; i < G.market.row.length; i++) {
     const c = G.market.row[i];
     if (!c) continue;
     const data = lookupCard(c.deck, c.slot);
-    if (data && data.cost <= me.influence) affordable.push({ idx: i, cost: data.cost });
+    if (!data || data.cost > me.influence) continue;
+    candidates.push({
+      kind: 'market', idx: i, cost: data.cost,
+      icVp: data.innerCircleVp ?? 0, deckVp: data.deckVp ?? 0, isAux: false,
+    });
   }
-  if (affordable.length > 0) {
-    affordable.sort((a, b) => b.cost - a.cost);
-    return { name: 'recruitFromMarket', args: [affordable[0].idx] };
+  // Aux stacks: lookup once, push if affordable + stack non-empty.
+  const auxRefs = [
+    { stack: 'priestesses' as const, ref: lookupCard('priestesses', 43) },
+    { stack: 'houseGuards' as const, ref: lookupCard('house-guards', 40) },
+  ];
+  for (const { stack, ref } of auxRefs) {
+    if (!ref) continue;
+    if ((G.auxStacks[stack] ?? 0) <= 0) continue;
+    if (ref.cost > me.influence) continue;
+    candidates.push({
+      kind: 'aux', stack, cost: ref.cost,
+      icVp: ref.innerCircleVp ?? 0, deckVp: ref.deckVp ?? 0, isAux: true,
+    });
+  }
+
+  if (candidates.length > 0) {
+    const scoreOf = (c: Cand) => {
+      const raw =
+        WEIGHTS.recruitIcVpWeight * c.icVp +
+        WEIGHTS.recruitDeckVpWeight * c.deckVp +
+        WEIGHTS.recruitCostWeight * c.cost +
+        (c.isAux ? WEIGHTS.recruitAuxStackBonus : 0);
+      // Blend raw value vs per-influence efficiency. Per-inf favors low-cost
+      // high-IC-VP cards (Priestess). Blend factor 0..1: 0=raw only, 1=per-inf only.
+      const blend = Math.max(0, Math.min(1, WEIGHTS.recruitPerInfluenceBlend));
+      const perInf = raw / Math.max(1, c.cost);
+      return (1 - blend) * raw + blend * perInf * c.cost; // perInf*cost keeps scale comparable
+    };
+    candidates.sort((a, b) => scoreOf(b) - scoreOf(a));
+    const best = candidates[0];
+    if (best.kind === 'market') {
+      return { name: 'recruitFromMarket', args: [best.idx] };
+    }
+    return { name: 'recruitFromAuxStack', args: [best.stack] };
   }
 
   // 3d. End turn.

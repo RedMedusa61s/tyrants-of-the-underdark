@@ -21,6 +21,7 @@ export type AiMove =
   | { name: 'resolveChoice'; args: [unknown] }
   | { name: 'playCard'; args: [number] }
   | { name: 'recruitFromMarket'; args: [number] }
+  | { name: 'recruitFromAuxStack'; args: ['houseGuards' | 'priestesses'] }
   | { name: 'deployTroop'; args: [string] }
   | { name: 'assassinateTroop'; args: [string] }
   | { name: 'returnEnemySpy'; args: [string, string] }
@@ -138,16 +139,31 @@ export function decideAiMove(G: TyrantsState, currentPlayer: string): AiMove | n
     if (d) return { name: 'deployTroop', args: [d] };
   }
 
-  // 3c. Try to recruit a random affordable card.
-  const affordable: number[] = [];
+  // 3c. Try to recruit a random affordable card — either from the market
+  // row or from the aux stacks (Priestess, House Guard). Aux stacks were
+  // added to the move set after the random AI was first written; including
+  // them here keeps the random baseline a fair "any-legal-move" opponent.
+  type R =
+    | { name: 'recruitFromMarket'; args: [number] }
+    | { name: 'recruitFromAuxStack'; args: ['houseGuards' | 'priestesses'] };
+  const recruitOptions: R[] = [];
   for (let i = 0; i < G.market.row.length; i++) {
     const c = G.market.row[i];
     if (!c) continue;
     const data = lookupCard(c.deck, c.slot);
-    if (data && data.cost <= me.influence) affordable.push(i);
+    if (data && data.cost <= me.influence) recruitOptions.push({ name: 'recruitFromMarket', args: [i] });
   }
-  const idx = pickRandom(affordable);
-  if (idx !== undefined) return { name: 'recruitFromMarket', args: [idx] };
+  for (const [stack, ref] of [
+    ['priestesses', lookupCard('priestesses', 43)] as const,
+    ['houseGuards', lookupCard('house-guards', 40)] as const,
+  ]) {
+    if (!ref) continue;
+    if ((G.auxStacks[stack] ?? 0) <= 0) continue;
+    if (ref.cost > me.influence) continue;
+    recruitOptions.push({ name: 'recruitFromAuxStack', args: [stack] });
+  }
+  const pick = pickRandom(recruitOptions);
+  if (pick) return pick;
 
   // 3d. End turn.
   return { name: 'endTurn', args: [] };

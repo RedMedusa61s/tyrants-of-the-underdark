@@ -75,6 +75,27 @@ export interface HeuristicWeights {
    *  the trashiest. Treated as 0 (off) or 1 (on); fractional values blend
    *  the two scoring strategies linearly (0.5 = tie-break by VP only). */
   endgamePromoteByVp: number;
+
+  // --- Recruit value scoring (market row + aux stacks) ---
+  // Per competitive-play wisdom, Priestess of Lolth (cost 2, +2 inf, IC VP 2)
+  // is a great deal and players sometimes deny-buy them. The old "always
+  // pick highest cost in market" rule never considered aux stacks at all
+  // and underbought them as a fallback. These weights score each candidate
+  // purchase; the AI picks the highest score across market + aux stacks.
+  /** Coefficient on the card's innerCircleVp (banked at game end if promoted). */
+  recruitIcVpWeight: number;
+  /** Coefficient on the card's deckVp (small permanent VP per copy in deck). */
+  recruitDeckVpWeight: number;
+  /** Coefficient on the card's cost (proxy for in-play strength of the effect). */
+  recruitCostWeight: number;
+  /** Flat additive bonus for aux-stack candidates (Priestess, House Guard).
+   *  Captures the denial value + reliability (15 copies, always available)
+   *  that the per-card stats don't reflect. */
+  recruitAuxStackBonus: number;
+  /** Blend factor 0..1: 0 = score by raw value (favors high-cost cards),
+   *  1 = score by value/cost (per-influence efficiency — favors Priestess
+   *  and House Guard). Intermediate values interpolate. */
+  recruitPerInfluenceBlend: number;
 }
 
 export const DEFAULT_WEIGHTS: HeuristicWeights = {
@@ -108,6 +129,18 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
   behindEndgameDeploySuppression: 0.5,
   aheadDeployUrgencyMultiplier: 1.5,
   endgamePromoteByVp: 1.0,
+
+  // Recruit scoring defaults: roughly preserves "buy highest-cost market
+  // card" behavior when big market cards are affordable (recruitCostWeight
+  // is high), but now ALSO considers aux stacks — so Priestess at 2 inf
+  // gets bought when nothing pricier is affordable instead of ending the
+  // turn with unspent influence. Tune recruitPerInfluenceBlend up to favor
+  // efficiency (per competitive play, Priestess is great value).
+  recruitIcVpWeight: 2,
+  recruitDeckVpWeight: 1,
+  recruitCostWeight: 2,
+  recruitAuxStackBonus: 0,
+  recruitPerInfluenceBlend: 0,
 };
 
 /** Merge a partial weights override onto the defaults. Missing fields fall
