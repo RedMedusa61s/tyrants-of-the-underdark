@@ -14,6 +14,7 @@ import { hasPresence } from '../engine/map-state';
 import type { AiMove } from './random-ai';
 import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
 import { takePhaseSnapshot, type PhaseSnapshot } from './game-phase';
+import { lookaheadPick, type SimulateMoveFn } from './lookahead';
 
 // Module-level pointer to the currently active weights. Per-call entrypoints
 // (decideHeuristicMove / decideHeuristicMoveWithWeights) swap this in for the
@@ -26,6 +27,12 @@ let WEIGHTS: HeuristicWeights = DEFAULT_WEIGHTS;
 // read it without recomputing scoreAll on every call. Null when not in a
 // move decision (or when called with no game state, e.g. unit tests).
 let PHASE: PhaseSnapshot | null = null;
+
+// Module-level pointer to the simulate function for 1-ply lookahead. Set
+// by decideHeuristicMoveWithWeights / decideHeuristicMove when the caller
+// provides one. Null when no simulator is available (e.g. the live web
+// client) — the heuristic falls back to score-only ranking in that case.
+let SIMULATE: SimulateMoveFn | null = null;
 
 function cyclingDeckSize(G: TyrantsState, pid: string): number {
   const p = G.players[pid];
@@ -281,18 +288,31 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
     case 'select-troop-space': {
       const ids = opts as string[];
       if (ids.length === 0) return { name: 'resolveChoice', args: [pc.optional ? null : null] };
-      // If any option is occupied by an enemy, treat as assassinate/return target — pick by enemy score.
+      // Split into enemy-occupied (assassinate / return-troop / supplant
+      // targets) and empty (deploy targets). When a simulator is available,
+      // use 1-ply lookahead — score each candidate by the state-value AFTER
+      // the move resolves. This catches consequence-aware wins the per-
+      // component scoring misses: assassinating an enemy that flips site
+      // control, deploying the space that creates total control, supplant
+      // chains that net us a trophy AND a marker, etc.
       const enemies = ids.filter(id => {
         const occ = G.troops[id];
         return occ && occ !== me.color;
       });
       if (enemies.length > 0) {
+        if (SIMULATE) {
+          const pick = lookaheadPick(enemies, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE);
+          return { name: 'resolveChoice', args: [pick] };
+        }
         enemies.sort((a, b) => scoreAssassinateSpace(G, pid, b) - scoreAssassinateSpace(G, pid, a));
         return { name: 'resolveChoice', args: [enemies[0]] };
       }
-      // Otherwise empty space — deploy heuristic.
       const empties = ids.filter(id => !G.troops[id]);
       if (empties.length > 0) {
+        if (SIMULATE) {
+          const pick = lookaheadPick(empties, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE);
+          return { name: 'resolveChoice', args: [pick] };
+        }
         empties.sort((a, b) => scoreDeploySpace(G, pid, b) - scoreDeploySpace(G, pid, a));
         return { name: 'resolveChoice', args: [empties[0]] };
       }
@@ -301,6 +321,15 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
     case 'select-site': {
       const ids = opts as string[];
       if (ids.length === 0) return { name: 'resolveChoice', args: [pc.optional ? null : null] };
+      // 1-ply lookahead beats the per-component scoring here too — it
+      // automatically accounts for the consequences a spy placement
+      // triggers (denying total control, drawing/grant chains on the
+      // playing card, etc.). Fall through to heuristic-only ranking when
+      // no simulator is available.
+      if (SIMULATE) {
+        const pick = lookaheadPick(ids, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE);
+        return { name: 'resolveChoice', args: [pick] };
+      }
       // Site-pick scoring components:
       //   - Base value: control-marker bonus + printed VP.
       //   - Denial bonus: at marker sites currently controlled by an opponent
@@ -347,19 +376,29 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
 }
 
 /** Decide a move with an explicit weights configuration. Swaps the module-
- *  level WEIGHTS pointer for the duration of the call. Synchronous, so no
- *  reentrancy worries — one move per call. */
+ *  level WEIGHTS and SIMULATE pointers for the duration of the call.
+ *  Synchronous, so no reentrancy worries — one move per call. The
+ *  `simulate` arg is optional: pass it to enable 1-ply lookahead, omit
+ *  it to fall back to score-only ranking. */
 export function decideHeuristicMoveWithWeights(
   G: TyrantsState,
   currentPlayer: string,
   weights: HeuristicWeights,
+  simulate?: SimulateMoveFn,
 ): AiMove | null {
-  const prev = WEIGHTS;
+  const prevW = WEIGHTS;
+  const prevS = SIMULATE;
   WEIGHTS = weights;
+  // Respect the weight-level toggle so a weight file can opt OUT of
+  // lookahead even when the harness offers one — used by the validation
+  // tournament to compare lookahead-on vs lookahead-off variants under
+  // the same engine + same RNG.
+  SIMULATE = (simulate && weights.useLookahead > 0) ? simulate : null;
   try {
     return decideHeuristicMove(G, currentPlayer);
   } finally {
-    WEIGHTS = prev;
+    WEIGHTS = prevW;
+    SIMULATE = prevS;
   }
 }
 
@@ -459,11 +498,14 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     if (me.power < assassinateThreshold) return null;
     const targets = legalAssassinateTargets(G, currentPlayer);
     if (targets.length === 0) return null;
-    // When behind in late game, apply the assassinate multiplier as a
-    // tie-break preference — we already prefer this path, but multiplying
-    // the scores doesn't change the ARGMAX, so the multiplier only matters
-    // when blended with other action types in a future refactor. Keep the
-    // weight live so it's tuneable now.
+    if (SIMULATE) {
+      const pick = lookaheadPick(targets, id => ({ name: 'assassinateTroop', args: [id] }), G, currentPlayer, SIMULATE);
+      return { name: 'assassinateTroop', args: [pick] };
+    }
+    // Heuristic fallback when no simulator (live web client). Multipliers
+    // like behindAssassinateMultiplier are kept live for tuneability —
+    // they don't currently affect ARGMAX (single-action choice) but will
+    // matter when we extend to ranking across action types.
     targets.sort((a, b) => scoreAssassinateSpace(G, currentPlayer, b) - scoreAssassinateSpace(G, currentPlayer, a));
     return { name: 'assassinateTroop', args: [targets[0]] };
   };
@@ -476,6 +518,10 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     if (behind && isEndgame && WEIGHTS.behindEndgameDeploySuppression > 0) return null;
     const targets = legalDeployTargets(G, currentPlayer);
     if (targets.length === 0) return null;
+    if (SIMULATE) {
+      const pick = lookaheadPick(targets, id => ({ name: 'deployTroop', args: [id] }), G, currentPlayer, SIMULATE);
+      return { name: 'deployTroop', args: [pick] };
+    }
     targets.sort((a, b) => scoreDeploySpace(G, currentPlayer, b) - scoreDeploySpace(G, currentPlayer, a));
     // The aheadDeployUrgencyMultiplier is kept live for tuneability but
     // doesn't currently affect ARGMAX (single-action choice). It will

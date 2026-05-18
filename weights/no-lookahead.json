@@ -1,0 +1,4 @@
+{
+  "_comment": "Current defaults but with 1-ply lookahead disabled. Compare against DEFAULT_WEIGHTS (lookahead on) to measure the strategic value of state-aware move selection.",
+  "useLookahead": 0
+}

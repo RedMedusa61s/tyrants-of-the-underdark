@@ -103,6 +103,13 @@ export interface HeuristicWeights {
    *  1 = score by value/cost (per-influence efficiency — favors Priestess
    *  and House Guard). Intermediate values interpolate. */
   recruitPerInfluenceBlend: number;
+
+  // --- Lookahead toggle ---
+  /** Enable 1-ply lookahead at high-leverage decision points (assassinate
+   *  target, deploy target, spy site, supplant target). Treat as 0/1:
+   *  fractional values don't blend usefully. When the heuristic is called
+   *  with no simulator (e.g. the live web client), this knob is moot. */
+  useLookahead: number;
 }
 
 export const DEFAULT_WEIGHTS: HeuristicWeights = {
@@ -149,6 +156,8 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
   recruitCostWeight: 2,
   recruitAuxStackBonus: 0,
   recruitPerInfluenceBlend: 0,
+
+  useLookahead: 1,
 };
 
 /** Merge a partial weights override onto the defaults. Missing fields fall

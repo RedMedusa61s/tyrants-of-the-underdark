@@ -9,6 +9,7 @@ import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { TyrantsGame, type TyrantsState } from '../game';
 import { decideHeuristicMoveWithWeights } from './heuristic-ai';
 import type { HeuristicWeights } from './heuristic-weights';
+import type { SimulateMoveFn } from './lookahead';
 import { scoreAll } from '../engine/scoring';
 
 export interface TournamentOpts {
@@ -73,13 +74,25 @@ function runOneGame(
   const reducer = CreateGameReducer({ game: wrappedGame }) as unknown as Reducer;
   let state = InitializeGame({ game: wrappedGame, numPlayers: opts.numPlayers }) as unknown as BgState;
 
+  // 1-ply lookahead simulator: applies one move via the reducer and
+  // returns the resulting G. Closes over `state` to inherit the current
+  // ctx/plugins/etc.; overrides .G with the caller's G so lookahead can
+  // explore counterfactual board positions. boardgame.io's reducer is
+  // pure, so calling it doesn't mutate the input state.
+  const simulate: SimulateMoveFn = (G, playerId, moveName, args) => {
+    const wrapped = { ...state, G };
+    const next = reducer(wrapped, makeMoveAction(moveName, args, playerId));
+    if (next === wrapped) return null; // INVALID_MOVE
+    return next.G;
+  };
+
   let safety = opts.safetyLimit ?? 20000;
   while (safety-- > 0) {
     if (state.ctx.gameover) break;
     const pid = state.ctx.currentPlayer;
     const seat = seats[Number(pid)];
     const weights = seat === 'A' ? weightsA : weightsB;
-    const move = decideHeuristicMoveWithWeights(state.G, pid, weights);
+    const move = decideHeuristicMoveWithWeights(state.G, pid, weights, simulate);
     if (!move) {
       state = reducer(state, makeMoveAction('endTurn', [], pid));
       continue;
