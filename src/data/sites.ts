@@ -63,7 +63,7 @@ const seed = (
 // Review against the actual board before trusting any of these.
 export const SITES: Site[] = [
   // Left section (used in 3p with-left, 4p)
-  seed('gauntlgrym',    'Gauntlgrym',                'left',   2, 3, { control: true, start: true, whites: 2 }),
+  seed('gauntlgrym',    'Gauntlgrym',                'left',   2, 3, { control: true, whites: 2 }),
   seed('blingdenstone', 'Blingdenstone',             'center', 4, 2, { whites: 2 }),
   seed('buiyrandyn',    'Buiyrandyn',                'left',   3, 3, { whites: 1 }),
   seed('jhachalkhyn',   'Jhachalkhyn',               'left',   4, 4, { start: true, whites: 0 }),
@@ -83,13 +83,13 @@ export const SITES: Site[] = [
   seed('ched-nasad',    'Ched Nasad',                'center', 3, 4, { start: true, whites: 0 }),
 
   // Right section (used in 3p with-right, 4p)
-  seed('chchitl',       "Ch'Chitl",                  'left',   2, 3, { control: true, start: true, whites: 2 }),
+  seed('chchitl',       "Ch'Chitl",                  'left',   2, 3, { control: true, whites: 2 }),
   seed('phaerlin',      'The Phaerlin',              'right',  2, 3, { control: true, whites: 2, whiteSlots: [0, 1] }),
   seed('llacerellyn',   'Llacerellyn',               'center', 2, 2, { whites: 0 }),
   seed('sszuraassnee',  "Ss'zuraass'nee",            'right',  2, 3, { control: true, whites: 2 }),
   seed('tsenviilyq',    'Tsenviilyq',                'center', 4, 3, { control: true, whites: 3 }),
   seed('yathchol',      'Yathchol',                  'right',  4, 2, { whites: 2 }),
-  seed('chaulssin',     'Chaulssin',                 'right',  4, 5, { start: true, whites: 0 }),
+  seed('chaulssin',     'Chaulssin',                 'right',  4, 5, { whites: 0 }),
   seed('dekanter',      'Ruins of Dekanter',         'right',  5, 6, { whites: 2 }),
   seed('everfire',      'Everfire',                  'center', 3, 3, { whites: 0 }),
   seed('kanaglym',      'Kanaglym',                  'center', 3, 3, { whites: 0 }),
