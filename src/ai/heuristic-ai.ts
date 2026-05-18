@@ -44,6 +44,12 @@ function cardCost(deck: string, slot: number): number {
  *  Goal per user: raise the average influence of remaining cycling cards so future
  *  hands draw a smaller but more powerful set. */
 function trashScore(deck: string, slot: number): number {
+  // Insane Outcasts are pure deck poison (deckVp = -1, innerCircleVp = 0, no
+  // effect, just clogs your draw). Score them WORSE than starters so they're
+  // preferred for any devour/promote/discard prompt that asks "which card to
+  // get rid of?". Promoting an Outcast self-ejects it back to the supply
+  // (Mechanics.promote), so we strictly want to promote them when possible.
+  if (deck === 'insane-outcasts') return -10;
   const isStarter = deck === 'starter-1';
   // Starters score 0; recruited cards score by their cost (higher cost = worse to trash).
   return isStarter ? 0 : WEIGHTS.trashRecruitedBase + cardCost(deck, slot);
@@ -164,14 +170,22 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
 
   switch (pc.kind) {
     case 'select-card-in-hand': {
-      // Devour-from-hand: permanently trash a card from your cycling deck. Pick the
-      // worst-to-keep card (starter Nobles/Soldiers, then lowest-cost recruits).
-      // Skip if optional and trashing would drop the cycling deck below threshold.
+      // Two flavors of this prompt:
+      //   (a) Devour-from-hand (Succubus / Marilith / etc.): permanently
+      //       trashes a card from your cycling deck. Skip if optional and
+      //       trashing would drop the cycling deck below threshold.
+      //   (b) Insane Outcast's "discard to return the Outcast to supply":
+      //       moves the card from hand to discard (NOT removed from cycling
+      //       deck). The deck-floor guard doesn't apply — discarding doesn't
+      //       shrink the deck. Always worth doing if any card is eligible
+      //       (the Outcast itself is pure poison; even sacrificing a starter
+      //       turn-resource is a good trade).
+      const isOutcastDiscard = pc.cardKey?.startsWith('insane-outcasts::') ?? false;
       const idxs = (opts as number[]).length > 0
         ? (opts as number[])
         : me.hand.map((_, i) => i);
       if (idxs.length === 0) return { name: 'resolveChoice', args: [null] };
-      if (pc.optional && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
+      if (pc.optional && !isOutcastDiscard && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
       let bestIdx = idxs[0];
@@ -353,8 +367,24 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   const me = G.players[currentPlayer];
 
   // 3a. Play all hand cards first (always strictly better than not playing).
+  //
+  // Card-pick within the hand: prefer playing an Insane Outcast FIRST when
+  // there are other cards in hand. The Outcast's effect is "discard a card
+  // from your hand to return this Outcast to the supply" — a chance to
+  // remove the Outcast from your cycling deck. That chance only exists when
+  // there's another card to offer up. Playing the Outcast at the END (when
+  // the hand has emptied for resources first) wastes the opportunity — the
+  // discard prompt opens against an empty hand and the Outcast stays in
+  // discard. Per user's competitive-play notes: if you have 2 Outcasts,
+  // play one to discard the other; if you have an Outcast + a starter you
+  // don't need this turn, play the Outcast and discard the starter.
   if (me.hand.length > 0) {
-    return { name: 'playCard', args: [0] };
+    let pickIdx = 0;
+    if (me.hand.length > 1) {
+      const outcastIdx = me.hand.findIndex(c => c.deck === 'insane-outcasts');
+      if (outcastIdx >= 0) pickIdx = outcastIdx;
+    }
+    return { name: 'playCard', args: [pickIdx] };
   }
 
   // 3b. Spend Power on board — phase-aware priority.

@@ -27,6 +27,13 @@ export interface PendingChoice {
   options?: unknown[];        // semantics vary by kind
   optional?: boolean;
   response?: unknown;         // filled in by UI/AI before resume
+  // Added by the game-level dispatcher when the choice is stored on G:
+  /** The player who owns this choice (filled in by game.ts when the prompt is published). */
+  playerId?: string;
+  /** "<deck>::<slot>" key of the card whose effect surfaced this choice. Lets
+   *  AI / UI distinguish e.g. an Insane Outcast's "discard to return" prompt
+   *  from a Succubus / Marilith "devour from hand" prompt. */
+  cardKey?: string;
 }
 
 export interface EffectContext {
