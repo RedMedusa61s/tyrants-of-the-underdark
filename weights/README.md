@@ -19,6 +19,8 @@ treat the result as a tie.
 
 ## Suggested workflow for tuning
 
+### Manual (hypothesis-driven)
+
 1. Save the current defaults as `weights/baseline.json` (empty `{}` works
    — defaults pass through).
 2. Make a hypothesis: e.g. "the AI under-values assassinating enemies on
@@ -28,5 +30,28 @@ treat the result as a tie.
    tournament against the baseline.
 4. If the gap clears the noise floor, promote v2 → baseline and iterate.
 
-The runner is ~1.3 games/sec for 2P and slower for 4P, so a 200-game
-2P tournament finishes in ~2.5 minutes.
+### Automated (hill-climber)
+
+```
+npm run tune -- --iters 50 --games-per-trial 100 --num-players 2
+npm run tune -- --iters 30 --seed weights/tuned.json    # resume from last accepted
+```
+
+Each iteration mutates a single random knob, plays a head-to-head
+tournament against the current best, and accepts only if the win-rate
+gap exceeds the ±2σ noise floor. Accepted weights are written to
+`weights/tuned.json`; every trial (accept or reject) is appended to
+`weights/tune-log.json` (JSONL).
+
+**Tournament size matters.** 80 games/trial = ±15 pp noise floor — only
+big jumps clear it. 200 games/trial = ±10 pp noise floor, but each
+trial takes ~2.5 min for 2P. Trade-off: many cheap trials catch easy
+wins, few expensive trials catch small ones.
+
+**Validate before promoting.** Hill-climbing is one-shot per trial, so
+the tuner can drift on a lucky run. Confirm any accepted tune by
+running a fresh 300-game tournament against the baseline before
+promoting `tuned.json` into shipped defaults.
+
+The runner is ~1.4 games/sec for 2P and slower for 4P, so an 80-game
+2P trial finishes in ~60 seconds.

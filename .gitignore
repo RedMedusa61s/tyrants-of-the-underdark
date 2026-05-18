@@ -40,3 +40,6 @@ docs/rulebook.pdf
 worker/.wrangler/
 worker/dist/
 worker/node_modules/
+weights/_smoke-*.json
+weights/tuned.json
+weights/tune-log.json
