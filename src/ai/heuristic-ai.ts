@@ -11,8 +11,13 @@ import { TROOP_SPACES, TROOP_SPACES_BY_ID, sitesSpaces } from '../data/troop-spa
 import { lookupCard } from '../card-data';
 import { hasPresence } from '../engine/map-state';
 import type { AiMove } from './random-ai';
+import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
 
-const MIN_CYCLING_DECK = 5;
+// Module-level pointer to the currently active weights. Per-call entrypoints
+// (decideHeuristicMove / decideHeuristicMoveWithWeights) swap this in for the
+// duration of a single move decision. Module-global keeps the score-helper
+// signatures un-noisy without threading weights through every callsite.
+let WEIGHTS: HeuristicWeights = DEFAULT_WEIGHTS;
 
 function cyclingDeckSize(G: TyrantsState, pid: string): number {
   const p = G.players[pid];
@@ -33,7 +38,7 @@ function cardCost(deck: string, slot: number): number {
 function trashScore(deck: string, slot: number): number {
   const isStarter = deck === 'starter-1';
   // Starters score 0; recruited cards score by their cost (higher cost = worse to trash).
-  return isStarter ? 0 : 10 + cardCost(deck, slot);
+  return isStarter ? 0 : WEIGHTS.trashRecruitedBase + cardCost(deck, slot);
 }
 
 function pickRandom<T>(arr: T[]): T | undefined {
@@ -47,10 +52,10 @@ function scoreDeploySpace(G: TyrantsState, pid: string, spaceId: string): number
   if (!t) return -Infinity;
   let s = 0;
   if (t.parentSite) {
-    s += 5;
+    s += WEIGHTS.deployBaseSite;
     const site = SITES_BY_ID[t.parentSite];
-    if (site?.hasControlMarker) s += 12;
-    s += (site?.vp ?? 0);
+    if (site?.hasControlMarker) s += WEIGHTS.deployControlMarker;
+    s += (site?.vp ?? 0) * WEIGHTS.deployVpMultiplier;
     // Spread: penalize sites where we already own multiple slots.
     let mine = 0, total = 0, enemy = 0;
     for (const sp of sitesSpaces(t.parentSite)) {
@@ -59,14 +64,14 @@ function scoreDeploySpace(G: TyrantsState, pid: string, spaceId: string): number
       if (occ === me.color) mine++;
       else if (occ && occ !== 'white') enemy++;
     }
-    s -= mine * 2;
+    s -= mine * WEIGHTS.deployOwnPenalty;
     // Bonus if this deploy could establish control (we'd tie or beat enemy lead).
-    if (mine + 1 > Math.max(enemy, mine)) s += 3;
+    if (mine + 1 > Math.max(enemy, mine)) s += WEIGHTS.deployEstablishBonus;
     // Slightly prefer sites that aren't already full of our troops.
-    if (mine === 0 && total > 0) s += 2;
+    if (mine === 0 && total > 0) s += WEIGHTS.deployFirstFootBonus;
   } else {
     // Route space: useful for reach, but lower priority.
-    s += 1;
+    s += WEIGHTS.deployRouteSpace;
   }
   return s;
 }
@@ -75,13 +80,13 @@ function scoreAssassinateSpace(G: TyrantsState, pid: string, spaceId: string): n
   const me = G.players[pid];
   const occ = G.troops[spaceId];
   if (!occ || occ === me.color) return -Infinity;
-  let s = occ === 'white' ? 2 : 6;
+  let s = occ === 'white' ? WEIGHTS.assassinateWhite : WEIGHTS.assassinateEnemy;
   const t = TROOP_SPACES_BY_ID[spaceId];
   const siteId = t?.parentSite;
   if (siteId) {
     const site = SITES_BY_ID[siteId];
-    if (site?.hasControlMarker) s += 6;
-    s += (site?.vp ?? 0);
+    if (site?.hasControlMarker) s += WEIGHTS.assassinateControlMarker;
+    s += (site?.vp ?? 0) * WEIGHTS.assassinateVpMultiplier;
   }
   return s;
 }
@@ -131,7 +136,7 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
         ? (opts as number[])
         : me.hand.map((_, i) => i);
       if (idxs.length === 0) return { name: 'resolveChoice', args: [null] };
-      if (pc.optional && cyclingDeckSize(G, pid) - 1 < MIN_CYCLING_DECK) {
+      if (pc.optional && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
       let bestIdx = idxs[0];
@@ -152,7 +157,7 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       // best cards. Guard against shrinking cycling deck below threshold.
       const idxs = opts as number[];
       if (idxs.length === 0) return { name: 'resolveChoice', args: [null] };
-      if (pc.optional && cyclingDeckSize(G, pid) - 1 < MIN_CYCLING_DECK) {
+      if (pc.optional && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
       const pool = pc.kind === 'select-card-in-discard' ? me.discard : G.cardsPlayedThisTurn;
@@ -216,11 +221,11 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       // Prefer control-marker sites we don't already dominate.
       const ranked = ids.slice().sort((a, b) => {
         const sa = SITES_BY_ID[a], sb = SITES_BY_ID[b];
-        let av = (sa?.hasControlMarker ? 10 : 0) + (sa?.vp ?? 0);
-        let bv = (sb?.hasControlMarker ? 10 : 0) + (sb?.vp ?? 0);
+        let av = (sa?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (sa?.vp ?? 0);
+        let bv = (sb?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (sb?.vp ?? 0);
         // Prefer sites where we don't already have a spy.
-        if ((G.spies[a] ?? []).includes(me.color)) av -= 5;
-        if ((G.spies[b] ?? []).includes(me.color)) bv -= 5;
+        if ((G.spies[a] ?? []).includes(me.color)) av -= WEIGHTS.siteOwnSpyPenalty;
+        if ((G.spies[b] ?? []).includes(me.color)) bv -= WEIGHTS.siteOwnSpyPenalty;
         return bv - av;
       });
       return { name: 'resolveChoice', args: [ranked[0]] };
@@ -247,6 +252,23 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
   }
 }
 
+/** Decide a move with an explicit weights configuration. Swaps the module-
+ *  level WEIGHTS pointer for the duration of the call. Synchronous, so no
+ *  reentrancy worries — one move per call. */
+export function decideHeuristicMoveWithWeights(
+  G: TyrantsState,
+  currentPlayer: string,
+  weights: HeuristicWeights,
+): AiMove | null {
+  const prev = WEIGHTS;
+  WEIGHTS = weights;
+  try {
+    return decideHeuristicMove(G, currentPlayer);
+  } finally {
+    WEIGHTS = prev;
+  }
+}
+
 export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiMove | null {
   // 1. Resolve pending choice if it's ours.
   if (G.pendingChoice && G.pendingChoice.playerId === currentPlayer) {
@@ -263,8 +285,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     );
     // Prefer a starting site with a control marker / highest VP.
     open.sort((a, b) => {
-      const av = (a.hasControlMarker ? 10 : 0) + a.vp;
-      const bv = (b.hasControlMarker ? 10 : 0) + b.vp;
+      const av = (a.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + a.vp;
+      const bv = (b.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + b.vp;
       return bv - av;
     });
     const pick = open[0] ?? pickRandom(open);
@@ -281,7 +303,7 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   // 3b. Spend Power on board.
   //   - Assassinate where we have presence (3 power, +trophy).
   //   - Else deploy (1 power) preferring control-marker sites.
-  if (me.power >= 3) {
+  if (me.power >= WEIGHTS.powerThresholdForAssassinate) {
     const targets = legalAssassinateTargets(G, currentPlayer);
     if (targets.length > 0) {
       targets.sort((a, b) => scoreAssassinateSpace(G, currentPlayer, b) - scoreAssassinateSpace(G, currentPlayer, a));

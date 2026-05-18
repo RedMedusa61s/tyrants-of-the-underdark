@@ -1,0 +1,6 @@
+{
+  "_comment": "Test variant: value assassinations harder, especially on high-VP non-control sites. Run with: npm run tournament -- --games 200 --num-players 2 --b weights/aggressive.json",
+  "assassinateEnemy": 8,
+  "assassinateVpMultiplier": 2,
+  "powerThresholdForAssassinate": 2
+}

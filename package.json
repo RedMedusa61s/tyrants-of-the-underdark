@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "extract-assets": "node scripts/extract-assets.mjs",
     "dump-asset-urls": "node scripts/dump-asset-urls.mjs",
-    "sim": "vite-node scripts/headless.ts --"
+    "sim": "vite-node scripts/headless.ts --",
+    "tournament": "vite-node scripts/tournament.ts --"
   },
   "keywords": [],
   "author": "",
