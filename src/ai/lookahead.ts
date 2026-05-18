@@ -52,17 +52,33 @@ export function stateValue(G: TyrantsState, pid: string): number {
   return my - bestOpp;
 }
 
-/** Pick the best candidate by 1-ply lookahead. Each candidate maps to a
- *  move (name + args); the function simulates the move, scores the
- *  resulting state, and returns the candidate with the highest score.
- *  If simulate returns null for ALL candidates (every move rejected),
- *  returns the first candidate as a fallback. */
+/** Pick the best candidate by 1-ply lookahead.
+ *
+ *  Score = stateValue(after-move) + TIEBREAK_WEIGHT * heuristicScore(candidate).
+ *
+ *  The heuristic-tiebreak term is critical: most moves in this game produce
+ *  identical immediate state-values (deploying into an uncontested space
+ *  adds 0 VP, assassinating any troop adds +1 trophy = +1 VP, etc.). Without
+ *  a tiebreak, lookahead picks arbitrarily among indistinguishable options
+ *  and throws away the heuristic's per-component guidance ("this assassinate
+ *  target sits at a control-marker site so it's strategically richer").
+ *
+ *  The tiebreak weight is small (0.01) so a genuine VP-changing consequence
+ *  always trumps a heuristic preference — but among VP-equivalent options,
+ *  heuristic order wins. If heuristicScore is omitted the function behaves
+ *  as pure state-value argmax (identical to the prior version).
+ *
+ *  If simulate returns null for ALL candidates (every move rejected), the
+ *  first candidate is returned as a fallback. */
+const TIEBREAK_WEIGHT = 0.01;
+
 export function lookaheadPick<C>(
   candidates: C[],
   toMove: (c: C) => { name: string; args: unknown[] },
   G: TyrantsState,
   pid: string,
   simulate: SimulateMoveFn,
+  heuristicScore?: (c: C) => number,
 ): C {
   if (candidates.length === 1) return candidates[0];
   let bestC = candidates[0];
@@ -73,7 +89,8 @@ export function lookaheadPick<C>(
     const next = simulate(G, pid, name, args);
     if (!next) continue;
     anyValid = true;
-    const score = stateValue(next, pid);
+    let score = stateValue(next, pid);
+    if (heuristicScore) score += TIEBREAK_WEIGHT * heuristicScore(c);
     if (score > bestScore) {
       bestScore = score;
       bestC = c;

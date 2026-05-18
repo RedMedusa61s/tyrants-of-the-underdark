@@ -301,7 +301,12 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       });
       if (enemies.length > 0) {
         if (SIMULATE) {
-          const pick = lookaheadPick(enemies, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE);
+          const pick = lookaheadPick(
+            enemies,
+            id => ({ name: 'resolveChoice', args: [id] }),
+            G, pid, SIMULATE,
+            id => scoreAssassinateSpace(G, pid, id),
+          );
           return { name: 'resolveChoice', args: [pick] };
         }
         enemies.sort((a, b) => scoreAssassinateSpace(G, pid, b) - scoreAssassinateSpace(G, pid, a));
@@ -310,7 +315,12 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       const empties = ids.filter(id => !G.troops[id]);
       if (empties.length > 0) {
         if (SIMULATE) {
-          const pick = lookaheadPick(empties, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE);
+          const pick = lookaheadPick(
+            empties,
+            id => ({ name: 'resolveChoice', args: [id] }),
+            G, pid, SIMULATE,
+            id => scoreDeploySpace(G, pid, id),
+          );
           return { name: 'resolveChoice', args: [pick] };
         }
         empties.sort((a, b) => scoreDeploySpace(G, pid, b) - scoreDeploySpace(G, pid, a));
@@ -327,7 +337,17 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       // playing card, etc.). Fall through to heuristic-only ranking when
       // no simulator is available.
       if (SIMULATE) {
-        const pick = lookaheadPick(ids, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE);
+        // Heuristic tiebreak for site picks: same components used by the
+        // pure-heuristic fallback below (control-marker, VP, denial, own-spy
+        // penalty) flattened to a single score.
+        const heuScore = (id: string) => {
+          const s = SITES_BY_ID[id];
+          let v = (s?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (s?.vp ?? 0);
+          v += siteDenialValue(G, id, me.color);
+          if ((G.spies[id] ?? []).includes(me.color)) v -= WEIGHTS.siteOwnSpyPenalty;
+          return v;
+        };
+        const pick = lookaheadPick(ids, id => ({ name: 'resolveChoice', args: [id] }), G, pid, SIMULATE, heuScore);
         return { name: 'resolveChoice', args: [pick] };
       }
       // Site-pick scoring components:
@@ -499,7 +519,12 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     const targets = legalAssassinateTargets(G, currentPlayer);
     if (targets.length === 0) return null;
     if (SIMULATE) {
-      const pick = lookaheadPick(targets, id => ({ name: 'assassinateTroop', args: [id] }), G, currentPlayer, SIMULATE);
+      const pick = lookaheadPick(
+        targets,
+        id => ({ name: 'assassinateTroop', args: [id] }),
+        G, currentPlayer, SIMULATE,
+        id => scoreAssassinateSpace(G, currentPlayer, id),
+      );
       return { name: 'assassinateTroop', args: [pick] };
     }
     // Heuristic fallback when no simulator (live web client). Multipliers
@@ -519,7 +544,12 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     const targets = legalDeployTargets(G, currentPlayer);
     if (targets.length === 0) return null;
     if (SIMULATE) {
-      const pick = lookaheadPick(targets, id => ({ name: 'deployTroop', args: [id] }), G, currentPlayer, SIMULATE);
+      const pick = lookaheadPick(
+        targets,
+        id => ({ name: 'deployTroop', args: [id] }),
+        G, currentPlayer, SIMULATE,
+        id => scoreDeploySpace(G, currentPlayer, id),
+      );
       return { name: 'deployTroop', args: [pick] };
     }
     targets.sort((a, b) => scoreDeploySpace(G, currentPlayer, b) - scoreDeploySpace(G, currentPlayer, a));
