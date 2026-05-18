@@ -89,7 +89,7 @@ export const SITES: Site[] = [
   seed('sszuraassnee',  "Ss'zuraass'nee",            'right',  2, 3, { control: true, whites: 2 }),
   seed('tsenviilyq',    'Tsenviilyq',                'center', 4, 3, { control: true, whites: 3 }),
   seed('yathchol',      'Yathchol',                  'right',  4, 2, { whites: 2 }),
-  seed('chaulssin',     'Chaulssin',                 'right',  4, 5, { whites: 0 }),
+  seed('chaulssin',     'Chaulssin',                 'right',  4, 5, { start: true, whites: 0 }),
   seed('dekanter',      'Ruins of Dekanter',         'right',  5, 6, { whites: 2 }),
   seed('everfire',      'Everfire',                  'center', 3, 3, { whites: 0 }),
   seed('kanaglym',      'Kanaglym',                  'center', 3, 3, { whites: 0 }),
