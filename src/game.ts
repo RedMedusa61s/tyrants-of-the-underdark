@@ -493,6 +493,9 @@ export const TyrantsGame: Game<TyrantsState> = {
       const pid = ctx.currentPlayer;
       const site = SITES.find(s => s.id === siteId);
       if (!site || !site.isStartingSite) return INVALID_MOVE;
+      // Per rulebook setup p.4: starting sites already claimed by a rival
+      // (i.e. containing any non-white troop) are off-limits.
+      if (sitesSpaces(siteId).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')) return INVALID_MOVE;
       const space = sitesSpaces(siteId).find(sp => !G.troops[sp.id]);
       if (!space) return INVALID_MOVE;
       const player = G.players[pid];

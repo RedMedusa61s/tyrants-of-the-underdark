@@ -245,9 +245,16 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     if (firstSaveRef.current) { firstSaveRef.current = false; return; }
     if (ctx.gameover) { localStorage.removeItem(SAVE_KEY); return; }
     if (G.snapshots.length === 0) return;
+    // Don't persist during setup. bgio's play order is re-randomized on
+    // page refresh (G.firstPlayerId is regenerated in setup()), so a saved
+    // mid-setup codec would resume with a mismatched currentPlayer — the
+    // human's starting deploy would silently skip and an AI would deploy
+    // for the wrong seat (Issue #24). Clearing here also lets a fresh-page
+    // load start a new setup cleanly.
+    if (G.setupPhase) { localStorage.removeItem(SAVE_KEY); return; }
     const latest = G.snapshots[G.snapshots.length - 1].codec;
     localStorage.setItem(SAVE_KEY, latest);
-  }, [G.snapshots.length, ctx.gameover]);
+  }, [G.snapshots.length, G.setupPhase, ctx.gameover]);
 
   // Best-effort archive on page unload (tab close, refresh, navigate away).
   // IndexedDB writes are not guaranteed to flush before the page is killed,
@@ -453,11 +460,16 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   })();
 
   const startingClickable = G.setupPhase && myTurn
-    // Per rulebook setup: each player picks ANY of the printed starting
-    // sites in play. White troops printed at a starting site don't block
-    // it — the player drops into the next empty slot. So we only require
-    // at least one empty slot (not all empty).
-    ? new Set(SITES.filter(s => s.isStartingSite && s.id in G.siteControl && sitesSpaces(s.id).some(sp => !G.troops[sp.id])).map(s => s.id))
+    // Per rulebook setup p.4: "Each player chooses one of the starting
+    // sites that isn't already occupied by another player." White troops
+    // printed at a starting site don't block it (the player drops into the
+    // next empty slot) — but ANY non-white troop means a rival player has
+    // already claimed it, so it's off-limits.
+    ? new Set(SITES.filter(s =>
+        s.isStartingSite && s.id in G.siteControl &&
+        sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
+        !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
+      ).map(s => s.id))
     : humanSitePick
       ? new Set((humanSitePick.options as string[] | undefined) ?? SITES.map(s => s.id))
       : baseActionClickableSites;
