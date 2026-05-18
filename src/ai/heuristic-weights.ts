@@ -49,6 +49,32 @@ export interface HeuristicWeights {
   // --- Site-pick (spy placement / return) ranking ---
   siteControlMarkerBonus: number;
   siteOwnSpyPenalty: number;
+
+  // --- Game-phase awareness (see src/ai/game-phase.ts) ---
+  /** Minimum barracks across all players at which "late game" starts. */
+  phaseLateBarracks: number;
+  /** Minimum barracks across all players at which "endgame" starts (the
+   *  user's "last turn or two" — promote-by-VP kicks in, etc.). */
+  phaseEndgameBarracks: number;
+  /** VP lead/deficit at which the AI considers itself "ahead" or "behind"
+   *  for the purpose of late-game pacing. Symmetric: |lead| ≥ this triggers
+   *  the corresponding strategy. */
+  phaseLeadThreshold: number;
+  /** Multiplier on assassinate priority when behind in late/endgame. Higher
+   *  = AI farms trophies harder instead of deploying (which would hasten the
+   *  game's end while it's losing). 1.0 = neutral. */
+  behindAssassinateMultiplier: number;
+  /** When behind in endgame, suppress deploys with this probability-like
+   *  threshold (0.0 = always deploy as usual; 1.0 = never deploy in
+   *  endgame-and-behind). Implemented as a hard skip when set above 0. */
+  behindEndgameDeploySuppression: number;
+  /** Multiplier on deploy priority when ahead in late/endgame. Higher
+   *  = AI drains its barracks faster to trigger game-end while leading. */
+  aheadDeployUrgencyMultiplier: number;
+  /** In endgame phase, promote the highest-innerCircleVp card instead of
+   *  the trashiest. Treated as 0 (off) or 1 (on); fractional values blend
+   *  the two scoring strategies linearly (0.5 = tie-break by VP only). */
+  endgamePromoteByVp: number;
 }
 
 export const DEFAULT_WEIGHTS: HeuristicWeights = {
@@ -72,6 +98,16 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
 
   siteControlMarkerBonus: 10,
   siteOwnSpyPenalty: 5,
+
+  // Phase thresholds — user-supplied rules-of-thumb: "38 barracks → still
+  // getting started; 8 barracks → game will be over soon."
+  phaseLateBarracks: 15,
+  phaseEndgameBarracks: 5,
+  phaseLeadThreshold: 10,
+  behindAssassinateMultiplier: 1.5,
+  behindEndgameDeploySuppression: 0.5,
+  aheadDeployUrgencyMultiplier: 1.5,
+  endgamePromoteByVp: 1.0,
 };
 
 /** Merge a partial weights override onto the defaults. Missing fields fall

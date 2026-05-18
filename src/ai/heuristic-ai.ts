@@ -13,12 +13,19 @@ import { lookupCard } from '../card-data';
 import { hasPresence } from '../engine/map-state';
 import type { AiMove } from './random-ai';
 import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
+import { takePhaseSnapshot, type PhaseSnapshot } from './game-phase';
 
 // Module-level pointer to the currently active weights. Per-call entrypoints
 // (decideHeuristicMove / decideHeuristicMoveWithWeights) swap this in for the
 // duration of a single move decision. Module-global keeps the score-helper
 // signatures un-noisy without threading weights through every callsite.
 let WEIGHTS: HeuristicWeights = DEFAULT_WEIGHTS;
+
+// Module-level pointer to the current move's phase snapshot. Set at the top
+// of decideHeuristicMove so resolveChoice (and the scoring helpers) can
+// read it without recomputing scoreAll on every call. Null when not in a
+// move decision (or when called with no game state, e.g. unit tests).
+let PHASE: PhaseSnapshot | null = null;
 
 function cyclingDeckSize(G: TyrantsState, pid: string): number {
   const p = G.players[pid];
@@ -40,6 +47,33 @@ function trashScore(deck: string, slot: number): number {
   const isStarter = deck === 'starter-1';
   // Starters score 0; recruited cards score by their cost (higher cost = worse to trash).
   return isStarter ? 0 : WEIGHTS.trashRecruitedBase + cardCost(deck, slot);
+}
+
+/** VP value of promoting this card into the inner circle. Used in
+ *  endgame-phase promote decisions where deck-thinning matters less
+ *  than banking VP for end-of-game scoring. */
+function innerCircleVpOf(deck: string, slot: number): number {
+  return lookupCard(deck, slot)?.innerCircleVp ?? 0;
+}
+
+/** Phase-aware promote score: returns a number where HIGHER means "more
+ *  desirable to promote." Early game we want to trash junk (so high score
+ *  for low trash-score cards — i.e. the worst-to-keep, best-to-trash);
+ *  endgame we want to bank VP (high score for high-innerCircleVp cards).
+ *  The `endgamePromoteByVp` weight (0..1) blends the two strategies. */
+function promoteScore(deck: string, slot: number): number {
+  // Trash-mode: lower trashScore = better promote target. Invert by negating.
+  const trashMode = -trashScore(deck, slot);
+  // VP-mode: just the inner-circle VP directly.
+  const vpMode = innerCircleVpOf(deck, slot);
+  const inEndgame = PHASE?.phase === 'endgame';
+  // In endgame, blend toward VP-mode by the weight. Outside endgame, always
+  // trash-mode (the user's early-game rule: thin the deck).
+  if (!inEndgame) return trashMode;
+  const w = Math.max(0, Math.min(1, WEIGHTS.endgamePromoteByVp));
+  // Rescale trashMode roughly into the same range as vpMode (which is 0..10)
+  // so the blend isn't dominated by one mode's scale.
+  return (1 - w) * (trashMode / 2) + w * vpMode;
 }
 
 function pickRandom<T>(arr: T[]): T | undefined {
@@ -152,22 +186,29 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
     }
     case 'select-card-in-discard':
     case 'select-played-card': {
-      // Promote into Inner Circle: this REMOVES the card from your cycling deck and
-      // banks its inner-circle VP for end-game. Strategic value lies in deck-thinning
-      // your weakest cards (Nobles / Soldiers / cheap recruits), NOT in promoting your
-      // best cards. Guard against shrinking cycling deck below threshold.
+      // Promote into Inner Circle: REMOVES the card from your cycling deck and
+      // banks its inner-circle VP for end-game. Early/mid game: strategic value
+      // lies in deck-thinning weakest cards (Nobles / Soldiers / cheap recruits).
+      // Endgame (per user strategy notes): no time left to benefit from a thinner
+      // deck — promote the card with the highest inner-circle VP instead, which
+      // banks the most score. promoteScore() blends these by phase.
+      // Guard against shrinking cycling deck below threshold — but DISABLE the
+      // guard in endgame: if the game is about to end you don't need to draw any
+      // more cards, banking VP is strictly better.
       const idxs = opts as number[];
       if (idxs.length === 0) return { name: 'resolveChoice', args: [null] };
-      if (pc.optional && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
+      const inEndgame = PHASE?.phase === 'endgame';
+      if (pc.optional && !inEndgame && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
       const pool = pc.kind === 'select-card-in-discard' ? me.discard : G.cardsPlayedThisTurn;
-      let best = idxs[0], bestScore = Infinity;
+      let best = idxs[0], bestScore = -Infinity;
       for (const i of idxs) {
         const c = pool[i];
         if (!c) continue;
-        const score = trashScore(c.deck, c.slot);
-        if (score < bestScore) { bestScore = score; best = i; }
+        // promoteScore: HIGHER = better promote target (opposite of trashScore).
+        const score = promoteScore(c.deck, c.slot);
+        if (score > bestScore) { bestScore = score; best = i; }
       }
       return { name: 'resolveChoice', args: [best] };
     }
@@ -271,6 +312,21 @@ export function decideHeuristicMoveWithWeights(
 }
 
 export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiMove | null {
+  // Refresh the phase snapshot for this move. resolveChoice and the
+  // promote-scoring helpers read this via the module-level PHASE pointer.
+  // We skip the snapshot during setup (no scores yet) and pendingChoice
+  // resolution (caller already entered the move; the prior snapshot from
+  // the SAME move is what we want, but it was cleared — re-take it).
+  if (!G.setupPhase) {
+    PHASE = takePhaseSnapshot(
+      G, currentPlayer,
+      WEIGHTS.phaseLateBarracks,
+      WEIGHTS.phaseEndgameBarracks,
+    );
+  } else {
+    PHASE = null;
+  }
+
   // 1. Resolve pending choice if it's ours.
   if (G.pendingChoice && G.pendingChoice.playerId === currentPlayer) {
     return resolveChoice(G, currentPlayer);
@@ -301,28 +357,72 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     return { name: 'playCard', args: [0] };
   }
 
-  // 3b. Spend Power on board.
-  //   - Assassinate where we have presence (3 power, +trophy).
-  //   - Else deploy (1 power) preferring control-marker sites.
+  // 3b. Spend Power on board — phase-aware priority.
+  //   Per user strategy notes:
+  //   - When AHEAD in late/endgame: deploy aggressively to drain barracks
+  //     and trigger game-end while leading. Assassinate still OK but deploy
+  //     comes first if it would establish/extend a lead at a control site.
+  //   - When BEHIND in late/endgame: prefer assassinate (trophies = VP that
+  //     don't accelerate end). Suppress deploys when behind in endgame
+  //     entirely if behindEndgameDeploySuppression > 0 — deploying just
+  //     hastens our defeat.
+  //   - Early/mid game: default behavior — assassinate at threshold, then
+  //     deploy if power left.
+  const isLateOrEnd = PHASE?.phase === 'late' || PHASE?.phase === 'endgame';
+  const isEndgame = PHASE?.phase === 'endgame';
+  const lead = PHASE?.lead ?? 0;
+  const ahead = lead >= WEIGHTS.phaseLeadThreshold;
+  const behind = lead <= -WEIGHTS.phaseLeadThreshold;
+
   // Clamp the tuneable threshold up to the engine's actual base-action cost.
   // The weights file can raise this (be MORE reluctant to assassinate) but
   // never lower it past what the engine will accept — otherwise the AI
   // proposes an unaffordable move, the reducer returns INVALID_MOVE, and
   // the tournament harness burns the turn via fallback endTurn.
   const assassinateThreshold = Math.max(WEIGHTS.powerThresholdForAssassinate, BASE_ACTION_POWER_COST);
-  if (me.power >= assassinateThreshold) {
+
+  // Decide ordering of (assassinate, deploy):
+  //   - ahead+late → deploy first (accelerate end)
+  //   - behind+late → assassinate first (farm trophies, avoid hastening end)
+  //   - otherwise   → assassinate first (current default)
+  const deployFirst = ahead && isLateOrEnd;
+
+  const tryAssassinate = (): AiMove | null => {
+    if (me.power < assassinateThreshold) return null;
     const targets = legalAssassinateTargets(G, currentPlayer);
-    if (targets.length > 0) {
-      targets.sort((a, b) => scoreAssassinateSpace(G, currentPlayer, b) - scoreAssassinateSpace(G, currentPlayer, a));
-      return { name: 'assassinateTroop', args: [targets[0]] };
-    }
-  }
-  if (me.power >= 1) {
+    if (targets.length === 0) return null;
+    // When behind in late game, apply the assassinate multiplier as a
+    // tie-break preference — we already prefer this path, but multiplying
+    // the scores doesn't change the ARGMAX, so the multiplier only matters
+    // when blended with other action types in a future refactor. Keep the
+    // weight live so it's tuneable now.
+    targets.sort((a, b) => scoreAssassinateSpace(G, currentPlayer, b) - scoreAssassinateSpace(G, currentPlayer, a));
+    return { name: 'assassinateTroop', args: [targets[0]] };
+  };
+
+  const tryDeploy = (): AiMove | null => {
+    if (me.power < 1) return null;
+    // Suppress deploys when behind in endgame — deploying drains the
+    // common barracks pool that triggers game end, and we don't want to
+    // end the game while losing.
+    if (behind && isEndgame && WEIGHTS.behindEndgameDeploySuppression > 0) return null;
     const targets = legalDeployTargets(G, currentPlayer);
-    if (targets.length > 0) {
-      targets.sort((a, b) => scoreDeploySpace(G, currentPlayer, b) - scoreDeploySpace(G, currentPlayer, a));
-      return { name: 'deployTroop', args: [targets[0]] };
-    }
+    if (targets.length === 0) return null;
+    targets.sort((a, b) => scoreDeploySpace(G, currentPlayer, b) - scoreDeploySpace(G, currentPlayer, a));
+    // The aheadDeployUrgencyMultiplier is kept live for tuneability but
+    // doesn't currently affect ARGMAX (single-action choice). It will
+    // matter when we extend to ranking across action types.
+    void WEIGHTS.aheadDeployUrgencyMultiplier;
+    void WEIGHTS.behindAssassinateMultiplier;
+    return { name: 'deployTroop', args: [targets[0]] };
+  };
+
+  if (deployFirst) {
+    const m = tryDeploy() ?? tryAssassinate();
+    if (m) return m;
+  } else {
+    const m = tryAssassinate() ?? tryDeploy();
+    if (m) return m;
   }
 
   // 3c. Recruit: highest-cost affordable card (concentrate influence).
