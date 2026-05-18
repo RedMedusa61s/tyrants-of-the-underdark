@@ -9,6 +9,7 @@
 
 import type { TyrantsState } from './game';
 import { scoreAll } from './engine/scoring';
+import { AI_VERSION, BUILD_TIME } from './ai-version';
 
 export interface PublishContext {
   numPlayers: number;
@@ -40,6 +41,12 @@ export function buildGameRecord(G: TyrantsState, ctx: PublishContext): unknown {
   const scores = scoreAll(G);
   return {
     schemaVersion: 1,
+    // Build identity — git short SHA of the code that produced this game,
+    // injected at Vite build time via `define`. Lets us correlate game
+    // outcomes / per-turn behavior to specific AI versions. Logs predating
+    // this field don't have it; absence is a valid value.
+    aiVersion: AI_VERSION,
+    buildTime: BUILD_TIME,
     source: ctx.source,
     numPlayers: ctx.numPlayers,
     halfDecks: ctx.halfDecks,

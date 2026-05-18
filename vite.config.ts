@@ -2,6 +2,19 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+
+/** Best-effort git short SHA injected as __AI_VERSION__ at build time so
+ *  every game log published from this build is stamped with the exact code
+ *  that produced it. Falls back to 'unknown' if git isn't available
+ *  (e.g. building from a tarball or in a CI without checkout). */
+function readGitSha(): string {
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
 
 // Dev-only middleware: the running app POSTs its log/snapshots JSON to
 // /__save-log on every state change. The handler writes it to a known path
@@ -218,5 +231,13 @@ export default defineConfig(({ mode }) => {
     server: { port: 5173, open: false },
     resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
     publicDir: 'assets',
+    // Stamp build-time identity into the bundle. Game logs include this in
+    // their `aiVersion` field so we can later correlate strategic behavior
+    // to specific code versions. JSON.stringify wraps in quotes so the
+    // define replaces a literal identifier with a string literal at parse time.
+    define: {
+      __AI_VERSION__: JSON.stringify(readGitSha()),
+      __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    },
   };
 });
