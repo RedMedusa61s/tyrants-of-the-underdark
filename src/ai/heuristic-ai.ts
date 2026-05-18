@@ -5,7 +5,7 @@
 //   - Assassinate enemy troops where possible (trophies = end-game VP).
 //   - Grab site control whenever practical.
 
-import type { TyrantsState } from '../game';
+import type { TyrantsState, Color } from '../game';
 import { BASE_ACTION_POWER_COST } from '../game';
 import { SITES, SITES_BY_ID } from '../data/sites';
 import { TROOP_SPACES, TROOP_SPACES_BY_ID, sitesSpaces } from '../data/troop-spaces';
@@ -115,6 +115,33 @@ function scoreDeploySpace(G: TyrantsState, pid: string, spaceId: string): number
     s += WEIGHTS.deployRouteSpace;
   }
   return s;
+}
+
+/** How much denial-value would a fresh spy at `siteId` add for `myColor`?
+ *  Only meaningful at control-marker sites; returns 0 elsewhere.
+ *
+ *  Rules:
+ *  - Marker site, currently controlled by an opponent, no opposing spy yet
+ *    → high value (we deny total control AND tax their power to remove us).
+ *  - Marker site already covered by an opposing spy → 0 (TC already denied,
+ *    our second spy doesn't compound).
+ *  - I already have a spy at this site → 0 (the engine rejects a duplicate
+ *    placement and the resource is wasted).
+ *  - Non-marker site → 0 (no TC to deny; the +1 site-control VP is a smaller
+ *    concern and is handled by the base control-marker scoring).
+ */
+function siteDenialValue(G: TyrantsState, siteId: string, myColor: Color): number {
+  const site = SITES_BY_ID[siteId];
+  if (!site?.hasControlMarker) return 0;
+  const spiesHere = G.spies[siteId] ?? [];
+  if (spiesHere.includes(myColor)) return 0;
+  // Any opposing-color spy already there? (Whites don't have spies; only
+  // the four player colors do, so non-myColor entries are by definition
+  // opposing players' spies.)
+  if (spiesHere.some(c => c !== myColor)) return 0;
+  const controller = G.siteControl[siteId];
+  if (!controller || controller === myColor) return 0;
+  return WEIGHTS.siteDenialBonus;
 }
 
 function scoreAssassinateSpace(G: TyrantsState, pid: string, spaceId: string): number {
@@ -274,12 +301,23 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
     case 'select-site': {
       const ids = opts as string[];
       if (ids.length === 0) return { name: 'resolveChoice', args: [pc.optional ? null : null] };
-      // Prefer control-marker sites we don't already dominate.
+      // Site-pick scoring components:
+      //   - Base value: control-marker bonus + printed VP.
+      //   - Denial bonus: at marker sites currently controlled by an opponent
+      //     and not yet covered by an opposing spy. My spy there denies them
+      //     total control AND forces them to spend power removing it.
+      //   - Own-spy penalty: don't double-up where I already have a spy
+      //     (no extra denial value, and the engine rejects double placement).
+      // The same scoring applies to placement and return prompts. For a
+      // return prompt every option has my color in spies, so the own-spy
+      // penalty applies uniformly and the denial bonus is suppressed by
+      // the "already have my spy here" gate inside siteDenialValue.
       const ranked = ids.slice().sort((a, b) => {
         const sa = SITES_BY_ID[a], sb = SITES_BY_ID[b];
         let av = (sa?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (sa?.vp ?? 0);
         let bv = (sb?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (sb?.vp ?? 0);
-        // Prefer sites where we don't already have a spy.
+        av += siteDenialValue(G, a, me.color);
+        bv += siteDenialValue(G, b, me.color);
         if ((G.spies[a] ?? []).includes(me.color)) av -= WEIGHTS.siteOwnSpyPenalty;
         if ((G.spies[b] ?? []).includes(me.color)) bv -= WEIGHTS.siteOwnSpyPenalty;
         return bv - av;

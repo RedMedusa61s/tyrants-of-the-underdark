@@ -49,6 +49,13 @@ export interface HeuristicWeights {
   // --- Site-pick (spy placement / return) ranking ---
   siteControlMarkerBonus: number;
   siteOwnSpyPenalty: number;
+  /** Denial bonus: applied when placing a spy at a control-marker site
+   *  that's currently controlled by an OPPONENT and has no opposing spy
+   *  already there. A spy at such a site denies the opponent total
+   *  control (TC) and forces them to spend power removing it — power
+   *  they'd otherwise use to assassinate / deploy / build their lead.
+   *  Per user's competitive-play notes. */
+  siteDenialBonus: number;
 
   // --- Game-phase awareness (see src/ai/game-phase.ts) ---
   /** Minimum barracks across all players at which "late game" starts. */
@@ -119,6 +126,7 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
 
   siteControlMarkerBonus: 10,
   siteOwnSpyPenalty: 5,
+  siteDenialBonus: 15,
 
   // Phase thresholds — user-supplied rules-of-thumb: "38 barracks → still
   // getting started; 8 barracks → game will be over soon."
