@@ -55,19 +55,33 @@ export type RolloutToTurnEndFn = (
 ) => TyrantsState | null;
 
 /** Value of a state from `pid`'s perspective: own total VP minus the
- *  strongest opponent's total VP. Positive means we're ahead. Uses the
- *  full scoreAll so trophies, control markers, inner-circle VP, and
- *  final-scoring riders all count. */
+ *  MEAN of opponents' total VPs. Uses the full scoreAll so trophies,
+ *  control markers, inner-circle VP, and final-scoring riders all count.
+ *
+ *  Why mean (not max) for an n-player game: a move that harms opponent X
+ *  by 1 VP shifts my (score − mean) by 1/(N−1), not by 1. In a 4-player
+ *  game that means harming any one opponent is worth roughly 1/3 as
+ *  much to me as the same harm in a 2-player game — because the other
+ *  two opponents (who I'm also competing with) are unaffected. Using
+ *  `max` instead would credit only the leader's harm and miss the other
+ *  two players' relative positioning. Per user's notes on per-player-
+ *  count strategy.
+ *
+ *  scoreLead in game-phase.ts deliberately KEEPS `my − max(opp)`: that
+ *  function decides "do I expect to WIN if the game ends now?", which
+ *  is a binary against the leader, not an expected-value calculation. */
 export function stateValue(G: TyrantsState, pid: string): number {
   const all = scoreAll(G);
   const my = all[pid]?.total ?? 0;
-  let bestOpp = -Infinity;
+  let oppSum = 0;
+  let oppCount = 0;
   for (const [id, s] of Object.entries(all)) {
     if (id === pid) continue;
-    if (s.total > bestOpp) bestOpp = s.total;
+    oppSum += s.total;
+    oppCount++;
   }
-  if (!Number.isFinite(bestOpp)) return my;
-  return my - bestOpp;
+  if (oppCount === 0) return my;
+  return my - oppSum / oppCount;
 }
 
 /** Pick the best candidate by 1-ply lookahead.
