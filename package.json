@@ -14,7 +14,8 @@
     "dump-asset-urls": "node scripts/dump-asset-urls.mjs",
     "sim": "vite-node scripts/headless.ts --",
     "tournament": "vite-node scripts/tournament.ts --",
-    "tune": "vite-node scripts/tune.ts --"
+    "tune": "vite-node scripts/tune.ts --",
+    "replay-divergence": "vite-node scripts/replay-divergence.ts --"
   },
   "keywords": [],
   "author": "",
