@@ -15,6 +15,7 @@ import type { AiMove } from './random-ai';
 import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
 import { takePhaseSnapshot, type PhaseSnapshot } from './game-phase';
 import { lookaheadPick, type SimulateMoveFn } from './lookahead';
+import { categoryOfCard, categoryRank } from './card-classes';
 
 // Module-level pointer to the currently active weights. Per-call entrypoints
 // (decideHeuristicMove / decideHeuristicMoveWithWeights) swap this in for the
@@ -465,17 +466,33 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
 
   // 3a. Play all hand cards first (always strictly better than not playing).
   //
-  // Card-pick within the hand: prefer playing an Insane Outcast FIRST when
-  // there are other cards in hand. The Outcast's effect is "discard a card
-  // from your hand to return this Outcast to the supply" — a chance to
-  // remove the Outcast from your cycling deck. That chance only exists when
-  // there's another card to offer up. Playing the Outcast at the END (when
-  // the hand has emptied for resources first) wastes the opportunity — the
-  // discard prompt opens against an empty hand and the Outcast stays in
-  // discard. Per user's competitive-play notes: if you have 2 Outcasts,
-  // play one to discard the other; if you have an Outcast + a starter you
-  // don't need this turn, play the Outcast and discard the starter.
+  // Card-pick within the hand follows the category-rank order from
+  // src/ai/card-classes.ts:
+  //   1. 'hand'       — devour-cost cards (Marilith, Succubus, etc.),
+  //                     draw cards (Rather Modar), Insane Outcast. Play
+  //                     while hand is full so their prompts have options.
+  //   2. 'power' / 'other' — pure +power and meta effects. Stockpile
+  //                          power, no in-turn ordering sensitivity.
+  //   3. 'tactical'   — board-interactive (spies, supplant, deploy-via-
+  //                     effect, etc.). The order-sensitive zone, but for
+  //                     now resolved by category ALONE plus heuristic
+  //                     ordering inside category. Future work: turn-end
+  //                     rollout to search interactive-card orderings.
+  //   4. 'influence'  — pure +influence. Lock in influence after tactical.
+  //
+  // Cards not in the table fall through to 'other' (mid-priority). Ties
+  // within a rank: preserve hand-index order (stable sort) — gives a
+  // deterministic, reproducible play sequence for the tournament harness.
   if (me.hand.length > 0) {
+    if (WEIGHTS.useCardOrdering > 0) {
+      const ranked = me.hand
+        .map((c, i) => ({ i, rank: categoryRank(categoryOfCard(c)) }))
+        .sort((a, b) => a.rank - b.rank || a.i - b.i);
+      return { name: 'playCard', args: [ranked[0].i] };
+    }
+    // Legacy fallback: play hand[0], but still prefer an Insane Outcast
+    // first when one is present alongside other cards (small fix that
+    // predates the full category-ordering work).
     let pickIdx = 0;
     if (me.hand.length > 1) {
       const outcastIdx = me.hand.findIndex(c => c.deck === 'insane-outcasts');

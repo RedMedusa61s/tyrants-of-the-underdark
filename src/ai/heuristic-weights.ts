@@ -110,6 +110,10 @@ export interface HeuristicWeights {
    *  fractional values don't blend usefully. When the heuristic is called
    *  with no simulator (e.g. the live web client), this knob is moot. */
   useLookahead: number;
+  /** Enable category-based hand-play ordering (src/ai/card-classes.ts).
+   *  0 = play hand[0] every time (legacy behavior), 1 = sort by category
+   *  rank: hand-mutators first, power, tactical, influence. */
+  useCardOrdering: number;
 }
 
 export const DEFAULT_WEIGHTS: HeuristicWeights = {
@@ -158,6 +162,7 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
   recruitPerInfluenceBlend: 0,
 
   useLookahead: 1,
+  useCardOrdering: 1,
 };
 
 /** Merge a partial weights override onto the defaults. Missing fields fall

@@ -1,0 +1,4 @@
+{
+  "_comment": "Disable category-based hand-play ordering. Compare against DEFAULT_WEIGHTS to measure the effect of playing devour/draw cards first, power before tactical, tactical before influence.",
+  "useCardOrdering": 0
+}
