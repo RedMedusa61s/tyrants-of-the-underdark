@@ -13,6 +13,13 @@ import { ensureSpiesLeftInitialized } from './engine/handler-helpers';
 
 export type Color = 'black' | 'red' | 'orange' | 'blue';
 
+/** Power cost of the base-action assassinate and return-enemy-spy moves
+ *  (rulebook p.10). Hardcoded engine-side in the move handlers; the UI
+ *  gating + AIs reference this constant to keep them in sync. Don't lower
+ *  the heuristic AI's `powerThresholdForAssassinate` below this — the
+ *  engine will reject the move as INVALID and the AI will burn a turn. */
+export const BASE_ACTION_POWER_COST = 3;
+
 export interface CardRef {
   deck: string;
   slot: number;
@@ -749,7 +756,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       const presenceOk = hasPresence(G, color, { site: target.parentSite, space: target.parentRoute ? spaceId : undefined });
       if (!presenceOk) return INVALID_MOVE;
 
-      if (!Mechanics.expendPower(G, pid, 3)) return INVALID_MOVE;
+      if (!Mechanics.expendPower(G, pid, BASE_ACTION_POWER_COST)) return INVALID_MOVE;
       const killed = assassinateTroop(G, spaceId);
       if (killed === 'white') p.trophyHall.white += 1;
       else if (killed) p.trophyHall[killed] = (p.trophyHall[killed] ?? 0) + 1;
@@ -764,7 +771,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (p.color === targetColor) return INVALID_MOVE;
       if (!hasPresence(G, p.color, { site: siteId })) return INVALID_MOVE;
       if (!(G.spies[siteId] ?? []).includes(targetColor)) return INVALID_MOVE;
-      if (!Mechanics.expendPower(G, pid, 3)) return INVALID_MOVE;
+      if (!Mechanics.expendPower(G, pid, BASE_ACTION_POWER_COST)) return INVALID_MOVE;
       if (returnSpy(G, targetColor, siteId)) {
         // Returned spy goes back to ITS OWNER's supply (not yours). Backfill
         // a missing spiesLeft for the owner first (legacy saves predate the

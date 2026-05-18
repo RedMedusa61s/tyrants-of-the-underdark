@@ -6,6 +6,7 @@
 //   - Grab site control whenever practical.
 
 import type { TyrantsState } from '../game';
+import { BASE_ACTION_POWER_COST } from '../game';
 import { SITES, SITES_BY_ID } from '../data/sites';
 import { TROOP_SPACES, TROOP_SPACES_BY_ID, sitesSpaces } from '../data/troop-spaces';
 import { lookupCard } from '../card-data';
@@ -303,7 +304,13 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   // 3b. Spend Power on board.
   //   - Assassinate where we have presence (3 power, +trophy).
   //   - Else deploy (1 power) preferring control-marker sites.
-  if (me.power >= WEIGHTS.powerThresholdForAssassinate) {
+  // Clamp the tuneable threshold up to the engine's actual base-action cost.
+  // The weights file can raise this (be MORE reluctant to assassinate) but
+  // never lower it past what the engine will accept — otherwise the AI
+  // proposes an unaffordable move, the reducer returns INVALID_MOVE, and
+  // the tournament harness burns the turn via fallback endTurn.
+  const assassinateThreshold = Math.max(WEIGHTS.powerThresholdForAssassinate, BASE_ACTION_POWER_COST);
+  if (me.power >= assassinateThreshold) {
     const targets = legalAssassinateTargets(G, currentPlayer);
     if (targets.length > 0) {
       targets.sort((a, b) => scoreAssassinateSpace(G, currentPlayer, b) - scoreAssassinateSpace(G, currentPlayer, a));

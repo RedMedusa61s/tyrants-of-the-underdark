@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 import type { BoardProps } from 'boardgame.io/react';
-import { TyrantsGame, type TyrantsState, type CardRef } from './game';
+import { TyrantsGame, BASE_ACTION_POWER_COST, type TyrantsState, type CardRef } from './game';
 import { MapView } from './components/MapView';
 import { CardCalibration } from './components/CardCalibration';
 import { CostVerify } from './components/CostVerify';
@@ -536,8 +536,8 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // game tab so the player can always Cancel sticky modes / switch actions
   // while looking at the map.
   const canDeploy = myTurn && p.power >= 1 && !G.pendingChoice;
-  const canAssassinate = myTurn && p.power >= 3 && !G.pendingChoice;
-  const canReturnSpy = myTurn && p.power >= 3 && !G.pendingChoice;
+  const canAssassinate = myTurn && p.power >= BASE_ACTION_POWER_COST && !G.pendingChoice;
+  const canReturnSpy = myTurn && p.power >= BASE_ACTION_POWER_COST && !G.pendingChoice;
   const actionBtn = (label: string, enabled: boolean, active: boolean, onClick: () => void) => (
     <button onClick={onClick} disabled={!enabled}
       style={{

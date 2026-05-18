@@ -39,7 +39,11 @@ export interface HeuristicWeights {
   minCyclingDeck: number;
 
   // --- Action priorities ---
-  /** Spend power on assassinate before deploy when power ≥ this. */
+  /** Spend power on assassinate before deploy when power ≥ this. Note: the
+   *  engine's assassinate base-action costs 3 power, so the heuristic floors
+   *  this value at 3 internally — setting it lower in a weight file is a no-op.
+   *  Raise it above 3 to make the AI MORE reluctant to assassinate (save the
+   *  power for multi-deploys). */
   powerThresholdForAssassinate: number;
 
   // --- Site-pick (spy placement / return) ranking ---

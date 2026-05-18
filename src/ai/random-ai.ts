@@ -10,6 +10,7 @@
 // can evaluate moves by predicted VP gain.
 
 import type { TyrantsState } from '../game';
+import { BASE_ACTION_POWER_COST } from '../game';
 import { SITES } from '../data/sites';
 import { TROOP_SPACES, sitesSpaces } from '../data/troop-spaces';
 import { lookupCard } from '../card-data';
@@ -97,7 +98,7 @@ export function decideAiMove(G: TyrantsState, currentPlayer: string): AiMove | n
   }
 
   // 3b. Spend Power on board actions while it's available.
-  if (me.power >= 3) {
+  if (me.power >= BASE_ACTION_POWER_COST) {
     // Prefer return-spy if an enemy spy sits where we have presence (cheap disruption).
     const spyTargets: Array<{ site: string; color: string }> = [];
     for (const s of SITES) {
