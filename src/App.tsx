@@ -26,7 +26,10 @@ import { BugFixResponseDialog } from './components/BugFixResponseDialog';
 import { fetchUnseenFixNotes, markFixNoteSeen, type FixNoteUpdate } from './bug-report-tracker';
 import { capturePageScreenshot } from './screenshot';
 import { decideAiMove, type AiMove } from './ai/random-ai';
-import { decideHeuristicMove } from './ai/heuristic-ai';
+import { decideHeuristicMove, decideHeuristicMoveWithWeights } from './ai/heuristic-ai';
+import { DEFAULT_WEIGHTS } from './ai/heuristic-weights';
+import type { SimulateMoveFn, RolloutToTurnEndFn } from './ai/lookahead';
+import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { lookupCard } from './card-data';
 import { scoreAll } from './engine/scoring';
 
@@ -376,7 +379,27 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const pendingAiSummary = pendingAiSummaryIdx >= 0 ? G.turnLogs[pendingAiSummaryIdx] : null;
   const showingModal = !!pendingAiSummary;
 
-  // AI driver: dispatch one random move per state tick whenever it's an AI seat's turn
+  // Reducer + template state for the heuristic AI's 1-ply / turn-end lookahead.
+  // Constructed once per game session (when halfDecks / numPlayers are known)
+  // since both are inputs to TyrantsGame.setup. The reducer is reused across
+  // every AI move decision; closures `simulate` and `rollout` below splice
+  // the LIVE G + ctx into the template state for each counterfactual reducer
+  // call so lookahead reflects current play.
+  const aiLookahead = useMemo(() => {
+    if (!session) return null;
+    type AnyState = { G: TyrantsState; ctx: typeof ctx & { gameover?: unknown } };
+    type AnyReducer = (s: AnyState, action: unknown) => AnyState;
+    const wrappedGame = {
+      ...TyrantsGame,
+      setup: (sa: Parameters<NonNullable<typeof TyrantsGame.setup>>[0]) =>
+        TyrantsGame.setup!(sa, { halfDecks: session.config.halfDecks }),
+    };
+    const reducer = CreateGameReducer({ game: wrappedGame }) as unknown as AnyReducer;
+    const template = InitializeGame({ game: wrappedGame, numPlayers: session.config.numPlayers }) as unknown as AnyState;
+    return { reducer, template };
+  }, [session]);
+
+  // AI driver: dispatch one move per state tick whenever it's an AI seat's turn
   // (or an AI has a pending choice). State updates re-run this effect, so the AI keeps
   // playing until control returns to P1. Paused while a turn-summary modal is open so
   // the user has time to read each AI's actions.
@@ -386,14 +409,49 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     const handle = setTimeout(() => {
       const seatIdx = Number(ctx.currentPlayer);
       const style = session?.config.aiStyles[seatIdx - 1] ?? 'random';
-      const decide = AI_FNS[style] ?? decideAiMove;
-      const decided = decide(G, ctx.currentPlayer);
+      let decided: AiMove | null = null;
+      if (style === 'heuristic' && aiLookahead) {
+        // Build simulate + rollout closures that hand the AI the boardgame.io
+        // reducer for counterfactual play. Without these the heuristic falls
+        // back to pure-score ranking (no chooseOne fix, no rollout) — that's
+        // a big strength loss. See replay-divergence and rollout-vs-no-lookahead
+        // tournament results for the magnitude (+28pp).
+        const { reducer, template } = aiLookahead;
+        const action = (type: string, args: unknown[], pid: string) =>
+          ({ type: 'MAKE_MOVE', payload: { type, args, playerID: pid } });
+        const simulate: SimulateMoveFn = (Gx, pid, name, args) => {
+          const wrapped = { ...template, G: Gx, ctx: { ...ctx, currentPlayer: pid } };
+          const next = reducer(wrapped, action(name, args, pid));
+          if (next === wrapped) return null;
+          return next.G;
+        };
+        const rollout: RolloutToTurnEndFn = (Gx, pid, name, args) => {
+          let s = { ...template, G: Gx, ctx: { ...ctx, currentPlayer: pid } };
+          s = reducer(s, action(name, args, pid));
+          if (s.G === Gx) return null;
+          let inner = 50;
+          while (inner-- > 0) {
+            if (s.ctx.gameover) break;
+            if (s.ctx.currentPlayer !== pid) break;
+            const m = decideHeuristicMoveWithWeights(s.G, pid, DEFAULT_WEIGHTS);
+            if (!m) { s = reducer(s, action('endTurn', [], pid)); continue; }
+            const next = reducer(s, action(m.name, m.args as unknown[], pid));
+            if (next === s) s = reducer(s, action('endTurn', [], pid));
+            else s = next;
+          }
+          return s.G;
+        };
+        decided = decideHeuristicMoveWithWeights(G, ctx.currentPlayer, DEFAULT_WEIGHTS, simulate, rollout);
+      } else {
+        const decide = AI_FNS[style] ?? decideAiMove;
+        decided = decide(G, ctx.currentPlayer);
+      }
       if (!decided) return;
       const fn = (moves as Record<string, (...args: unknown[]) => void>)[decided.name];
       if (typeof fn === 'function') fn(...decided.args);
     }, AI_THINK_MS);
     return () => clearTimeout(handle);
-  }, [G, ctx.currentPlayer, isAiTurn, aiHasPendingChoice, moves, showingModal, session]);
+  }, [G, ctx, isAiTurn, aiHasPendingChoice, moves, showingModal, session, aiLookahead]);
 
   // Human-facing pending choices that drive map UI.
   const humanSitePick = G.pendingChoice
