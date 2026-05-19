@@ -115,6 +115,15 @@ export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onCl
       spies: Object.fromEntries(Object.entries(G.spies).filter(([, arr]) => arr.length > 0)),
       siteControl: Object.fromEntries(Object.entries(G.siteControl).filter(([, v]) => v != null)),
       controlMarkers: Object.fromEntries(Object.entries(G.controlMarkers).filter(([, m]) => m.holder != null)),
+      // Image-retry diagnostics: stamped by the Card component every time
+      // an <img> errors or loads with naturalWidth=0. Helps us tell whether
+      // the retry escalation is firing during iPad image-cache bug reports.
+      imageRetryLog: (() => {
+        try {
+          const raw = localStorage.getItem('totu.img-retry-log');
+          return raw ? JSON.parse(raw) : [];
+        } catch { return null; }
+      })(),
     } : undefined;
 
     const meta = {

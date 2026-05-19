@@ -134,6 +134,17 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
   // network error) onError will re-set the flag.
   useEffect(() => { setImgFailed(false); }, [imgUrl]);
   const handleImgError = () => {
+    // Stamp a retry event into localStorage so the next problem-report
+    // can show whether the retry path fired and which tier it reached.
+    // Bounded log (keep last 50 events) so we don't fill quota.
+    try {
+      const raw = localStorage.getItem('totu.img-retry-log');
+      const arr = raw ? (JSON.parse(raw) as Array<{ t: number; path: string; tier: number }>) : [];
+      arr.push({ t: Date.now(), path: card.image, tier: retryTick });
+      if (arr.length > 50) arr.splice(0, arr.length - 50);
+      localStorage.setItem('totu.img-retry-log', JSON.stringify(arr));
+    } catch { /* localStorage may be full / unavailable — non-fatal */ }
+
     if (retryTick === 0) {
       // TIER 1: revoke the cached blob URL and create a fresh one from the
       // same IndexedDB blob. Handles the common iPad case where the URL
@@ -175,9 +186,22 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
         <PlaceholderCard card={card} hover={hover} />
       ) : (
         <img
+          // Key change forces React to remount the <img> element on each
+          // retry tick. This bypasses any per-element decoded-cache state
+          // iPad Safari may have gotten into — bug reports #19, #29, #30
+          // show that setting src= on an existing element isn't always
+          // enough to recover. A brand-new DOM element gets a fresh shot.
+          key={`${card.image}|${retryTick}`}
           src={imgUrl}
           alt={card.name}
           onError={handleImgError}
+          // onLoad catches the silent-decode-failure case: iPad sometimes
+          // reports a successful load (no onError) but the image is
+          // visually blank — naturalWidth is 0. Treat that as an error
+          // and let the retry escalation run.
+          onLoad={(e) => {
+            if (e.currentTarget.naturalWidth === 0) handleImgError();
+          }}
           style={{
             width: '100%', display: 'block', borderRadius: 8,
             boxShadow: hover ? '0 8px 32px rgba(0,0,0,0.8)' : '0 2px 8px rgba(0,0,0,0.5)',
