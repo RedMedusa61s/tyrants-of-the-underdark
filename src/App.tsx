@@ -15,7 +15,7 @@ import { RouteVerify } from './components/RouteVerify';
 import { ProblemReportDialog } from './components/ProblemReportDialog';
 import { FirstRunImageImport } from './components/FirstRunImageImport';
 import { PlaceholderCard } from './components/PlaceholderCard';
-import { useCachedImage } from './image-cache';
+import { useCachedImage, clearImageBlobUrl } from './image-cache';
 import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
@@ -115,7 +115,14 @@ const HOVER_CAPABLE =
 function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; label?: string }) {
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
-  const imgUrl = useCachedImage(card.image);
+  // retryTick bumps after an <img> errors mid-session; useCachedImage
+  // refetches when this changes. Caps at 1 so a genuinely broken image
+  // doesn't loop forever — second failure falls through to placeholder.
+  // Per iPad bug reports (#19, #29): blob URLs can become un-decodable
+  // mid-session under memory pressure even though IndexedDB still has the
+  // bytes; revoke + recreate recovers reliably.
+  const [retryTick, setRetryTick] = useState(0);
+  const imgUrl = useCachedImage(card.image, retryTick);
   // Reset the failed flag whenever the URL changes. useCachedImage starts
   // out returning the virtual /cards/<deck>/<slot>-<slug>.jpg path which
   // 404s on a static host like GH Pages (no such file exists — it's a
@@ -126,6 +133,17 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
   // here gives the resolved blob URL a fresh try; if it ALSO fails (real
   // network error) onError will re-set the flag.
   useEffect(() => { setImgFailed(false); }, [imgUrl]);
+  const handleImgError = () => {
+    if (retryTick === 0) {
+      // First failure: drop the cached blob URL and force re-fetch. If the
+      // underlying blob is still in IndexedDB, a fresh createObjectURL
+      // recovers immediately; if not, fetchAndStore re-slices from the sheet.
+      clearImageBlobUrl(card.image);
+      setRetryTick(1);
+    } else {
+      setImgFailed(true);
+    }
+  };
   // No-images mode forces the placeholder regardless of cache state. Also
   // falls back to placeholder if the image actually 404s at runtime.
   const showPlaceholder = isNoImagesMode() || imgFailed;
@@ -153,7 +171,7 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
         <img
           src={imgUrl}
           alt={card.name}
-          onError={() => setImgFailed(true)}
+          onError={handleImgError}
           style={{
             width: '100%', display: 'block', borderRadius: 8,
             boxShadow: hover ? '0 8px 32px rgba(0,0,0,0.8)' : '0 2px 8px rgba(0,0,0,0.5)',

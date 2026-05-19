@@ -238,6 +238,20 @@ const blobUrlCache = new Map<string, string>();
  *  cached entry under this threshold is presumed corrupt and re-sliced. */
 const MIN_VALID_CARD_BLOB_BYTES = 5_000;
 
+/** Drop a cached blob URL — revokes the URL object and clears the in-memory
+ *  cache entry so the next getImageBlobUrl() call gets a fresh URL pointing
+ *  at the same underlying blob. Used as a defensive retry path on iPad
+ *  Safari, where blob URLs occasionally become un-decodable mid-session
+ *  under memory pressure even though the underlying IndexedDB blob is fine.
+ *  Re-creating the URL after revoke tends to recover the image. */
+export function clearImageBlobUrl(relativePath: string): void {
+  const url = blobUrlCache.get(relativePath);
+  if (url) {
+    try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+    blobUrlCache.delete(relativePath);
+  }
+}
+
 export async function getImageBlobUrl(relativePath: string): Promise<string> {
   if (blobUrlCache.has(relativePath)) return blobUrlCache.get(relativePath)!;
   let blob = await dbGet(relativePath);
@@ -309,7 +323,7 @@ export async function bulkImport(
  *  while we're loading the cached blob), then swaps to a blob URL once
  *  available. On any error, returns the remote URL — the consumer can render
  *  it normally and let onError fall through to a placeholder. */
-export function useCachedImage(relativePath: string): string {
+export function useCachedImage(relativePath: string, retryTick: number = 0): string {
   const [url, setUrl] = useState<string>(() => remoteUrlFor(relativePath));
   useEffect(() => {
     let cancelled = false;
@@ -317,6 +331,8 @@ export function useCachedImage(relativePath: string): string {
       .then(blobUrl => { if (!cancelled) setUrl(blobUrl); })
       .catch(() => { /* keep the initial remote-URL fallback */ });
     return () => { cancelled = true; };
-  }, [relativePath]);
+    // retryTick changes force a re-fetch (e.g., when an <img> errors and
+    // the caller calls clearImageBlobUrl then bumps the tick).
+  }, [relativePath, retryTick]);
   return url;
 }
