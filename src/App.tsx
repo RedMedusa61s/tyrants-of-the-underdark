@@ -15,7 +15,7 @@ import { RouteVerify } from './components/RouteVerify';
 import { ProblemReportDialog } from './components/ProblemReportDialog';
 import { FirstRunImageImport } from './components/FirstRunImageImport';
 import { PlaceholderCard } from './components/PlaceholderCard';
-import { useCachedImage, clearImageBlobUrl } from './image-cache';
+import { useCachedImage, clearImageBlobUrl, evictImageFromCache } from './image-cache';
 import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
@@ -135,12 +135,18 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
   useEffect(() => { setImgFailed(false); }, [imgUrl]);
   const handleImgError = () => {
     if (retryTick === 0) {
-      // First failure: drop the cached blob URL and force re-fetch. If the
-      // underlying blob is still in IndexedDB, a fresh createObjectURL
-      // recovers immediately; if not, fetchAndStore re-slices from the sheet.
+      // TIER 1: revoke the cached blob URL and create a fresh one from the
+      // same IndexedDB blob. Handles the common iPad case where the URL
+      // pointer broke but the underlying bytes are fine.
       clearImageBlobUrl(card.image);
       setRetryTick(1);
+    } else if (retryTick === 1) {
+      // TIER 2: also evict the IndexedDB entry and re-slice from the source
+      // sheet via createImageBitmap. Handles the rarer case where the IDB
+      // blob itself is corrupt (old-slicer leftovers, partial write, etc.).
+      evictImageFromCache(card.image).finally(() => setRetryTick(2));
     } else {
+      // Both recovery tiers failed — fall through to placeholder.
       setImgFailed(true);
     }
   };

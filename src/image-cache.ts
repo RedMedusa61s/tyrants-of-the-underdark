@@ -57,6 +57,16 @@ async function dbPut(key: string, blob: Blob): Promise<void> {
   });
 }
 
+async function dbDelete(key: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 async function dbKeys(): Promise<string[]> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -240,15 +250,43 @@ const MIN_VALID_CARD_BLOB_BYTES = 5_000;
 
 /** Drop a cached blob URL — revokes the URL object and clears the in-memory
  *  cache entry so the next getImageBlobUrl() call gets a fresh URL pointing
- *  at the same underlying blob. Used as a defensive retry path on iPad
- *  Safari, where blob URLs occasionally become un-decodable mid-session
- *  under memory pressure even though the underlying IndexedDB blob is fine.
- *  Re-creating the URL after revoke tends to recover the image. */
+ *  at the same underlying blob (still in IndexedDB). Used as TIER-1 retry
+ *  path on iPad Safari, where blob URLs occasionally become un-decodable
+ *  mid-session under memory pressure even though the underlying blob is
+ *  fine. Re-creating the URL after revoke tends to recover the image. */
 export function clearImageBlobUrl(relativePath: string): void {
   const url = blobUrlCache.get(relativePath);
   if (url) {
     try { URL.revokeObjectURL(url); } catch { /* ignore */ }
     blobUrlCache.delete(relativePath);
+  }
+}
+
+/** TIER-2 retry: drop the blob URL AND evict the IndexedDB entry, so the
+ *  next getImageBlobUrl() call goes through fetchAndStore (which re-slices
+ *  card images from the source sheet via createImageBitmap). Heavier than
+ *  clearImageBlobUrl but recovers from the rare case where the underlying
+ *  IDB blob itself got corrupted, not just the URL pointer. */
+export async function evictImageFromCache(relativePath: string): Promise<void> {
+  clearImageBlobUrl(relativePath);
+  try { await dbDelete(relativePath); } catch { /* ignore — non-fatal */ }
+}
+
+/** Soft cap on the number of blob URLs we keep alive simultaneously. On
+ *  iPad Safari, accumulated URL.createObjectURL pointers seem to correlate
+ *  with mid-session image-decode failures (cards going blank after they'd
+ *  displayed earlier). When the cache grows past this, evict the oldest
+ *  entries — they're typically market cards already replaced. Currently-
+ *  displayed cards are still safe: if a stale URL gets evicted, the Card
+ *  component's retry-on-error mechanism (tier 1) creates a fresh URL on
+ *  the next img error. */
+const MAX_LIVE_BLOB_URLS = 80;
+function maybeEvictOldest(): void {
+  while (blobUrlCache.size > MAX_LIVE_BLOB_URLS) {
+    // Map iteration is insertion-order; the first entry is the oldest.
+    const oldestKey = blobUrlCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    clearImageBlobUrl(oldestKey);
   }
 }
 
@@ -266,6 +304,7 @@ export async function getImageBlobUrl(relativePath: string): Promise<string> {
   if (!blob) blob = await fetchAndStore(relativePath);
   const url = URL.createObjectURL(blob);
   blobUrlCache.set(relativePath, url);
+  maybeEvictOldest();
   return url;
 }
 
