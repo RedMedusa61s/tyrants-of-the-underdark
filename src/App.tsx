@@ -235,9 +235,12 @@ type BaseAction = null | { kind: 'deploy' | 'assassinate' } | { kind: 'return-sp
 
 function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const session = useContext(SessionContext);
-  const [tab, setTab] = useState<'play' | 'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>(
-    isSplitViewMode() ? 'play' : 'game'
-  );
+  const [tab, setTab] = useState<'play' | 'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>('game');
+  // Split-view as React state so toggling doesn't need a page reload (which
+  // would surprise the user mid-setup — no game state on disk yet → back
+  // to the game-selection dialog). Initialized from localStorage; the
+  // toggle button below writes both state and storage in lockstep.
+  const [splitView, setSplitView] = useState<boolean>(isSplitViewMode);
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
   // Auto-captured screenshot for the bug report. Grabbed BEFORE the dialog
@@ -534,11 +537,18 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     : null;
 
   // Auto-focus the map tab whenever the human needs to click something on the board.
+  // In split-view mode the play tab ALREADY has the map visible, so leave the
+  // user there instead of yanking them away — the whole point of split view is
+  // a single screen with both map and cards.
   useEffect(() => {
     if ((G.setupPhase && myTurn) || humanMapPick || baseAction) {
-      if (tab !== 'map') setTab('map');
+      if (splitView) {
+        if (tab !== 'play' && tab !== 'map') setTab('play');
+      } else if (tab !== 'map') {
+        setTab('map');
+      }
     }
-  }, [G.setupPhase, myTurn, humanMapPick, baseAction, tab]);
+  }, [G.setupPhase, myTurn, humanMapPick, baseAction, tab, splitView]);
 
   // Clear pending base action whenever it's no longer the human's turn or a card prompt fires.
   useEffect(() => {
@@ -891,13 +901,18 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           {isNoImagesMode() ? '🖼 images off' : '🖼 images on'}
         </button>
         <button onClick={() => {
-          const cur = isSplitViewMode();
-          localStorage.setItem(SPLIT_VIEW_KEY, cur ? '0' : '1');
-          window.location.reload();
+          // Toggle in React state (no page reload — reload would dump the
+          // user out of mid-game setup). localStorage persists the choice
+          // across sessions; isSplitViewMode() reads it on next load.
+          setSplitView(prev => {
+            const next = !prev;
+            try { localStorage.setItem(SPLIT_VIEW_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+            return next;
+          });
         }}
           title="Toggle split-view mode. Adds a 'play' tab that shows the map and your hand+market on the same page, with hover-to-expand. The original game/map tabs stay available."
-          style={{ padding: '6px 14px', background: isSplitViewMode() ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-          {isSplitViewMode() ? '📐 split view on' : '📐 split view off'}
+          style={{ padding: '6px 14px', background: splitView ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+          {splitView ? '📐 split view on' : '📐 split view off'}
         </button>
         <button onClick={async () => {
           // Click 1: count records and open the disclosure dialog. Actual
@@ -1052,7 +1067,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           const base = devMode
             ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'dividers', 'markers', 'log'] as const
             : ['game', 'map', 'log'] as const;
-          const tabs: readonly string[] = isSplitViewMode() ? ['play', ...base] : base;
+          const tabs: readonly string[] = splitView ? ['play', ...base] : base;
           return tabs;
         })().map(t => (
           <button key={t} onClick={() => {
