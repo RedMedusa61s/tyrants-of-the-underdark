@@ -207,12 +207,16 @@ function toCardRef(deck: string, slot: number): CardRef {
 }
 
 // Two of four half-decks make the market for a game (rulebook "first game" suggests Drow + Dragons).
-// Each unique card in a half-deck appears in the market deck equal to its rarity.
+// Each half-deck has 40 cards total (one entry per slot in card-data covers the printed
+// physical copies — Advance Scout has 3 slots because there are 3 physical Advance
+// Scouts in the deck). Don't multiply by the `rarity` field — that's the slot count,
+// not a per-slot duplicator. Multiplying produced a ~190-card market deck instead of
+// the printed 80 (40+40), reported as issue #31.
 function buildMarketDeck(rng: () => number, halfDecks: string[] = ['drow', 'dragons']): CardRef[] {
   const deck: CardRef[] = [];
   for (const half of halfDecks) {
     for (const c of cardsInDeck(half)) {
-      for (let i = 0; i < c.rarity; i++) deck.push(toCardRef(half, c.slot));
+      deck.push(toCardRef(half, c.slot));
     }
   }
   return shuffle(deck, rng);

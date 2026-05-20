@@ -2932,7 +2932,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -2949,7 +2949,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -2966,7 +2966,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -2983,7 +2983,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3000,7 +3000,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3017,7 +3017,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3034,7 +3034,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3051,7 +3051,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
