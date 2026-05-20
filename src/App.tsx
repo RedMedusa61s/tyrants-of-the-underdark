@@ -655,6 +655,24 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       }}>{label}</button>
   );
   const deployLabel = p.barracksLeft <= 0 ? 'Deploy (1 Power → +1 VP)' : 'Deploy (1 Power)';
+  // End-turn guard: resources reset each turn so unspent power / influence /
+  // unplayed cards are wasted. Warn the player before ending — easy to bump
+  // the End Turn button by accident, especially on touch. Skip the prompt
+  // when nothing actionable is left so the common path stays fast.
+  const handleEndTurn = () => {
+    const reasons: string[] = [];
+    if (p.hand.length > 0) reasons.push(`${p.hand.length} unplayed card${p.hand.length === 1 ? '' : 's'}`);
+    if (p.power >= 1) reasons.push(`${p.power} unspent power`);
+    if (p.influence >= 2) reasons.push(`${p.influence} unspent influence`);
+    if (reasons.length > 0) {
+      const ok = window.confirm(
+        `You have ${reasons.join(' and ')} remaining.\n\n` +
+        `Resources don't carry over between turns. End turn anyway?`
+      );
+      if (!ok) return;
+    }
+    moves.endTurn();
+  };
   const actionBar = (
     <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
       {actionBtn(deployLabel, canDeploy, baseAction?.kind === 'deploy',
@@ -664,7 +682,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {actionBtn('Return enemy spy (3 Power)', canReturnSpy, baseAction?.kind === 'return-spy',
         () => setBaseAction(baseAction?.kind === 'return-spy' ? null : { kind: 'return-spy' }))}
       {baseAction && actionBtn('Cancel', true, false, () => setBaseAction(null))}
-      <button onClick={() => moves.endTurn()} disabled={!myTurn}
+      <button onClick={handleEndTurn} disabled={!myTurn}
         style={{ padding: '8px 16px', background: '#3a2055', color: 'white', border: 'none', borderRadius: 4, cursor: myTurn ? 'pointer' : 'not-allowed', marginLeft: 'auto' }}>
         End Turn
       </button>
@@ -995,12 +1013,16 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               )}
             </div>
           )}
+          {/* Action bar rendered ABOVE the map so it's reachable without
+              scrolling past the (large) board image. Per user feedback —
+              this is the bar most likely needed while looking at the map
+              (Cancel sticky base-actions, Assassinate / Deploy / Return
+              Spy / End Turn). Kept inside the map-tab block so the bar
+              only shows when relevant. */}
+          {actionBar}
           <MapView G={G}
             clickableSites={startingClickable} onSiteClick={handleSiteClick}
             clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
-          {/* Action bar mirrored here so the user can Cancel sticky base-actions
-              and reach Assassinate / Return Spy / End Turn while in map mode. */}
-          {actionBar}
         </div>
       )}
       {tab === 'calibrate' && <div style={{ marginTop: 16 }}><MapView calibrate /></div>}
