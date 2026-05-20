@@ -536,6 +536,13 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     ? new Set((humanMarketPick.options as number[] | undefined) ?? [])
     : null;
 
+  // When split-view turns ON, the game and map tabs disappear from the bar.
+  // If the user happened to be on one of them, slide them over to 'play'
+  // so they aren't stuck staring at a tab that's no longer accessible.
+  useEffect(() => {
+    if (splitView && (tab === 'game' || tab === 'map')) setTab('play');
+  }, [splitView, tab]);
+
   // Auto-focus the map tab whenever the human needs to click something on the board.
   // In split-view mode the play tab ALREADY has the map visible, so leave the
   // user there instead of yanking them away — the whole point of split view is
@@ -543,7 +550,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   useEffect(() => {
     if ((G.setupPhase && myTurn) || humanMapPick || baseAction) {
       if (splitView) {
-        if (tab !== 'play' && tab !== 'map') setTab('play');
+        if (tab !== 'play') setTab('play');
       } else if (tab !== 'map') {
         setTab('map');
       }
@@ -1060,15 +1067,19 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
         {(() => {
-          // Tab list, with the experimental 'play' (split-view) tab inserted
-          // first when the user has enabled the toggle. Keeps the original
-          // game/map tabs visible so the user can fall back to single-view
-          // any time.
-          const base = devMode
+          // Tab list. In normal mode: game, map, log (+ dev tabs). In split-
+          // view mode: 'play' replaces game + map (everything is on one
+          // screen, so the separate tabs are redundant and showing them is
+          // confusing). Log + dev tabs still available.
+          if (splitView) {
+            const dev = devMode
+              ? ['calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'dividers', 'markers'] as const
+              : [] as const;
+            return ['play', ...dev, 'log'] as readonly string[];
+          }
+          return devMode
             ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'dividers', 'markers', 'log'] as const
             : ['game', 'map', 'log'] as const;
-          const tabs: readonly string[] = splitView ? ['play', ...base] : base;
-          return tabs;
         })().map(t => (
           <button key={t} onClick={() => {
             // Manual tab change implicitly cancels any sticky base action — the
