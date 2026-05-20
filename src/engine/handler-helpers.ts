@@ -475,7 +475,7 @@ export function supplantAtLastReturnedSpySite(): EffectHandler {
 
 /** Spaces a player has presence at (the legal targets for assassinate/return from spaces).
  *  Filtered to spaces in active sections only (membership in G.troops). */
-function spacesWithPresence(G: import('../game').TyrantsState, color: import('../game').Color): string[] {
+export function spacesWithPresence(G: import('../game').TyrantsState, color: import('../game').Color): string[] {
   const out: string[] = [];
   for (const ts of TROOP_SPACES) {
     if (!(ts.id in G.troops)) continue;

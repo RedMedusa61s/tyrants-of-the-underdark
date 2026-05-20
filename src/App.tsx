@@ -16,6 +16,7 @@ import { ProblemReportDialog } from './components/ProblemReportDialog';
 import { FirstRunImageImport } from './components/FirstRunImageImport';
 import { PlaceholderCard } from './components/PlaceholderCard';
 import { useCachedImage, clearImageBlobUrl, evictImageFromCache } from './image-cache';
+import { cardWhiffReason } from './engine/card-targets';
 import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
@@ -707,6 +708,29 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     }
     moves.endTurn();
   };
+
+  // Wrap moves.playCard with a whiff check: if the card's primary effect
+  // has no valid targets given current board state (e.g. Advance Scout
+  // with no white troops where you have presence), confirm before
+  // burning the play. The engine would otherwise silently log
+  // "(supplant: no eligible targets — skipped)" and the card goes to
+  // discard with no effect.
+  const playCardSafe = (i: number) => {
+    const card = p.hand[i];
+    if (card) {
+      const data = lookupCard(card.deck, card.slot);
+      const reason = data ? cardWhiffReason(G, ctx.currentPlayer, data.effectKey) : null;
+      if (reason) {
+        const ok = window.confirm(
+          `${card.name} has no valid targets right now (${reason}).\n\n` +
+          `Play it anyway? The card's effect will be skipped and it'll go to your discard.`
+        );
+        if (!ok) return;
+      }
+    }
+    moves.playCard(i);
+  };
+
   const actionBar = (
     <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
       {actionBtn(deployLabel, canDeploy, baseAction?.kind === 'deploy',
@@ -1078,6 +1102,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {tab === 'play' && (
         <SplitPlayView
           G={G} ctx={ctx} myTurn={myTurn} p={p} moves={moves}
+          playCardSafe={playCardSafe}
           startingClickable={startingClickable} handleSiteClick={handleSiteClick}
           clickableSpaces={clickableSpaces} handleSpaceClick={handleSpaceClick}
           clickableMarketSlots={clickableMarketSlots}
@@ -1220,7 +1245,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             const eligible = !isChoosing || !opts || opts.includes(i);
             const onClick = isChoosing
               ? (eligible ? () => moves.resolveChoice(i) : undefined)
-              : (myTurn && !G.pendingChoice ? () => moves.playCard(i) : undefined);
+              : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
             const label = isChoosing ? (eligible ? 'pick' : '—') : 'play';
             return <Card key={i} card={c} label={label} onClick={onClick} />;
           })}
@@ -1456,6 +1481,7 @@ function SplitPlayView(props: {
   myTurn: boolean;
   p: TyrantsState['players'][string];
   moves: Record<string, (...args: unknown[]) => void>;
+  playCardSafe: (idx: number) => void;
   startingClickable: Set<string> | undefined;
   handleSiteClick: (siteId: string) => void;
   clickableSpaces: Set<string> | undefined;
@@ -1464,7 +1490,7 @@ function SplitPlayView(props: {
   humanMapPick: { prompt: string; optional?: boolean } | null;
   actionBar: React.ReactNode;
 }) {
-  const { G, ctx, myTurn, p, moves,
+  const { G, ctx, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
           clickableMarketSlots, humanMapPick, actionBar } = props;
   const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
@@ -1519,7 +1545,7 @@ function SplitPlayView(props: {
                 const eligible = !isChoosing || !opts || opts.includes(i);
                 const onClick = isChoosing
                   ? (eligible ? () => moves.resolveChoice(i) : undefined)
-                  : (myTurn && !G.pendingChoice ? () => moves.playCard(i) : undefined);
+                  : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
                 const label = isChoosing ? (eligible ? 'pick' : '—') : 'play';
                 return <Card key={i} card={c} label={label} onClick={onClick} />;
               })}
