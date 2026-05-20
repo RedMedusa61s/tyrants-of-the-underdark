@@ -39,6 +39,7 @@ const SAVE_KEY = 'totu.savegame';
 const CONFIG_KEY = 'totu.gameconfig';
 const DEV_KEY = 'totu.dev-mode';
 const NO_IMAGES_KEY = 'totu.no-images';
+const SPLIT_VIEW_KEY = 'totu.split-view';
 
 function readUrlBoolFlag(param: string, storageKey: string): boolean {
   try {
@@ -65,6 +66,16 @@ function initialDevMode(): boolean {
  *  the dev exercise the placeholder UI without clearing the image cache. */
 export function isNoImagesMode(): boolean {
   return readUrlBoolFlag('no-images', NO_IMAGES_KEY);
+}
+
+/** Split-view mode (?split-view=1 / ?split-view=0). When on, a new "play"
+ *  tab becomes available that shows the map and the hand+market strip on
+ *  the same page — map on top, cards below, with hover-to-expand. Per
+ *  user feedback on the forum: "I wonder if it would be possible to
+ *  somehow have your hand of cards and the market on the same 'page' as
+ *  the map." Off by default; the existing game/map tabs stay unchanged. */
+export function isSplitViewMode(): boolean {
+  return readUrlBoolFlag('split-view', SPLIT_VIEW_KEY);
 }
 
 type AiStyle = 'random' | 'heuristic';
@@ -223,7 +234,9 @@ type BaseAction = null | { kind: 'deploy' | 'assassinate' } | { kind: 'return-sp
 
 function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const session = useContext(SessionContext);
-  const [tab, setTab] = useState<'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>('game');
+  const [tab, setTab] = useState<'play' | 'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>(
+    isSplitViewMode() ? 'play' : 'game'
+  );
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
   // Auto-captured screenshot for the bug report. Grabbed BEFORE the dialog
@@ -853,6 +866,15 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           style={{ padding: '6px 14px', background: isNoImagesMode() ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
           {isNoImagesMode() ? '🖼 images off' : '🖼 images on'}
         </button>
+        <button onClick={() => {
+          const cur = isSplitViewMode();
+          localStorage.setItem(SPLIT_VIEW_KEY, cur ? '0' : '1');
+          window.location.reload();
+        }}
+          title="Toggle split-view mode. Adds a 'play' tab that shows the map and your hand+market on the same page, with hover-to-expand. The original game/map tabs stay available."
+          style={{ padding: '6px 14px', background: isSplitViewMode() ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+          {isSplitViewMode() ? '📐 split view on' : '📐 split view off'}
+        </button>
         <button onClick={async () => {
           // Click 1: count records and open the disclosure dialog. Actual
           // upload only fires after the user confirms in the dialog (see
@@ -998,16 +1020,23 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       )}
 
       <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
-        {(devMode
-          ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'dividers', 'markers', 'log'] as const
-          : ['game', 'map', 'log'] as const
-        ).map(t => (
+        {(() => {
+          // Tab list, with the experimental 'play' (split-view) tab inserted
+          // first when the user has enabled the toggle. Keeps the original
+          // game/map tabs visible so the user can fall back to single-view
+          // any time.
+          const base = devMode
+            ? ['game', 'map', 'calibrate', 'routes', 'cards', 'costs', 'text', 'sites', 'whites', 'slots', 'dividers', 'markers', 'log'] as const
+            : ['game', 'map', 'log'] as const;
+          const tabs: readonly string[] = isSplitViewMode() ? ['play', ...base] : base;
+          return tabs;
+        })().map(t => (
           <button key={t} onClick={() => {
             // Manual tab change implicitly cancels any sticky base action — the
             // user is leaving the map context, so they don't want the deploy /
             // assassinate / return-spy mode to follow them around.
             if (baseAction) setBaseAction(null);
-            setTab(t);
+            setTab(t as typeof tab);
           }}
             style={{ padding: '4px 12px', background: tab === t ? '#3a2055' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer' }}>
             {t}
@@ -1045,6 +1074,16 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             clickableSites={startingClickable} onSiteClick={handleSiteClick}
             clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
         </div>
+      )}
+      {tab === 'play' && (
+        <SplitPlayView
+          G={G} ctx={ctx} myTurn={myTurn} p={p} moves={moves}
+          startingClickable={startingClickable} handleSiteClick={handleSiteClick}
+          clickableSpaces={clickableSpaces} handleSpaceClick={handleSpaceClick}
+          clickableMarketSlots={clickableMarketSlots}
+          humanMapPick={humanMapPick}
+          actionBar={actionBar}
+        />
       )}
       {tab === 'calibrate' && <div style={{ marginTop: 16 }}><MapView calibrate /></div>}
       {tab === 'routes' && <div style={{ marginTop: 16 }}><MapView editRoutes /></div>}
@@ -1402,6 +1441,134 @@ function configFromSave(codec: string): GameConfig | null {
     const aiStyles: AiStyle[] = Array.from({ length: numPlayers - 1 }, () => 'heuristic');
     return { numPlayers, aiStyles, halfDecks: ['drow', 'dragons'] };
   } catch { return null; }
+}
+
+/** Split-view layout: map on top, hand + market strip below. Hover (on
+ *  hover-capable devices) expands the panel under the cursor and shrinks
+ *  the other; on touch devices the panel responds to taps via a focus
+ *  state. Per James Roberts' forum feedback — "would it be possible to
+ *  somehow have your hand of cards and the market on the same page as
+ *  the map." Opt-in via the split-view toggle; the original game/map
+ *  tabs stay unchanged as the default. */
+function SplitPlayView(props: {
+  G: TyrantsState;
+  ctx: { currentPlayer: string };
+  myTurn: boolean;
+  p: TyrantsState['players'][string];
+  moves: Record<string, (...args: unknown[]) => void>;
+  startingClickable: Set<string> | undefined;
+  handleSiteClick: (siteId: string) => void;
+  clickableSpaces: Set<string> | undefined;
+  handleSpaceClick: (spaceId: string) => void;
+  clickableMarketSlots: Set<number> | null | undefined;
+  humanMapPick: { prompt: string; optional?: boolean } | null;
+  actionBar: React.ReactNode;
+}) {
+  const { G, ctx, myTurn, p, moves,
+          startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
+          clickableMarketSlots, humanMapPick, actionBar } = props;
+  const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
+
+  // Hover expansion: on hover-capable devices, mouse enter/leave drive
+  // which panel takes more vertical space. On touch, focus is unset and
+  // both panels share the space 50/50 (tap a card to play it normally).
+  const enterMap = HOVER_CAPABLE ? () => setFocus('map') : undefined;
+  const leaveMap = HOVER_CAPABLE ? () => setFocus(prev => prev === 'map' ? null : prev) : undefined;
+  const enterCards = HOVER_CAPABLE ? () => setFocus('cards') : undefined;
+  const leaveCards = HOVER_CAPABLE ? () => setFocus(prev => prev === 'cards' ? null : prev) : undefined;
+
+  // Flex weights — when one panel is focused it claims most of the height;
+  // otherwise the map gets ~60% (typical board games favor seeing the
+  // board at all times) and cards get ~40%.
+  const mapFlex = focus === 'map' ? '4 1 0' : focus === 'cards' ? '1 1 0' : '3 1 0';
+  const cardsFlex = focus === 'cards' ? '4 1 0' : focus === 'map' ? '1 1 0' : '2 1 0';
+
+  const sectionBox = (kind: 'map' | 'cards'): React.CSSProperties => ({
+    flex: kind === 'map' ? mapFlex : cardsFlex,
+    overflow: 'auto',
+    transition: 'flex 280ms ease',
+    minHeight: 80,
+  });
+
+  return (
+    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, height: 'calc(100vh - 160px)' }}>
+      {humanMapPick && (
+        <div style={{ padding: 8, background: '#3a2055', borderRadius: 4 }}>
+          <b>{humanMapPick.prompt}</b>
+          {humanMapPick.optional && (
+            <button onClick={() => moves.resolveChoice(null)} style={{ marginLeft: 12, padding: '2px 8px', fontSize: 12 }}>
+              Decline
+            </button>
+          )}
+        </div>
+      )}
+      {actionBar}
+      <div onMouseEnter={enterMap} onMouseLeave={leaveMap} style={sectionBox('map')}>
+        <MapView G={G}
+          clickableSites={startingClickable} onSiteClick={handleSiteClick}
+          clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
+      </div>
+      <div onMouseEnter={enterCards} onMouseLeave={leaveCards} style={sectionBox('cards')}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
+          <div style={{ flex: '1 1 320px', minWidth: 280 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85 }}>Your Hand ({p.hand.length})</h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+              {p.hand.map((c, i) => {
+                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === ctx.currentPlayer;
+                const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
+                const eligible = !isChoosing || !opts || opts.includes(i);
+                const onClick = isChoosing
+                  ? (eligible ? () => moves.resolveChoice(i) : undefined)
+                  : (myTurn && !G.pendingChoice ? () => moves.playCard(i) : undefined);
+                const label = isChoosing ? (eligible ? 'pick' : '—') : 'play';
+                return <Card key={i} card={c} label={label} onClick={onClick} />;
+              })}
+            </div>
+          </div>
+          <div style={{ flex: '2 1 480px', minWidth: 360 }}>
+            <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85 }}>
+              Market <span style={{ opacity: 0.6, fontWeight: 'normal' }}>· {G.market.deck.length} left in deck</span>
+            </h3>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
+              {G.market.row.map((c, i) => {
+                if (!c) return <div key={i} style={{ width: 120, height: 168, margin: 4, border: '1px dashed #444', borderRadius: 8 }} />;
+                const inPickMode = !!clickableMarketSlots;
+                const slotPickable = inPickMode && clickableMarketSlots!.has(i);
+                const cost = lookupCard(c.deck, c.slot)?.cost ?? '?';
+                const label = inPickMode
+                  ? (slotPickable ? 'pick' : '—')
+                  : `recruit (${cost} Inf)`;
+                const onClick = inPickMode
+                  ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
+                  : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
+                return <Card key={i} card={c} label={label} onClick={onClick} />;
+              })}
+              {(['houseGuards', 'priestesses'] as const).map(stack => {
+                const ref = stack === 'houseGuards'
+                  ? { deck: 'house-guards', slot: 40 }
+                  : { deck: 'priestesses',  slot: 43 };
+                const data = lookupCard(ref.deck, ref.slot);
+                if (!data) return null;
+                const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
+                const remaining = G.auxStacks?.[stack] ?? 0;
+                const cost = data.cost ?? 999;
+                const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
+                const label = remaining === 0
+                  ? `empty · ${data.name}`
+                  : `recruit (${cost} Inf) · ${remaining} left`;
+                const onClick = canRecruit ? () => moves.recruitFromAuxStack(stack) : undefined;
+                return (
+                  <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
+                    <Card card={card} label={label} onClick={onClick} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function App() {
