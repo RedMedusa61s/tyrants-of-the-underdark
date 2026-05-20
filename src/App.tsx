@@ -659,11 +659,32 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // unplayed cards are wasted. Warn the player before ending — easy to bump
   // the End Turn button by accident, especially on touch. Skip the prompt
   // when nothing actionable is left so the common path stays fast.
+  //
+  // Influence check: warn only if the player can ACTUALLY afford something
+  // right now — enumerate the market row + aux stacks (Priestess, House
+  // Guard) against current influence. A leftover 1 influence with no
+  // cost-1 card in the market shouldn't trigger the warning; a leftover
+  // 1 influence with a Kobold (cost 1) in the market should.
+  const canAffordAnyRecruit = (): boolean => {
+    const inf = p.influence;
+    for (const c of G.market.row) {
+      if (!c) continue;
+      const d = lookupCard(c.deck, c.slot);
+      if (d && d.cost <= inf) return true;
+    }
+    const priestess = lookupCard('priestesses', 43);
+    if (priestess && (G.auxStacks?.priestesses ?? 0) > 0 && priestess.cost <= inf) return true;
+    const houseGuard = lookupCard('house-guards', 40);
+    if (houseGuard && (G.auxStacks?.houseGuards ?? 0) > 0 && houseGuard.cost <= inf) return true;
+    return false;
+  };
   const handleEndTurn = () => {
     const reasons: string[] = [];
     if (p.hand.length > 0) reasons.push(`${p.hand.length} unplayed card${p.hand.length === 1 ? '' : 's'}`);
     if (p.power >= 1) reasons.push(`${p.power} unspent power`);
-    if (p.influence >= 2) reasons.push(`${p.influence} unspent influence`);
+    if (p.influence > 0 && canAffordAnyRecruit()) {
+      reasons.push(`${p.influence} unspent influence (you can afford at least one card)`);
+    }
     if (reasons.length > 0) {
       const ok = window.confirm(
         `You have ${reasons.join(' and ')} remaining.\n\n` +
