@@ -197,26 +197,56 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
   }
 }
 
-/** Apply one control-marker's per-turn effect to `color`'s player, guarded by
- *  the per-turn ledger so it can fire at most once for that marker. The side
- *  (control vs total control) is determined from the current board state at
- *  the moment of payment — flipping to total control AFTER the effect was
- *  already paid this turn does not retroactively upgrade the payout. */
+/** Apply one control-marker's per-turn effect to `color`'s player. Pays the
+ *  CONTROL bonus at most once per turn, and the TC delta at most once per
+ *  turn — so a player who gains control mid-turn and later upgrades to TC
+ *  gets BOTH bonuses across the same turn (the TC payment pays only the
+ *  difference). Without the TC ledger, the upgrade was silently skipped —
+ *  the "I had TC at end of turn but got no VP" bug.
+ *
+ *  Per user spec: "award the VP as soon as you have total control, or at
+ *  the beginning of your turn if you start with it (same as it does for
+ *  influence). Same as influence, you only get it once per turn, you
+ *  can't farm VP by losing and gaining total control." */
 function payMarkerEffect(G: TyrantsState, m: { siteId: string; controlInfluence: number; controlVp: number; totalControlInfluence: number; totalControlVp: number }, color: Color): void {
-  if (G.markerInfluenceGrantedThisTurn.includes(m.siteId)) return;
+  if (!G.markerTcGrantedThisTurn) G.markerTcGrantedThisTurn = []; // legacy-save backfill
   const tc = hasTotalControl(G, color, m.siteId);
-  const inf = tc ? m.totalControlInfluence : m.controlInfluence;
-  const vp = tc ? m.totalControlVp : m.controlVp;
+  const controlPaid = G.markerInfluenceGrantedThisTurn.includes(m.siteId);
+  const tcPaid = G.markerTcGrantedThisTurn.includes(m.siteId);
+  // Decide what owed delta to pay:
+  //   - At TC and TC not yet paid: total owed = TC bonus. Already paid =
+  //     control bonus if control was paid earlier. Pay the delta.
+  //   - At control and neither paid: pay control bonus.
+  //   - Otherwise: nothing left to pay this turn.
+  let inf = 0, vp = 0;
+  let upgrade = false;
+  if (tc && !tcPaid) {
+    inf = m.totalControlInfluence - (controlPaid ? m.controlInfluence : 0);
+    vp = m.totalControlVp - (controlPaid ? m.controlVp : 0);
+    upgrade = controlPaid;
+  } else if (!tc && !controlPaid) {
+    inf = m.controlInfluence;
+    vp = m.controlVp;
+  } else {
+    return;
+  }
   const pid = Object.keys(G.players).find(k => G.players[k].color === color);
   if (!pid) return;
   const p = G.players[pid];
   if (inf > 0) p.influence += inf;
   if (vp > 0) p.vp += vp;
-  G.markerInfluenceGrantedThisTurn.push(m.siteId);
+  if (!controlPaid) G.markerInfluenceGrantedThisTurn.push(m.siteId);
+  if (tc) G.markerTcGrantedThisTurn.push(m.siteId);
+  // Suppress no-op log lines (delta might be 0/0 if the marker has no
+  // additional TC reward beyond its control reward — Phaerlin, etc.).
+  if (inf === 0 && vp === 0) return;
   const parts: string[] = [];
   if (inf > 0) parts.push(`+${inf} influence`);
   if (vp > 0) parts.push(`+${vp} VP`);
-  G.log.push(`P${Number(pid) + 1} ${parts.join(', ')} from ${m.siteId} control marker${tc ? ' (TOTAL CONTROL)' : ''}`);
+  const suffix = upgrade
+    ? ' (upgrade to TOTAL CONTROL)'
+    : (tc ? ' (TOTAL CONTROL)' : '');
+  G.log.push(`P${Number(pid) + 1} ${parts.join(', ')} from ${m.siteId} control marker${suffix}`);
 }
 
 /** Used by turn.onBegin to pay markers the active player already held from a

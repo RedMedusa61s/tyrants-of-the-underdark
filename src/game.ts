@@ -143,6 +143,13 @@ export interface TyrantsState {
    *  flipping control on/off mid-turn from farming repeated +1 influence
    *  from the same marker. Cleared each turn at onBegin. */
   markerInfluenceGrantedThisTurn: string[];
+  /** SiteIds whose TOTAL-control bonus has been paid this turn. If a marker
+   *  was paid at control-only level earlier in the turn and the player
+   *  later upgrades to TC (e.g. spy on site got cleared by another effect),
+   *  payMarkerEffect pays the delta and adds the marker here. Without this
+   *  separate ledger, the TC VP bonus is silently skipped — the "I had TC
+   *  at end of turn but got no VP" bug. Cleared each turn at onBegin. */
+  markerTcGrantedThisTurn: string[];
 
   /** Color of the player whose turn it currently is. Mirrors
    *  G.players[ctx.currentPlayer].color so engine code that doesn't get ctx
@@ -378,6 +385,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       cardsPlayedThisTurn: [],
       pendingEotPromotions: [],
       markerInfluenceGrantedThisTurn: [],
+      markerTcGrantedThisTurn: [],
       activeTurnColor: null,
       turnLogStart: 0,
       turnLogs: [],
@@ -426,6 +434,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       // already hold (below) or from markers they take control of during the
       // turn (granted live by Mechanics.claimMarkerInfluenceIfControlled).
       G.markerInfluenceGrantedThisTurn = [];
+      // Backfill on legacy saves loaded before this field existed.
+      G.markerTcGrantedThisTurn = [];
 
       // Per-turn marker effect for chits the active player held coming into
       // this turn. Pays both the influence (cobweb) and any VP printed on
