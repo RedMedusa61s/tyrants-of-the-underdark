@@ -172,7 +172,12 @@ export interface TyrantsState {
   /** Queue of end-of-turn "promote another card played this turn" effects. Each entry
    *  is the card that triggered the promotion (so the picker can exclude it from the
    *  eligible list). Drained during the endTurn prompt loop. */
-  pendingEotPromotions: CardRef[];
+  /** Triggers waiting on an end-of-turn "promote a played card" prompt.
+   *  Most entries are bare CardRef (any-played-card promote, e.g. Earth
+   *  Elemental Myrmidon). Entries with `aspectFilter` set restrict the
+   *  eligible options to played cards of that aspect — the Air / Fire /
+   *  Water Myrmidons all restrict to 'Obedience' per their printed text. */
+  pendingEotPromotions: Array<CardRef & { aspectFilter?: string }>;
 
   /** Turn number at which the end-game trigger fired (deploy-last-troop or market empty).
    *  The game ends at the end of the round containing this turn (rulebook p.14). */
@@ -212,6 +217,28 @@ function toCardRef(deck: string, slot: number): CardRef {
 // Scouts in the deck). Don't multiply by the `rarity` field — that's the slot count,
 // not a per-slot duplicator. Multiplying produced a ~190-card market deck instead of
 // the printed 80 (40+40), reported as issue #31.
+/** Indices of cards in G.cardsPlayedThisTurn that are eligible promote
+ *  targets for the given EoT trigger. Always excludes the trigger card
+ *  itself ("another card played this turn"). When the trigger carries
+ *  an aspectFilter (Air/Fire/Water Myrmidons → 'Obedience'), also
+ *  restricts to cards of that aspect. */
+function eotEligibleIndices(
+  G: TyrantsState,
+  trigger: CardRef & { aspectFilter?: string },
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < G.cardsPlayedThisTurn.length; i++) {
+    const c = G.cardsPlayedThisTurn[i];
+    if (c.deck === trigger.deck && c.slot === trigger.slot) continue;
+    if (trigger.aspectFilter) {
+      const data = lookupCard(c.deck, c.slot);
+      if (data?.aspect !== trigger.aspectFilter) continue;
+    }
+    out.push(i);
+  }
+  return out;
+}
+
 function buildMarketDeck(rng: () => number, halfDecks: string[] = ['drow', 'dragons']): CardRef[] {
   const deck: CardRef[] = [];
   for (const half of halfDecks) {
@@ -617,21 +644,21 @@ export const TyrantsGame: Game<TyrantsState> = {
         // Consume the trigger we were responding to.
         G.pendingEotPromotions.shift();
         // Skip any subsequent triggers that have no other cards to promote.
+        // Trigger entries can include an optional aspectFilter (Air/Fire/Water
+        // Myrmidons restrict to Obedience); eligible cards must also match
+        // that aspect when the filter is set.
         while (G.pendingEotPromotions.length > 0) {
           const t = G.pendingEotPromotions[0];
-          const eli = G.cardsPlayedThisTurn.filter(c => !(c.deck === t.deck && c.slot === t.slot));
-          if (eli.length > 0) break;
+          if (eotEligibleIndices(G, t).length > 0) break;
           G.pendingEotPromotions.shift();
         }
         if (G.pendingEotPromotions.length > 0) {
           const t = G.pendingEotPromotions[0];
-          const eligible = G.cardsPlayedThisTurn
-            .map((c, i) => ({ c, i }))
-            .filter(({ c }) => !(c.deck === t.deck && c.slot === t.slot))
-            .map(({ i }) => i);
+          const eligible = eotEligibleIndices(G, t);
+          const aspectTag = t.aspectFilter ? ` ${t.aspectFilter}` : '';
           G.pendingChoice = {
             kind: 'select-played-card',
-            prompt: `End of turn — promote another card played this turn (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
+            prompt: `End of turn — promote another${aspectTag} card played this turn (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
             options: eligible,
             optional: true,
             playerId: pc.playerId,
@@ -829,31 +856,25 @@ export const TyrantsGame: Game<TyrantsState> = {
       // before actually ending the turn. resolveChoice handles the special '__eot__' kind.
       if (G.pendingEotPromotions.length > 0) {
         const trigger = G.pendingEotPromotions[0];
-        const eligible = G.cardsPlayedThisTurn
-          .map((c, i) => ({ c, i }))
-          .filter(({ c }) => !(c.deck === trigger.deck && c.slot === trigger.slot))
-          .map(({ i }) => i);
+        const eligible = eotEligibleIndices(G, trigger);
         if (eligible.length === 0) {
-          // No other card to promote — drop this trigger and try the next or finish.
+          // No eligible card to promote (either no other played card, or none
+          // matching the trigger's aspectFilter) — drop this trigger and try
+          // the next or finish.
           G.pendingEotPromotions.shift();
-          // Recurse via a fresh endTurn cycle: just try again right away.
-          // (No infinite loop risk — queue strictly shrinks each iteration.)
           while (G.pendingEotPromotions.length > 0) {
             const t = G.pendingEotPromotions[0];
-            const eli = G.cardsPlayedThisTurn.filter(c => !(c.deck === t.deck && c.slot === t.slot));
-            if (eli.length > 0) break;
+            if (eotEligibleIndices(G, t).length > 0) break;
             G.pendingEotPromotions.shift();
           }
           if (G.pendingEotPromotions.length === 0) { events.endTurn(); return; }
         }
         const trigger2 = G.pendingEotPromotions[0];
-        const eligible2 = G.cardsPlayedThisTurn
-          .map((c, i) => ({ c, i }))
-          .filter(({ c }) => !(c.deck === trigger2.deck && c.slot === trigger2.slot))
-          .map(({ i }) => i);
+        const eligible2 = eotEligibleIndices(G, trigger2);
+        const aspectTag = trigger2.aspectFilter ? ` ${trigger2.aspectFilter}` : '';
         G.pendingChoice = {
           kind: 'select-played-card',
-          prompt: `End of turn — promote another card played this turn (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
+          prompt: `End of turn — promote another${aspectTag} card played this turn (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
           options: eligible2,
           optional: true,
           playerId: ctx.currentPlayer,

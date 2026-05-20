@@ -31,13 +31,20 @@ export function grant(opts: { power?: number; influence?: number; draw?: number 
 // turn-end step will surface as a "select a played card to promote" prompt. The
 // played-card list lives on the per-turn promotion queue.
 
-export function flagEotPromote(opts?: { count?: number }): EffectHandler {
+export function flagEotPromote(opts?: { count?: number; aspectFilter?: string }): EffectHandler {
   return ctx => {
     const n = opts?.count ?? 1;
     // Push the triggering card N times so the endTurn picker can exclude it from each
-    // resulting prompt (most cards specify "another card played this turn").
-    for (let i = 0; i < n; i++) ctx.G.pendingEotPromotions.push(ctx.card);
-    Mechanics.log(ctx.G, `(eot: queued ${n} promote — another card played this turn)`);
+    // resulting prompt (most cards specify "another card played this turn"). The
+    // optional aspectFilter (e.g. 'Obedience' for the Air/Fire/Water Myrmidons)
+    // is carried as a property on the queued entry; game.ts filters the
+    // 'select-played-card' eligible list by aspect when set.
+    const trigger = opts?.aspectFilter
+      ? { ...ctx.card, aspectFilter: opts.aspectFilter }
+      : ctx.card;
+    for (let i = 0; i < n; i++) ctx.G.pendingEotPromotions.push(trigger);
+    const tag = opts?.aspectFilter ? ` ${opts.aspectFilter} card` : ' another card';
+    Mechanics.log(ctx.G, `(eot: queued ${n} promote —${tag} played this turn)`);
     return true;
   };
 }

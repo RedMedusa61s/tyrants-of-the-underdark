@@ -11,9 +11,12 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
 
 registerAll({
   'aerisi-kalinoth':      sequence(grant({ power: 1 }), placeSpyAtChosenSite(), recruitFromMarketFiltered({ aspect: 'Guile', maxCost: 4 })),
-  'air-elemental-myrmidon': sequence(placeSpyAtChosenSite(), flagEotPromote()),
-  'fire-elemental-myrmidon': sequence(grant({ power: 2 }), flagEotPromote()),
-  'water-elemental-myrmidon': sequence(assassinateChoice({ whiteOnly: true }), flagEotPromote()),
+  // Air / Fire / Water Myrmidons' printed text restricts the promote to an
+  // OBEDIENCE card played this turn (typically a Noble or Priestess of Lolth).
+  // Earth Myrmidon promotes any other played card (unrestricted).
+  'air-elemental-myrmidon': sequence(placeSpyAtChosenSite(), flagEotPromote({ aspectFilter: 'Obedience' })),
+  'fire-elemental-myrmidon': sequence(grant({ power: 2 }), flagEotPromote({ aspectFilter: 'Obedience' })),
+  'water-elemental-myrmidon': sequence(assassinateChoice({ whiteOnly: true }), flagEotPromote({ aspectFilter: 'Obedience' })),
   'earth-elemental-myrmidon': sequence(grant({ influence: 2 }), flagEotPromote()),
   'imix':                 sequence(grant({ power: 4 }), focus('Malice', grant({ power: 2 }))),
   'ogremoch':             sequence(grant({ influence: 2 }), flagEotPromote(), focus('Ambition', flagEotPromote())),
