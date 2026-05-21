@@ -202,33 +202,84 @@ registerAll({
                                  }
                                  return true;
                                })) }),
-  // Cost 7 — Lich: place a spy. If another player has a troop at that
-  //   site, take 2 trophies from their hall and deploy them (as their
-  //   original colors). Reuses takeTrophyAndPlace for the second half.
-  //   The card text says "from THEIR trophy hall" (specifically the
-  //   player with a troop at the spy site); our approximation lets
-  //   the player pick any trophy from any opponent — strategically
-  //   close in 2P, slightly more permissive in 3P/4P.
+  // Cost 7 — Lich: place a spy. "If another player has a troop there,
+  //   take 2 trophies from their trophy hall and deploy them."
+  //   Restricted to THE qualifying opponent(s). If multiple opponents
+  //   have troops at the site, the player picks which one's hall; both
+  //   trophies then come from that chosen player.
   'lich':                sequence(
                            placeSpyAtChosenSite(),
                            (ctx => {
+                             interface S { phase: 'check' | 'pick-victim' | 'taking'; victimPid?: string; subState?: unknown }
+                             let state = (ctx.handlerState as S | null) ?? { phase: 'check' };
                              const G = ctx.G;
                              const siteId = (G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite;
                              if (!siteId) return true;
                              const me = G.players[ctx.actorId];
-                             // Any opponent with a troop at the spy site?
-                             let opponentPresent = false;
-                             for (const sp of TROOP_SPACES.filter(t => t.parentSite === siteId)) {
-                               const occ = G.troops[sp.id];
-                               if (occ && occ !== me.color && occ !== 'white') {
-                                 opponentPresent = true;
-                                 break;
+
+                             // Phase 'check': enumerate qualifying victims (opponents with
+                             // a troop at the spy site, AND non-empty trophy hall — taking
+                             // from an empty hall is a no-op so skip those).
+                             if (state.phase === 'check') {
+                               const victims = new Set<string>();
+                               for (const sp of TROOP_SPACES.filter(t => t.parentSite === siteId)) {
+                                 const occ = G.troops[sp.id];
+                                 if (!occ || occ === me.color || occ === 'white') continue;
+                                 const pid = Object.keys(G.players).find(k => G.players[k].color === occ);
+                                 if (!pid) continue;
+                                 const p = G.players[pid];
+                                 const totalTrophies = Object.values(p.trophyHall).reduce((a, b) => a + b, 0);
+                                 if (totalTrophies > 0) victims.add(pid);
                                }
-                               void me; // keep TS happy when only the test runs
+                               const list = [...victims];
+                               if (list.length === 0) { ctx.handlerState = null; return true; }
+                               if (list.length === 1) {
+                                 state = { phase: 'taking', victimPid: list[0], subState: null };
+                                 // fall through to taking
+                               } else {
+                                 // Multi-victim — surface a select-player prompt.
+                                 ctx.pendingChoice = {
+                                   kind: 'select-player',
+                                   prompt: 'Lich: which opponent\'s trophy hall to take from?',
+                                   options: list,
+                                   optional: true,
+                                 };
+                                 ctx.paused = true;
+                                 ctx.handlerState = { phase: 'pick-victim' };
+                                 return false;
+                               }
                              }
-                             if (!opponentPresent) return true;
-                             // Trigger the trophy-take-and-place flow inline.
-                             return takeTrophyAndPlace({ count: 2 })(ctx);
+
+                             // Phase 'pick-victim' resume.
+                             if (state.phase === 'pick-victim') {
+                               const pid = ctx.pendingChoice?.response as string | null;
+                               ctx.pendingChoice = null;
+                               ctx.paused = false;
+                               if (!pid) { ctx.handlerState = null; return true; }
+                               state = { phase: 'taking', victimPid: pid, subState: null };
+                               // fall through to taking
+                             }
+
+                             // Phase 'taking': call takeTrophyAndPlace with ownerPid lock.
+                             if (state.phase === 'taking' && state.victimPid) {
+                               const childCtx = {
+                                 ...ctx,
+                                 handlerState: state.subState ?? null,
+                                 pendingChoice: ctx.pendingChoice,
+                                 paused: ctx.paused,
+                               };
+                               const done = takeTrophyAndPlace({ count: 2, ownerPid: state.victimPid })(childCtx);
+                               if (!done) {
+                                 ctx.pendingChoice = childCtx.pendingChoice;
+                                 ctx.paused = childCtx.paused;
+                                 ctx.handlerState = { ...state, subState: childCtx.handlerState };
+                                 return false;
+                               }
+                               ctx.handlerState = null;
+                               return true;
+                             }
+                             ctx.handlerState = null;
+                             return true;
                            })),
 });
 

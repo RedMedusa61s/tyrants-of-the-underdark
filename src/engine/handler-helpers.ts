@@ -1729,7 +1729,11 @@ interface OrcusIterState {
   picked?: { playerId: string; color: Color | 'white'; label: string };
 }
 
-export function takeTrophyAndPlace(opts: { count: number }): EffectHandler {
+/** opts.ownerPid restricts trophy-taking to a SPECIFIC player's hall —
+ *  used by Lich ("take 2 trophies from THEIR hall" where "they" is the
+ *  opponent with a troop at the spy site). When omitted, any player's
+ *  hall is eligible (Orcus's behavior). */
+export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string }): EffectHandler {
   return ctx => {
     let state = (ctx.handlerState as OrcusIterState | null) ?? { remaining: opts.count };
 
@@ -1760,7 +1764,7 @@ export function takeTrophyAndPlace(opts: { count: number }): EffectHandler {
       ctx.pendingChoice = null;
       ctx.paused = false;
       if (idx == null) { ctx.handlerState = null; return true; } // declined → stop
-      const choices = enumerateTrophies(ctx.G);
+      const choices = enumerateTrophies(ctx.G, opts.ownerPid);
       const sel = choices[idx];
       if (!sel) { ctx.handlerState = null; return true; }
       state = { remaining: state.remaining, picked: sel };
@@ -1778,12 +1782,14 @@ export function takeTrophyAndPlace(opts: { count: number }): EffectHandler {
     // Loop end?
     if (state.remaining <= 0) { ctx.handlerState = null; return true; }
 
-    // Step 1 fresh prompt: list every (player, color) with > 0 trophies.
-    const choices = enumerateTrophies(ctx.G);
+    // Step 1 fresh prompt: list every (player, color) with > 0 trophies,
+    // optionally restricted to opts.ownerPid.
+    const choices = enumerateTrophies(ctx.G, opts.ownerPid);
     if (choices.length === 0) { ctx.handlerState = null; return true; }
+    const targetTag = opts.ownerPid != null ? ` from P${Number(opts.ownerPid) + 1}'s hall` : '';
     ctx.pendingChoice = {
       kind: 'choose-one',
-      prompt: `Take a trophy (${state.remaining} remaining). Pick which trophy hall + color:`,
+      prompt: `Take a trophy${targetTag} (${state.remaining} remaining). Pick which trophy + color:`,
       options: choices.map(c => c.label),
       optional: true,
     } as PendingChoice;
@@ -1793,9 +1799,13 @@ export function takeTrophyAndPlace(opts: { count: number }): EffectHandler {
   };
 }
 
-function enumerateTrophies(G: import('../game').TyrantsState): Array<{ playerId: string; color: Color | 'white'; label: string }> {
+function enumerateTrophies(
+  G: import('../game').TyrantsState,
+  ownerPid?: string,
+): Array<{ playerId: string; color: Color | 'white'; label: string }> {
   const out: Array<{ playerId: string; color: Color | 'white'; label: string }> = [];
   for (const [pid, p] of Object.entries(G.players)) {
+    if (ownerPid != null && pid !== ownerPid) continue;
     for (const [color, n] of Object.entries(p.trophyHall)) {
       if (n > 0) out.push({
         playerId: pid,
