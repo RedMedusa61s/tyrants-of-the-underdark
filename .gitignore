@@ -24,9 +24,12 @@ Thumbs.db
 eng.traineddata
 
 # --- Wizards of the Coast IP (do not redistribute) ---
-# Card art, board art, tokens, and the rulebook are copyrighted. Users obtain
-# their own copies (extracted from TTS Workshop mod 881660322 via
-# `npm run extract-assets`; rulebook from WotC). Local copies are fine.
+# Card art, board art, tokens, and the rulebook are copyrighted. We do NOT
+# ship art with the deployed client — players' browsers fetch the source
+# sheets from the original TTS Workshop mods' CDN at runtime (mod 881660322
+# for base half-decks, 2745860709 for Aberrations & Undead expansion) and
+# slice client-side via createImageBitmap. Local copies under assets/ are
+# fine for dev/inspection but won't ship.
 assets/raw/
 assets/cards/
 assets/board/

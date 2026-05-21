@@ -87,10 +87,20 @@ export async function clearImageCache(): Promise<void> {
   });
 }
 
+/** 1×1 transparent GIF used as the placeholder src while the real blob URL
+ *  is being resolved (sheet fetch + slice). Without this, card paths would
+ *  fall through to the local Vite publicDir URL — which 404s because we
+ *  don't ship sliced card art (it's copyrighted Wizards of the Coast / Gale
+ *  Force Nine art; players' browsers fetch the source sheets from the TTS
+ *  workshop mods' CDN at runtime and slice client-side). The transparent
+ *  placeholder avoids a spurious 404 + retry per card on first paint. */
+const BLANK_DATA_URL = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+
 /** Map a relative `assets/*` path to its remote source URL. Lookup order:
  *  (1) explicit ASSET_URLS entry (e.g. the board image → Imgur),
  *  (2) optional VITE_TOTU_IMAGE_BASE_URL prefix,
- *  (3) local dev path under the Vite publicDir.
+ *  (3) for card paths: a transparent placeholder (we never ship sliced art).
+ *  (4) otherwise: local dev path under the Vite publicDir.
  */
 function remoteUrlFor(relativePath: string): string {
   const mapped = ASSET_URLS[relativePath];
@@ -98,6 +108,7 @@ function remoteUrlFor(relativePath: string): string {
   const base = (import.meta.env.VITE_TOTU_IMAGE_BASE_URL as string | undefined)?.replace(/\/$/, '');
   const trimmed = relativePath.replace(/^assets\//, '');
   if (base) return `${base}/${trimmed}`;
+  if (parseCardPath(relativePath)) return BLANK_DATA_URL;
   return `/${trimmed}`;
 }
 
