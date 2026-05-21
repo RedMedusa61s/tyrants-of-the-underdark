@@ -240,10 +240,20 @@ function eotEligibleIndices(
 }
 
 function buildMarketDeck(rng: () => number, halfDecks: string[] = ['drow', 'dragons']): CardRef[] {
+  // Per build-card-data: each card-data entry's `rarity` field equals "how
+  // many physical copies of this card the market deck should contain FROM
+  // THIS SLOT." For base half-decks the data has multiple slots per unique
+  // card name (Advance Scout: slots 0/1/2, rarity=1 each) so 1×3 = 3 copies.
+  // For expansion half-decks the TTS sheet has one slot per unique card
+  // (Cranium Rats: slot 14, rarity=3) so 3×1 = 3 copies. Net: 40 cards per
+  // half-deck either way, 80 total. The pre-#31 bug came from
+  // double-counting (slot multiplicity × CSV count); build-card-data now
+  // derives rarity = csvCount / slotCount so this multiplication is correct.
   const deck: CardRef[] = [];
   for (const half of halfDecks) {
     for (const c of cardsInDeck(half)) {
-      deck.push(toCardRef(half, c.slot));
+      const n = Math.max(1, c.rarity ?? 1);
+      for (let i = 0; i < n; i++) deck.push(toCardRef(half, c.slot));
     }
   }
   return shuffle(deck, rng);

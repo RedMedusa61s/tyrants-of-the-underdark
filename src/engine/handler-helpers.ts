@@ -1832,6 +1832,220 @@ export function conditionalGrant(
   };
 }
 
+// ---------- Aberrations expansion: discard-from-opponents ----------
+//
+// Aberrations' theme is forcing opponents to discard from their hand. The
+// "discard from hand" verb here means "move from opponent's hand pile to
+// their discard pile" — the card stays in their cycling deck (unlike
+// devour which removes it entirely). Per the printed expansion's
+// triggers, most discard effects gate on the target having at least N
+// cards in hand ("...if they have 3+").
+
+/** Force EACH opponent (excluding ctx.actorId) to discard one random card
+ *  from their hand if they have at least `minHand` cards. Picks the
+ *  rightmost card index as the "discarded" one — order doesn't affect
+ *  game state since hand is shuffled into discard at turn end anyway,
+ *  and the AI's hand has no semantic positioning. Logged per-opponent. */
+export function eachOpponentDiscardsIfMinHand(minHand: number = 3): EffectHandler {
+  return ctx => {
+    for (const [pid, p] of Object.entries(ctx.G.players)) {
+      if (pid === ctx.actorId) continue;
+      if (p.hand.length < minHand) continue;
+      const idx = p.hand.length - 1;
+      const card = p.hand[idx];
+      if (!card) continue;
+      p.hand.splice(idx, 1);
+      p.discard.push(card);
+      Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced)`);
+    }
+    return true;
+  };
+}
+
+/** Choose ONE opponent (with at least `minHand` cards in hand) to discard a
+ *  random card. If no opponent qualifies, the effect skips silently. */
+export function chooseOpponentToDiscard(minHand: number = 3): EffectHandler {
+  return ctx => {
+    if (!ctx.pendingChoice) {
+      const eligible = Object.keys(ctx.G.players).filter(id => {
+        if (id === ctx.actorId) return false;
+        return ctx.G.players[id].hand.length >= minHand;
+      });
+      if (eligible.length === 0) {
+        Mechanics.log(ctx.G, `(force discard: no opponent has ${minHand}+ cards in hand — skipped)`);
+        return true;
+      }
+      ctx.pendingChoice = {
+        kind: 'select-player',
+        prompt: `Choose an opponent (with ${minHand}+ cards) to discard a card`,
+        options: eligible,
+        optional: true,
+      } as PendingChoice;
+      ctx.paused = true;
+      return false;
+    }
+    const pid = ctx.pendingChoice.response as string | null;
+    ctx.pendingChoice = null;
+    ctx.paused = false;
+    if (!pid) return true;
+    const target = ctx.G.players[pid];
+    if (!target || target.hand.length === 0) return true;
+    const idx = target.hand.length - 1;
+    const card = target.hand[idx];
+    target.hand.splice(idx, 1);
+    target.discard.push(card);
+    Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced)`);
+    return true;
+  };
+}
+
+/** Each opponent with a TROOP at the site of the last-placed spy discards
+ *  a card if they have at least `minHand` cards. Used by Chuul ("place a
+ *  spy; each opponent there discards a card if they have 3+"). */
+export function eachOpponentAtLastSpySiteDiscardsIfMinHand(minHand: number = 3): EffectHandler {
+  return ctx => {
+    const G = ctx.G;
+    const siteId = (G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite;
+    if (!siteId) return true;
+    const me = G.players[ctx.actorId];
+    const presentColors = new Set<string>();
+    for (const sp of TROOP_SPACES.filter(t => t.parentSite === siteId)) {
+      const occ = G.troops[sp.id];
+      if (occ && occ !== me.color && occ !== 'white') presentColors.add(occ);
+    }
+    for (const [pid, p] of Object.entries(G.players)) {
+      if (pid === ctx.actorId) continue;
+      if (!presentColors.has(p.color)) continue;
+      if (p.hand.length < minHand) continue;
+      const idx = p.hand.length - 1;
+      const card = p.hand[idx];
+      if (!card) continue;
+      p.hand.splice(idx, 1);
+      p.discard.push(card);
+      Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced; troop at ${siteId})`);
+    }
+    return true;
+  };
+}
+
+// ---------- Undead expansion: devour-self ----------
+//
+// Many Undead cards offer a triggered effect at the cost of "devour this
+// card" — sacrificing the card being played so it leaves the deck entirely.
+// devourSelfThen wraps the gated effect with the self-devour mechanic.
+// Implementation: mark the card to self-eject via the same mechanism
+// Insane Outcast uses (ctx.handlerState.returnedToSupply), then run the
+// gated effect. game.ts checks handlerState.returnedToSupply at the end
+// of the play and skips adding the card to discard.
+
+export function devourSelfThen(after: EffectHandler): EffectHandler {
+  return ctx => {
+    // Run the gated effect first so its prompts surface normally. Track
+    // the after-handler's state so resumes work. Mark self-eject in our
+    // ledger; we'll write it onto ctx.handlerState only on completion.
+    const state = (ctx.handlerState as { childState?: unknown } | null) ?? {};
+    const childCtx: EffectContext = { ...ctx, handlerState: state.childState ?? null };
+    const done = after(childCtx);
+    if (!done) {
+      ctx.pendingChoice = childCtx.pendingChoice;
+      ctx.paused = childCtx.paused;
+      ctx.handlerState = { childState: childCtx.handlerState };
+      return false;
+    }
+    Mechanics.log(ctx.G, `(devoured ${ctx.card.name} self)`);
+    ctx.handlerState = { returnedToSupply: true };
+    return true;
+  };
+}
+
+/** Like devourSelfThen, but the player may DECLINE the self-devour. If
+ *  they decline, the gated effect doesn't fire either (per the printed
+ *  card text "devour this card to [effect]"). */
+export function optionalDevourSelfThen(after: EffectHandler, label?: string): EffectHandler {
+  return ctx => {
+    interface S { paid?: boolean; declined?: boolean; childState?: unknown }
+    const state = (ctx.handlerState as S | null) ?? {};
+    if (!state.paid && !state.declined) {
+      if (!ctx.pendingChoice) {
+        ctx.pendingChoice = {
+          kind: 'choose-one',
+          prompt: label ?? `Devour ${ctx.card.name} for the bonus effect?`,
+          options: ['Decline', 'Devour for bonus'],
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = {};
+        return false;
+      }
+      const pick = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (pick == null || pick === 0) {
+        ctx.handlerState = null;
+        return true;
+      }
+      // Proceed with the gated effect, then mark self-devour at completion.
+      const newState: S = { paid: true, childState: null };
+      ctx.handlerState = newState;
+      return runChild();
+    }
+    if (state.declined) { ctx.handlerState = null; return true; }
+    return runChild();
+
+    function runChild(): boolean {
+      const s = ctx.handlerState as S;
+      const childCtx: EffectContext = { ...ctx, handlerState: s.childState ?? null };
+      const done = after(childCtx);
+      if (!done) {
+        ctx.pendingChoice = childCtx.pendingChoice;
+        ctx.paused = childCtx.paused;
+        ctx.handlerState = { paid: true, childState: childCtx.handlerState };
+        return false;
+      }
+      Mechanics.log(ctx.G, `(devoured ${ctx.card.name} self)`);
+      ctx.handlerState = { returnedToSupply: true };
+      return true;
+    }
+  };
+}
+
+/** Carrion Crawler: devour ONE card in the market row, then put `ctx.card`
+ *  itself into that market slot. The card-being-played effectively swaps
+ *  position with a market card it devours — the played card stays in the
+ *  market (does NOT go to the player's discard), and the devoured market
+ *  card leaves play entirely. handlerState.returnedToSupply tells game.ts
+ *  to skip adding ctx.card to discard. */
+export function marketDevourReplaceWithSelf(): EffectHandler {
+  return ctx => {
+    if (!ctx.pendingChoice) {
+      const eligible: number[] = [];
+      for (let i = 0; i < ctx.G.market.row.length; i++) {
+        if (ctx.G.market.row[i]) eligible.push(i);
+      }
+      if (eligible.length === 0) { ctx.handlerState = null; return true; }
+      ctx.pendingChoice = {
+        kind: 'select-market-card',
+        prompt: `Devour a card from the market; ${ctx.card.name} replaces it.`,
+        options: eligible,
+        optional: true,
+      } as PendingChoice;
+      ctx.paused = true;
+      return false;
+    }
+    const idx = ctx.pendingChoice.response as number | null;
+    ctx.pendingChoice = null;
+    ctx.paused = false;
+    if (idx == null) { ctx.handlerState = null; return true; }
+    const devoured = ctx.G.market.row[idx];
+    if (!devoured) { ctx.handlerState = null; return true; }
+    Mechanics.devour(ctx.G, devoured);
+    ctx.G.market.row[idx] = { ...ctx.card };
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} swapped ${ctx.card.name} into the market (devoured ${devoured.name})`);
+    // The played card ends up in the market, NOT the player's discard.
+    ctx.handlerState = { returnedToSupply: true };
+    return true;
+  };
+}
+
 // ---------- Tiny convenience: register many handlers at once ----------
 
 export function registerAll(table: Record<string, EffectHandler>) {

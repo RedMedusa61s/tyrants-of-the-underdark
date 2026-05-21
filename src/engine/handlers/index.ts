@@ -4,3 +4,5 @@ import './drow';
 import './dragons';
 import './elemental';
 import './demons';
+import './aberrations';
+import './undead';

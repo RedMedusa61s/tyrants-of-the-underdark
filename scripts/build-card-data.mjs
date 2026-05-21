@@ -71,6 +71,22 @@ for (let i = 1; i < sheetRows.length; i++) {
 // --- Build per-slot card-data ---
 const cardData = {};
 
+// Per (deck, normalized-name), count how many SLOTS exist in card-name-map.
+// Base half-decks duplicate slots per physical card (Advance Scout has 3
+// slots in drow because the printed deck has 3 copies; CSV count=3 too).
+// Expansion half-decks have ONE slot per unique card (the TTS sheet only
+// has one position for Cranium Rats even though the printed deck has 3
+// copies; the printed multiplicity is in the CSV count=3). Both shapes are
+// unified here: rarity = csvCount / slotCount, and the deck-builder in
+// game.ts pushes each slot entry `rarity` times into the market deck.
+// Net result: 40 cards per half-deck regardless of which shape it came from.
+const slotCountsByName = new Map();
+for (const [key, name] of Object.entries(nameMap)) {
+  const [deck] = key.split('::');
+  const k = `${deck}::${norm(name)}`;
+  slotCountsByName.set(k, (slotCountsByName.get(k) || 0) + 1);
+}
+
 // 1. Half-deck slots from name-map
 for (const [key, name] of Object.entries(nameMap)) {
   const [deck, slotStr] = key.split('::');
@@ -78,6 +94,12 @@ for (const [key, name] of Object.entries(nameMap)) {
   const manifestEntry = manifest.cards.find(c => c.deck === deck && c.slot === slot);
   if (!manifestEntry) continue;
   const sheetEntry = sheetByKey.get(`${deck}::${norm(name)}`);
+  const slotCount = slotCountsByName.get(`${deck}::${norm(name)}`) || 1;
+  const csvCount = sheetEntry?.count ?? 1;
+  // For most cards csvCount % slotCount === 0 (3 slots × rarity 1 = 3 copies,
+  // OR 1 slot × rarity 3 = 3 copies). When it isn't, round and keep going —
+  // the orphan-report will surface anything weird.
+  const rarity = Math.max(1, Math.round(csvCount / slotCount));
   cardData[key] = {
     deck,
     slot,
@@ -88,7 +110,7 @@ for (const [key, name] of Object.entries(nameMap)) {
     innerCircleVp: sheetEntry?.innerCircleVp ?? 0,
     aspect: sheetEntry?.aspect ?? '',
     type: sheetEntry?.type ?? '',
-    rarity: sheetEntry?.count ?? 1,
+    rarity,
     benefits: [sheetEntry?.benefit1, sheetEntry?.benefit2, sheetEntry?.benefit3].filter(Boolean),
     effectKey: slug(name),
     _matchedSheet: !!sheetEntry,

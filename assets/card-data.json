@@ -9,7 +9,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "Supplant white troop"
     ],
@@ -26,7 +26,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "Supplant white troop"
     ],
@@ -43,7 +43,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "Supplant white troop"
     ],
@@ -60,7 +60,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "eot promote a card"
@@ -78,7 +78,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "eot promote a card"
@@ -96,7 +96,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "eot promote a card"
@@ -114,7 +114,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "eot promote a card"
@@ -132,7 +132,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or assassinate"
@@ -150,7 +150,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or assassinate"
@@ -168,7 +168,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or assassinate"
@@ -186,7 +186,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Drow",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or assassinate"
@@ -204,7 +204,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 atk"
     ],
@@ -221,7 +221,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 atk"
     ],
@@ -238,7 +238,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "return troop or spy",
       "eot promote a card played"
@@ -256,7 +256,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "return troop or spy",
       "eot promote a card played"
@@ -309,7 +309,7 @@
     "innerCircleVp": 5,
     "aspect": "Malice",
     "type": "Doppleganger",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "supplant"
     ],
@@ -326,7 +326,7 @@
     "innerCircleVp": 5,
     "aspect": "Malice",
     "type": "Doppleganger",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "supplant"
     ],
@@ -343,7 +343,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "If there are 4+ cards promoted, gain 3 money.",
       "eot promote a card played this turn"
@@ -361,7 +361,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "If there are 4+ cards promoted, gain 3 money.",
       "eot promote a card played this turn"
@@ -379,7 +379,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "spy, troop there for 1 attack"
     ],
@@ -396,7 +396,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "spy, troop there for 1 attack"
     ],
@@ -413,7 +413,7 @@
     "innerCircleVp": 5,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy for 3 cards"
@@ -431,7 +431,7 @@
     "innerCircleVp": 5,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy for 3 cards"
@@ -467,7 +467,7 @@
     "innerCircleVp": 5,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "or deploy 4 troops",
       "or supplant white troop anywhere"
@@ -485,7 +485,7 @@
     "innerCircleVp": 5,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "or deploy 4 troops",
       "or supplant white troop anywhere"
@@ -557,7 +557,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "assassinate 2 white troops"
     ],
@@ -574,7 +574,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "assassinate 2 white troops"
     ],
@@ -591,7 +591,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "spy"
     ],
@@ -608,7 +608,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "spy"
     ],
@@ -625,7 +625,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy to supplant a troop there"
@@ -643,7 +643,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy to supplant a troop there"
@@ -661,7 +661,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Drow",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy to supplant a troop there"
@@ -679,7 +679,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 troops"
     ],
@@ -696,7 +696,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Drow",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 troops"
     ],
@@ -731,7 +731,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "1 money",
       "assassinate a white troop"
@@ -749,7 +749,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "1 money",
       "assassinate a white troop"
@@ -785,7 +785,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 money",
       "return a troop or spy"
@@ -803,7 +803,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 money",
       "return a troop or spy"
@@ -821,7 +821,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Troglodyte",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "Move an enemy troop",
       "eot promote a played card"
@@ -839,7 +839,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Troglodyte",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "Move an enemy troop",
       "eot promote a played card"
@@ -857,7 +857,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Half-Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "may devour a market card"
@@ -875,7 +875,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Half-Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "may devour a market card"
@@ -893,7 +893,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or 2 money"
@@ -911,7 +911,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or 2 money"
@@ -929,7 +929,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or 2 money"
@@ -947,7 +947,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or 2 money"
@@ -965,7 +965,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "assassinate a troop",
       "5 trophies ? 2 attack"
@@ -983,7 +983,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "assassinate a troop",
       "5 trophies ? 2 attack"
@@ -1001,7 +1001,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "spy",
       "return spy 4 attack"
@@ -1019,7 +1019,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "spy",
       "return spy 4 attack"
@@ -1037,7 +1037,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "spy",
       "return spy 4 attack"
@@ -1073,7 +1073,7 @@
     "innerCircleVp": 4,
     "aspect": "Guile",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "place a spy",
       "it troop there, 2 money"
@@ -1091,7 +1091,7 @@
     "innerCircleVp": 4,
     "aspect": "Guile",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "place a spy",
       "it troop there, 2 money"
@@ -1145,7 +1145,7 @@
     "innerCircleVp": 5,
     "aspect": "Malice",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 atk 2 money"
     ],
@@ -1162,7 +1162,7 @@
     "innerCircleVp": 5,
     "aspect": "Malice",
     "type": "Dragon",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 atk 2 money"
     ],
@@ -1196,7 +1196,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Dwarf",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "1 money",
       "eot promote a played card"
@@ -1214,7 +1214,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Dwarf",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "1 money",
       "eot promote a played card"
@@ -1232,7 +1232,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Dwarf",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "1 money",
       "eot promote a played card"
@@ -1250,7 +1250,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Dragon",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "may discard a card in market"
@@ -1268,7 +1268,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Dragon",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "may discard a card in market"
@@ -1286,7 +1286,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Dragon",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "may discard a card in market"
@@ -1304,7 +1304,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Kobold",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or deploy a troop",
       "or assassinate a white troop"
@@ -1322,7 +1322,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Kobold",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or deploy a troop",
       "or assassinate a white troop"
@@ -1358,7 +1358,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy for 3 money"
@@ -1376,7 +1376,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy for 3 money"
@@ -1394,7 +1394,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return spy for 3 money"
@@ -1412,7 +1412,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Kobold",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or deploy a troop",
       "or assassinate a white troop"
@@ -1448,7 +1448,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return a spy to deploy 3 troops",
@@ -1467,7 +1467,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return a spy to deploy 3 troops",
@@ -1486,7 +1486,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return a spy to deploy 3 troops",
@@ -1505,7 +1505,7 @@
     "innerCircleVp": 2,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return a spy to deploy 3 troops",
@@ -1524,7 +1524,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "spy",
       "eot promote an Obedience card played this turn"
@@ -1542,7 +1542,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "spy",
       "eot promote an Obedience card played this turn"
@@ -1560,7 +1560,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "eot promote another played card",
       "focus: 2 money"
@@ -1578,7 +1578,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "eot promote another played card",
       "focus: 2 money"
@@ -1596,7 +1596,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "eot promote another played card",
       "focus: 2 money"
@@ -1614,7 +1614,7 @@
     "innerCircleVp": 2,
     "aspect": "Ambition",
     "type": "Human",
-    "rarity": 4,
+    "rarity": 1,
     "benefits": [
       "eot promote another played card",
       "focus: 2 money"
@@ -1632,7 +1632,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "assassinate a white troop",
       "focus: deploy 2 troops"
@@ -1650,7 +1650,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "assassinate a white troop",
       "focus: deploy 2 troops"
@@ -1668,7 +1668,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "assassinate a white troop",
       "focus: deploy 2 troops"
@@ -1686,7 +1686,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "1 money",
       "return another troops/spy",
@@ -1705,7 +1705,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "1 money",
       "return another troops/spy",
@@ -1724,7 +1724,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "eot promote another played card"
@@ -1742,7 +1742,7 @@
     "innerCircleVp": 4,
     "aspect": "Ambition",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "eot promote another played card"
@@ -1760,7 +1760,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "assassinate a troop",
       "focus: 2 attack"
@@ -1778,7 +1778,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "assassinate a troop",
       "focus: 2 attack"
@@ -1796,7 +1796,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Human",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "assassinate a troop",
       "focus: 2 attack"
@@ -1814,7 +1814,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Elemental",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or 2 money",
@@ -1833,7 +1833,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Elemental",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or 2 money",
@@ -1852,7 +1852,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Elemental",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or 2 attack",
       "or 2 money",
@@ -1871,7 +1871,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 attack",
       "eot promote an obedience card played this turn"
@@ -1889,7 +1889,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "2 attack",
       "eot promote an obedience card played this turn"
@@ -1925,7 +1925,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return a spy 3 money, focus: 1 attack"
@@ -1943,7 +1943,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Human",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or return a spy 3 money, focus: 1 attack"
@@ -2052,7 +2052,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Elemental",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "focus: draw a card"
@@ -2070,7 +2070,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Elemental",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "focus: draw a card"
@@ -2088,7 +2088,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Elemental",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "focus: draw a card"
@@ -2106,7 +2106,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "assassinate a white troop",
       "eot promote an obedience card played this turn"
@@ -2124,7 +2124,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Elemental",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "assassinate a white troop",
       "eot promote an obedience card played this turn"
@@ -2214,7 +2214,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Gerro",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "supplant a white troop anywhere",
       "recruit an insane outcast"
@@ -2232,7 +2232,7 @@
     "innerCircleVp": 4,
     "aspect": "Conquest",
     "type": "Gerro",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "supplant a white troop anywhere",
       "recruit an insane outcast"
@@ -2250,7 +2250,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Giant",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or deploy 3 troops",
       "or assassinate 2 white troops"
@@ -2268,7 +2268,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Giant",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or deploy 3 troops",
       "or assassinate 2 white troops"
@@ -2286,7 +2286,7 @@
     "innerCircleVp": 2,
     "aspect": "Conquest",
     "type": "Giant",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or deploy 3 troops",
       "or assassinate 2 white troops"
@@ -2304,7 +2304,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Undead",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "2 attack",
       "give insane outcast to each opponent"
@@ -2322,7 +2322,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Undead",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "2 attack",
       "give insane outcast to each opponent"
@@ -2340,7 +2340,7 @@
     "innerCircleVp": 4,
     "aspect": "Malice",
     "type": "Undead",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "2 attack",
       "give insane outcast to each opponent"
@@ -2358,7 +2358,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Aberration",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "give insane outcase t player troop adjacent to deployed troop"
@@ -2376,7 +2376,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Aberration",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "give insane outcase t player troop adjacent to deployed troop"
@@ -2394,7 +2394,7 @@
     "innerCircleVp": 3,
     "aspect": "Conquest",
     "type": "Aberration",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "deploy 2 troops",
       "give insane outcase t player troop adjacent to deployed troop"
@@ -2448,7 +2448,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "move an enemy troop",
       "promote top card of your deck"
@@ -2466,7 +2466,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "move an enemy troop",
       "promote top card of your deck"
@@ -2484,7 +2484,7 @@
     "innerCircleVp": 4,
     "aspect": "Guile",
     "type": "Shapechanger",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or remove spy for 2 atk 2 money"
@@ -2502,7 +2502,7 @@
     "innerCircleVp": 4,
     "aspect": "Guile",
     "type": "Shapechanger",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or remove spy for 2 atk 2 money"
@@ -2520,7 +2520,7 @@
     "innerCircleVp": 4,
     "aspect": "Guile",
     "type": "Shapechanger",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or remove spy for 2 atk 2 money"
@@ -2538,7 +2538,7 @@
     "innerCircleVp": 5,
     "aspect": "Malice",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "devour a card in your hand for 5 attack"
     ],
@@ -2555,7 +2555,7 @@
     "innerCircleVp": 5,
     "aspect": "Malice",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "devour a card in your hand for 5 attack"
     ],
@@ -2572,7 +2572,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Illithid",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "devour a card from hand to",
       "3 money or assassinate a troop"
@@ -2590,7 +2590,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Illithid",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "devour a card from hand to",
       "3 money or assassinate a troop"
@@ -2608,7 +2608,7 @@
     "innerCircleVp": 3,
     "aspect": "Malice",
     "type": "Illithid",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "devour a card from hand to",
       "3 money or assassinate a troop"
@@ -2626,7 +2626,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Myconid",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "give insane outcast"
@@ -2644,7 +2644,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Myconid",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "give insane outcast"
@@ -2662,7 +2662,7 @@
     "innerCircleVp": 3,
     "aspect": "Ambition",
     "type": "Myconid",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "2 money",
       "give insane outcast"
@@ -2680,7 +2680,7 @@
     "innerCircleVp": 5,
     "aspect": "Ambition",
     "type": "Myconid",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "give insane outcast",
       "eot promote a played card"
@@ -2698,7 +2698,7 @@
     "innerCircleVp": 5,
     "aspect": "Ambition",
     "type": "Myconid",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "give insane outcast",
       "eot promote a played card"
@@ -2716,7 +2716,7 @@
     "innerCircleVp": 5,
     "aspect": "Ambition",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 money",
       "promote your top card"
@@ -2734,7 +2734,7 @@
     "innerCircleVp": 5,
     "aspect": "Ambition",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "3 money",
       "promote your top card"
@@ -2752,7 +2752,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Fiend",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or remove spy for 2 cards"
@@ -2770,7 +2770,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Fiend",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or remove spy for 2 cards"
@@ -2788,7 +2788,7 @@
     "innerCircleVp": 3,
     "aspect": "Guile",
     "type": "Fiend",
-    "rarity": 3,
+    "rarity": 1,
     "benefits": [
       "or spy",
       "or remove spy for 2 cards"
@@ -2806,7 +2806,7 @@
     "innerCircleVp": 5,
     "aspect": "Guile",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "devour a card from hand to",
       "place a spy and assasinate a troop there"
@@ -2824,7 +2824,7 @@
     "innerCircleVp": 5,
     "aspect": "Guile",
     "type": "Fiend",
-    "rarity": 2,
+    "rarity": 1,
     "benefits": [
       "devour a card from hand to",
       "place a spy and assasinate a troop there"
