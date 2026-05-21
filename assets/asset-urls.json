@@ -59,6 +59,24 @@
       "backUrl": "http://i.imgur.com/fYcfPQv.jpg",
       "cols": 10,
       "rows": 5
+    },
+    "aberrations": {
+      "nickname": "Aberrations half-deck",
+      "sheetUrl": "https://steamusercontent-a.akamaihd.net/ugc/1856048428670192110/73ADDD9C11A7762AB7293A7652E36B73830AF233/",
+      "backUrl": "https://steamusercontent-a.akamaihd.net/ugc/1856048428670192045/5AE6E001B7E2F27339B50ADFAE3A85F2CE1F0CDF/",
+      "cols": 7,
+      "rows": 6,
+      "width": 5250,
+      "height": 6000
+    },
+    "undead": {
+      "nickname": "Undead half-deck",
+      "sheetUrl": "https://steamusercontent-a.akamaihd.net/ugc/1856048428670192110/73ADDD9C11A7762AB7293A7652E36B73830AF233/",
+      "backUrl": "https://steamusercontent-a.akamaihd.net/ugc/1856048428670192045/5AE6E001B7E2F27339B50ADFAE3A85F2CE1F0CDF/",
+      "cols": 7,
+      "rows": 6,
+      "width": 5250,
+      "height": 6000
     }
   },
   "tiles": [

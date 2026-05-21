@@ -23,19 +23,22 @@ export interface SheetInfo {
  *  ever rehosts the sheets. */
 export const DECK_SHEETS: Record<string, SheetInfo> = (() => {
   const out: Record<string, SheetInfo> = {};
-  // Verified by HEAD-fetching all four TTS sheets — they're uniformly
-  // 7490×5230. If the mod author ever rehosts at different dimensions,
-  // add a per-sheet override to assets/asset-urls.json and read from there.
-  const SHEET_WIDTH = 7490;
-  const SHEET_HEIGHT = 5230;
+  // Base half-deck sheets (drow / dragons / elemental / demons) from TTS
+  // mod 881660322 are uniformly 7490×5230. The Aberrations & Undead
+  // expansion sheet (from mod 2745860709, shared between both decks) is
+  // 5250×6000. Per-deck width/height in asset-urls.json take precedence
+  // if present; the constants below are the legacy fallback for entries
+  // that don't carry dimensions.
+  const LEGACY_WIDTH = 7490;
+  const LEGACY_HEIGHT = 5230;
   for (const [key, info] of Object.entries(urls.decks)) {
-    const d = info as { sheetUrl: string; cols: number; rows: number };
+    const d = info as { sheetUrl: string; cols: number; rows: number; width?: number; height?: number };
     out[key] = {
       url: d.sheetUrl.replace(/^http:/, 'https:'),
       cols: d.cols,
       rows: d.rows,
-      width: SHEET_WIDTH,
-      height: SHEET_HEIGHT,
+      width: d.width ?? LEGACY_WIDTH,
+      height: d.height ?? LEGACY_HEIGHT,
     };
   }
   // Treat starter-1..N as aliases of the drow sheet (their slots are interleaved
