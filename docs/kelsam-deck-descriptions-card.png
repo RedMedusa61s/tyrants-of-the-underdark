@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta name="viewport" content="width=414, minimal-ui, initial-scale=1.0" />
+
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<meta charset="utf-8" />
+
+		<meta name="IE_RM_OFF" content="true" />
+
+		<meta name="theme-color" content="#000" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-barstyle" content="black-translucent" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="HandheldFriendly" content="True" />
+
+		<meta name="apple-mobile-web-app-title" content="Kelsam Tabletop" />
+		<meta name="application-name" content="Kelsam Tabletop" />
+
+		<meta name="Description" content="On this site you will find our custom player aids, companion apps, inserts, and many other types of custom tabletop game content." />
+		<meta name="keywords" content="kelsam tabletop,tabletop,kelsam" />
+		
+			<meta name="robots" content="index,follow" />
+		
+
+		<title>Kelsam Tabletop</title>
+
+		<link rel="icon" type="image/x-icon" href="/static/images/favicon.ico?v=2" />
+
+		<link rel="apple-touch-icon" href="https://tabletop.kelsam.net/static/images/logo_icon_57.jpg?v=2" />
+		<link rel="apple-touch-icon" sizes="72x72" href="https://tabletop.kelsam.net/static/images/logo_icon_72.jpg?v=2" />
+		<link rel="apple-touch-icon" sizes="114x114" href="https://tabletop.kelsam.net/static/images/logo_icon_114.jpg?v=2" />
+
+		<link rel="shortcut icon" href="https://tabletop.kelsam.net/static/images/logo_icon_57.jpg?v=2" />
+		<link rel="shortcut icon" sizes="72x72" href="https://tabletop.kelsam.net/static/images/logo_icon_72.jpg?v=2" />
+		<link rel="shortcut icon" sizes="114x114" href="https://tabletop.kelsam.net/static/images/logo_icon_114.jpg?v=2" />
+
+		
+			<link rel="image_src" href="https://tabletop.kelsam.net/static/images/og_logo.jpg?v=2" />
+			<meta property="og:image" content="https://tabletop.kelsam.net/static/images/og_logo.jpg?v=2" />
+			<meta property="og:image:type" content="image/jpeg" />
+			<meta property="og:image:width" content="250" />
+			<meta property="og:image:height" content="250" />
+		
+
+		<link href="https://fonts.googleapis.com/css2?family=Oswald&display=swap" rel="stylesheet">
+		<link rel="stylesheet" type="text/css" href="//kelsam.net/static/kelsam-logo.css" />
+		
+		<link rel="stylesheet" type="text/css" href="/static/base.css?v=1.18" />
+		<link rel="stylesheet" type="text/css" href="/static/libs/font-awesome/font-awesome.min.css" />
+		<script src="/static/libs/jquery.min.js"></script>
+		<script src="/static/libs/fancybox-3.5/jquery.fancybox.min.js?v=yt-fix-2"></script>
+		<link rel="stylesheet" type="text/css" href="/static/libs/fancybox-3.5/jquery.fancybox.min.css" />
+		<script src="/static/base.js?v=1.17"></script>
+
+		
+			<script async src="https://www.googletagmanager.com/gtag/js?id=G-BE66R99RQT"></script>
+			<script>
+				window.dataLayer = window.dataLayer || [];
+				function gtag(){dataLayer.push(arguments);}
+				gtag('js', new Date());
+				gtag('config', 'G-BE66R99RQT');
+			</script>
+		
+
+		
+	</head>
+	<body>
+		<div class="site">
+			<div class="background"></div>
+			<header>
+				<a href="/?sort-by=type&content=all" class="logo"><img src="/static/images/logo.png?v=4" /><span>Kelsam Tabletop</span></a>
+
+				<nav class="mainNav">
+					<!-- a href="/merch/" class="navItem"><span></span><span>Merch</span></a -->
+					<a href="/?sort-by=game&content=patrons" class="navItem"><span></span><span>Patrons</span></a>
+				</nav>
+
+				<div class="search-box">
+	<div class="fa fa-search"></div>
+	<form action="/" method="GET">
+		<input type="text" name="s" placeholder="Search game or project" value="" />
+	</form>
+</div>
+
+				<div class="fancybox-modal-link-content" id="mobile-search-box">
+					<div class="fancybox-modal-html mobile-search-box">
+						<div class="search-box">
+	<div class="fa fa-search"></div>
+	<form action="/" method="GET">
+		<input type="text" name="s" placeholder="Search game or project" value="" />
+	</form>
+</div>
+					</div>
+				</div>
+
+				<div class="mobileHeaderLinks">
+					<nav class="mobileNav">
+						<div class="mobileNavHandle"><span class="fa fa-bars"></span></div>
+						<div class="mobileNavLinks">
+							<a href="/?sort-by=game&content=patrons">Patrons</a>
+							<!-- a href="/merch/">Merch</a -->
+
+							<a href="https://kelsam.net/about/" target="_blank">About</a>
+							<a href="https://kelsam.net/contact/" target="_blank">Contact</a>
+							<a href="https://kelsam.net/privacy-policy/" target="_blank">Privacy</a>
+							<a href="/commercial-use/">Commercial&nbsp;Use</a>
+
+							
+						</div>
+					</nav>
+
+					<a href="#" class="globalSearchBtn fancybox-modal-link" data-content-id="mobile-search-box"><span></span><span class="fa fa-search"></span></a>
+				</div>
+
+				<div class="clear"></div>
+			</header>
+
+			<main>
+				<div class="userMsgs">
+					
+				</div>
+
+				
+
+	<div class="projects-grid" style="">
+		
+			<div class="results-filter left">
+				<div class="filter-label">Sort By:</div>
+				<div class="filter-options">
+					<a href="/?sort-by=type" class="active">Project Type</a>
+					<a href="/?sort-by=game" >Game</a>
+				</div>
+			</div>
+
+			<div class="results-filter right">
+				<div class="filter-label">Content:</div>
+				<div class="filter-options">
+					<a href="/?content=all" class="active">All</a>
+					<a href="/?content=free" >Free</a>
+					<a href="/?content=patrons" >Patrons</a>
+				</div>
+			</div>
+
+			<div class="results-filter-clear"></div>
+		
+
+		
+
+			<div class="title">Featured Projects</div>
+			
+				<div class="project-box"><a href="/projects/worms-the-board-game/clarifications-house-rules/" title="This variant serves to increase the mayhem in our worms battles with advanced prodding, varying Starters, and increased scatter on blasting :)" class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/clarifications-house-rules/WormsHouseRulesAndClarificationsCard.png?v=5');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game<br />Clarifications & House Rules</span></a><div class="blurb">This variant serves to increase the mayhem in our Worms battles!</div></div>
+			
+				<div class="project-box"><a href="/projects/worms-the-board-game/3d-printed-insert/" title="The player trays have room for their cards, a team of worms and extra room in the bottom" class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/3d-printed-insert/PlayerBinComponents.jpg?v=2');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game<br />3D Printed Insert</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This insert is for the Collector's Edition, each team gets a bin and there are only 3 other trays to streamline setup.</div></div>
+			
+				<div class="project-box"><a href="/projects/worms-the-board-game/target-standee/" title="Front and back view of the Target Standee" class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/target-standee/TargetStandeeFrontBackView.png?v=3');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game<br />Target Standee</span></a><div class="blurb">We had a hard time keeping track of the Target Token when the board got messy so we created a standee version!</div></div>
+			
+				<div class="project-box"><a href="/projects/worms-the-board-game/collectors-edition-painted-minis/" title="This is the teams breakdown with black bases being our display worms. Each team's primary worms are the four in front." class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/collectors-edition-painted-minis/AllWorms.png?v=2');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game<br />Collector's Edition Painted Minis</span></a><div class="blurb">The Collector's Edition came with a ton of worms so we've split them into teams and selected some for display.</div></div>
+			
+				<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/ti4-companion-app/" title="Player stats are shown at the top for quick reference." class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/ti4-companion-app/Ti4CompanionAppKelsamTabletopOG.jpg?v=2');"><span class="bottom-title">Twilight Imperium Fourth Edition<br />TI4 Companion App</span></a><div class="blurb">Our TI4 games have overtaken our massive table. We designed this app to manage the planet and tech cards taking over our play areas.</div></div>
+			
+				<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/3d-printed-insert/" title="Each player gets a set of drawers" class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/3d-printed-insert/PlayerDrawersMany.png?v=1');"><span class="bottom-title">Twilight Imperium Fourth Edition<br />3D Printed Insert</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This is the 4th insert we've designed for TI4. It's our greatest one yet! :)</div></div>
+			
+				<div class="project-box"><a href="/projects/starcraft-the-board-game/3d-printed-insert/" title="Faction towers for Arcturus Mengsk and Aldaris, there are drawers to organize minis and tokens" class="image-thumb " style="background-image: url('/media/i/_thumbnails/starcraft-the-board-game/3d-printed-insert/FactionTowers.jpg?v=3');"><span class="bottom-title">StarCraft: The Board Game<br />3D Printed Insert</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">The highlight of this insert is the faction towers. Each faction gets its own tower with reference info on shields for some room to strategize.</div></div>
+			
+				<div class="project-box"><a href="/projects/world-of-warcraft-the-board-game/3d-printed-insert/" title="There are 2 sets of minis drawers to keep them organized and move the bulk of the miniatures into the vertical space." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-board-game/3d-printed-insert/20240620_175833_HDR.jpg?v=4');"><span class="bottom-title">World of WarCraft: The Board Game<br />3D Printed Insert</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This is our biggest insert ever. There are two large sets of drawers to hold the minis and everything else fits in the base game box.</div></div>
+			
+				<div class="project-box"><a href="/projects/world-of-warcraft-the-board-game/combat-companion-app/" title="All the combat steps are the same, but the app manages monster stats and handles the tiny tokens." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-board-game/combat-companion-app/wowCombatApp.png?v=2');"><span class="bottom-title">World of WarCraft: The Board Game<br />Combat Companion App</span></a><div class="blurb">This app makes the dice and token combat system virtual. It's easier, less management, takes up less table space, and there are no tiny tokens to handle.</div></div>
+			
+				<div class="project-box"><a href="/projects/sanctum/3d-printed-insert/" title="The hero skill table trays make setup crazy fast." class="image-thumb " style="background-image: url('/media/i/_thumbnails/sanctum/3d-printed-insert/20230524_020350.jpg?v=2');"><span class="bottom-title">Sanctum<br />3D Printed Insert</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">The best part of this insert is how fast it makes the hero skills table setup. 5 seconds, no joke.</div></div>
+			
+				<div class="project-box"><a href="/projects/seti-search-for-extraterrestrial-intelligence/3d-printed-insert/" title="5th layer of insert" class="image-thumb " style="background-image: url('/media/i/_thumbnails/seti-search-for-extraterrestrial-intelligence/3d-printed-insert/Insert5.jpg?v=2');"><span class="bottom-title">SETI: Search for Extraterrestrial Intelligence<br />3D Printed Insert</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This insert features a custom data slider track to make star setup a breeze!</div></div>
+			
+				<div class="project-box"><a href="/projects/tabletop-projects/custom-gaming-table/" title="Our newest gaming table!" class="image-thumb " style="background-image: url('/media/i/_thumbnails/tabletop-projects/custom-gaming-table/2023TableBuild_Final.jpg?v=4');"><span class="bottom-title">Tabletop Projects<br />Custom Gaming Table</span></a><div class="blurb">This is what we came up with for the center of a Venn diagram between "Wants a big fancy gaming table" and "Doesn't want to spend thousands on it".</div></div>
+			
+				<div class="project-box"><a href="/projects/dd-adventure-board-games/puppets-of-the-balor-campaign/" title="This is the adventure book that we designed for our campaign." class="image-thumb " style="background-image: url('/media/i/_thumbnails/dd-adventure-board-games/puppets-of-the-balor-campaign/puppets.jpg?v=4');"><span class="bottom-title">D&D Adventure Board Games<br />Puppets of the Balor Campaign</span></a><div class="blurb">We wanted to construct our own campaign-style game involving all of our D&D games. The result is this adventure book for the first four games.</div></div>
+			
+				<div class="project-box"><a href="/projects/alchemists/re-usable-deduction-boards/" title="They fit behind the screens but are much easier to handle and write on." class="image-thumb " style="background-image: url('/media/i/_thumbnails/alchemists/re-usable-deduction-boards/pic3410533.jpg?v=1');"><span class="bottom-title">Alchemists<br />Reusable Deduction Boards</span></a><div class="blurb">We adjusted the sheets, bought some minimal-border picture frames and wet-erase markers, put it all together, and now have reusable boards.</div></div>
+			
+				<div class="project-box"><a href="/projects/tabletop-projects/kelsam-score-keeper-app/" title="" class="image-thumb " style="background-image: url('/media/i/_thumbnails/tabletop-projects/kelsam-score-keeper-app/ScoreKeeperFeaturedImage.png?v=2');"><span class="bottom-title">Tabletop Projects<br />Kelsam Score Keeper App</span></a><div class="blurb">This is the score keeper we made for simple games that just need to track player scores.</div></div>
+			
+
+			
+				<div class="title">Inserts</div>
+				
+					<div class="project-box"><a href="/projects/worms-the-board-game/3d-printed-insert/" title="The player trays have room for their cards, a team of worms and extra room in the bottom" class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/3d-printed-insert/PlayerBinComponents.jpg?v=2');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This insert is for the Collector's Edition, each team gets a bin and there are only 3 other trays to streamline setup.</div></div>
+				
+					<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/3d-printed-insert/" title="Each player gets a set of drawers" class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/3d-printed-insert/PlayerDrawersMany.png?v=1');"><span class="bottom-title">Twilight Imperium Fourth Edition</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This is the 4th insert we've designed for TI4. It's our greatest one yet! :)</div></div>
+				
+					<div class="project-box"><a href="/projects/world-of-warcraft-the-board-game/3d-printed-insert/" title="There are 2 sets of minis drawers to keep them organized and move the bulk of the miniatures into the vertical space." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-board-game/3d-printed-insert/20240620_175833_HDR.jpg?v=4');"><span class="bottom-title">World of WarCraft: The Board Game</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This is our biggest insert ever. There are two large sets of drawers to hold the minis and everything else fits in the base game box.</div></div>
+				
+					<div class="project-box"><a href="/projects/starcraft-the-board-game/3d-printed-insert/" title="Faction towers for Arcturus Mengsk and Aldaris, there are drawers to organize minis and tokens" class="image-thumb " style="background-image: url('/media/i/_thumbnails/starcraft-the-board-game/3d-printed-insert/FactionTowers.jpg?v=3');"><span class="bottom-title">StarCraft: The Board Game</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">The highlight of this insert is the faction towers. Each faction gets its own tower with reference info on shields for some room to strategize.</div></div>
+				
+					<div class="project-box"><a href="/projects/star-wars-rebellion/3d-printed-insert/" title="Each drawer is labeled with what miniatures it houses so the build phase can be efficient." class="image-thumb " style="background-image: url('/media/i/_thumbnails/star-wars-rebellion/3d-printed-insert/20210629_133520.jpg?v=6');"><span class="bottom-title">Star Wars: Rebellion</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This is most certainly our best insert ever. It has a lot of cool features that we'd never be able to do with foam-core, like sets of miniatures drawers.</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-2nd-edition/foam-core-insert/" title="We have made deck boxes for each Adventure Variant Expansion and for the Character Decks." class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-2nd-edition/foam-core-insert/IMAG0992.jpg?v=4');"><span class="bottom-title">Runebound Second Edition</span></a><div class="blurb">This design covers every expansion, limits the boxes needed to play, and features boxes for Adventure Variants and Character Decks.</div></div>
+				
+					<div class="project-box"><a href="/projects/harry-potter-hogwarts-battle/3d-printed-insert/" title="Play trays go straight from box to table and setup trays are sorted for convenience." class="image-thumb " style="background-image: url('/media/i/_thumbnails/harry-potter-hogwarts-battle/3d-printed-insert/20240128_182512.jpg?v=1');"><span class="bottom-title">Harry Potter: Hogwarts Battle</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This insert houses the base game and both expansions in the base game box. Setup is quick with several play trays that go straight from box to table.</div></div>
+				
+					<div class="project-box"><a href="/projects/tyrants-of-the-underdark/3d-printed-insert/" title="Player tray in action" class="image-thumb " style="background-image: url('/media/i/_thumbnails/tyrants-of-the-underdark/3d-printed-insert/20240525_002653_HDR.jpg?v=1');"><span class="bottom-title">Tyrants of the Underdark</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This insert fits the first edition box. It has player trays for the houses and organizes the cards (including the expansion decks) to make setup a breeze.</div></div>
+				
+					<div class="project-box"><a href="/projects/dungeonquest/foam-core-insert/" title="Third layer of insert" class="image-thumb " style="background-image: url('/media/i/_thumbnails/dungeonquest/foam-core-insert/IMAG1045.jpg?v=2');"><span class="bottom-title">DungeonQuest Revised Edition</span></a><div class="blurb">This insert is one of the first that we did with multiple trays. It has card drawers for each mini-deck as well as small trays for all tokens.</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-3rd-edition/foam-core-insert/" title="For this insert we decided to make boxes for each scenario." class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-3rd-edition/foam-core-insert/IMAG1817.jpg?v=4');"><span class="bottom-title">Runebound Third Edition</span></a><div class="blurb">This design covers every expansion, has tokens sorted for convenience, and features boxes for each scenario.</div></div>
+				
+					<div class="project-box"><a href="/projects/sanctum/3d-printed-insert/" title="The hero skill table trays make setup crazy fast." class="image-thumb " style="background-image: url('/media/i/_thumbnails/sanctum/3d-printed-insert/20230524_020350.jpg?v=2');"><span class="bottom-title">Sanctum</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">The best part of this insert is how fast it makes the hero skills table setup. 5 seconds, no joke.</div></div>
+				
+					<div class="project-box"><a href="/projects/wiz-war/foam-core-insert/" title="For the school decks, we built a large well that stores each of them with a foam core separator, labelled with the schools' icons and names on each side." class="image-thumb " style="background-image: url('/media/i/_thumbnails/wiz-war/foam-core-insert/IMAG0974.jpg?v=2');"><span class="bottom-title">Wiz-War</span></a><div class="blurb">For this game we decided to store the base game and both expansions in one box with an overflowing insert (the lid doesn't fit on all the way).</div></div>
+				
+					<div class="project-box"><a href="/projects/risk-star-wars-black-edition/3d-printed-insert/" title="This insert features rounded edges for easy component scooping, and a draw deck space for each player." class="image-thumb " style="background-image: url('/media/i/_thumbnails/risk-star-wars-black-edition/3d-printed-insert/swRiskInsert.jpg?v=2');"><span class="bottom-title">Risk: Star Wars Black Edition</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This was our first crack at making a 3D printed insert. It features rounded edges for easy component scooping and a draw deck space for each player.</div></div>
+				
+					<div class="project-box"><a href="/projects/artisans-of-splendent-vale/3d-printed-insert/" title="The best part of this insert is that it keeps numbered meeples organized, ordered, and ready for action!" class="image-thumb " style="background-image: url('/media/i/_thumbnails/artisans-of-splendent-vale/3d-printed-insert/photo.jpg?v=5');"><span class="bottom-title">Artisans of Splendent Vale</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This mini-insert for the small components tuck box keeps numbered meeples ordered and ready for action!</div></div>
+				
+					<div class="project-box"><a href="/projects/world-of-warcraft-the-adventure-game/foam-core-insert/" title="After sleeving the cards, we found that all the components would not fit nicely into the base box." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-adventure-game/foam-core-insert/IMAG0960.jpg?v=3');"><span class="bottom-title">World of WarCraft: The Adventure Game</span></a><div class="blurb">We designed custom faction boxes for the character decks and tokens. We also made draw bins for challenge decks, and a neat drawer bin for discovery tokens.</div></div>
+				
+					<div class="project-box"><a href="/projects/dd-adventure-board-games/custom-heroes-box/" title="We created a box to store all the heroes so we'd easily be able to select any hero from any of the sets no matter which game we pulled off the shelf to play." class="image-thumb " style="background-image: url('/media/i/_thumbnails/dd-adventure-board-games/custom-heroes-box/pic3798030.jpg?v=3');"><span class="bottom-title">D&D Adventure Board Games</span></a><div class="blurb">We created a box to store all the heroes so we'd be able to easily select any hero from any of the sets no matter which game we pulled off the shelf to play.</div></div>
+				
+					<div class="project-box"><a href="/projects/drakon/foam-core-insert/" title="Bottom layer of insert" class="image-thumb " style="background-image: url('/media/i/_thumbnails/drakon/foam-core-insert/IMAG1031.jpg?v=2');"><span class="bottom-title">Drakon</span></a><div class="blurb">The best part about this one is the dungeon tile stacks bin. It makes setup much, much swifter.</div></div>
+				
+					<div class="project-box"><a href="/projects/chaostle/foam-core-insert/" title="Half of the character boards are stored in the base game box and half are stored in the expansion box." class="image-thumb " style="background-image: url('/media/i/_thumbnails/chaostle/foam-core-insert/IMAG0956.jpg?v=2');"><span class="bottom-title">Chaostle</span></a><div class="blurb">We kept the original plastic insert in the base game box and built this insert for the Melee Expansion box.</div></div>
+				
+					<div class="project-box"><a href="/projects/enigma/foam-core-insert/" title="Insert Middle Layer" class="image-thumb " style="background-image: url('/media/i/_thumbnails/enigma/foam-core-insert/IMAG1037.jpg?v=1');"><span class="bottom-title">Enigma</span></a><div class="blurb">This was the first insert we ever made.  If we ever remake this it will be very different. But it was certainly a useful learning experience.</div></div>
+				
+					<div class="project-box"><a href="/projects/seti-search-for-extraterrestrial-intelligence/3d-printed-insert/" title="5th layer of insert" class="image-thumb " style="background-image: url('/media/i/_thumbnails/seti-search-for-extraterrestrial-intelligence/3d-printed-insert/Insert5.jpg?v=2');"><span class="bottom-title">SETI: Search for Extraterrestrial Intelligence</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">This insert features a custom data slider track to make star setup a breeze!</div></div>
+				
+					<div class="project-box"><a href="/projects/chess/custom-chess-box/" title="The pieces sit on a liner and hang over their spots" class="image-thumb " style="background-image: url('/media/i/_thumbnails/chess/custom-chess-box/IMAG1973.jpg?v=2');"><span class="bottom-title">Chess</span></a><div class="blurb">We got a gorgeous new fossil stone chess set, but it came in a decrepit green box, so we made our own.</div></div>
+				
+					<div class="project-box"><a href="/projects/project-l/3d-printed-insert/" title="Setup with the insert in action :)" class="image-thumb " style="background-image: url('/media/i/_thumbnails/project-l/3d-printed-insert/InsertInAction.jpg?v=3');"><span class="bottom-title">Project L</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">Our components didn't fit well into any of our boxes for this game, so we've printed a new box that houses the base game and both expansions.</div></div>
+				
+			
+				<div class="title">Player Aids</div>
+				
+					<div class="project-box"><a href="/projects/worms-the-board-game/target-standee/" title="Front and back view of the Target Standee" class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/target-standee/TargetStandeeFrontBackView.png?v=3');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game</span></a><div class="blurb">We had a hard time keeping track of the Target Token when the board got messy so we created a standee version!</div></div>
+				
+					<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/galaxy-mats/" title="8-player Galaxy Mat" class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/galaxy-mats/KelsamTabletop_TI4GalaxyMat_8plyr_Web.jpg?v=3');"><span class="bottom-title">Twilight Imperium Fourth Edition</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">Many players wanted a nice game mat to place on their hard-top table, so we made this galaxy mat and have updated it several times to fit requests.</div></div>
+				
+					<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/acrylic-command-control-tokens/" title="Color-specific acrylic tokens" class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/acrylic-command-control-tokens/IMAG1439.jpg?v=2');"><span class="bottom-title">Twilight Imperium Fourth Edition</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">We designed these laser cut acrylic tokens before we started 3D printing. They're pretty expensive, but awesome if you want that extra flare.</div></div>
+				
+					<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/3d-printed-command-control-tokens/" title="3D Printed Tokens" class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/3d-printed-command-control-tokens/KelsamTokenUpgrades_Main.jpg?v=6');"><span class="bottom-title">Twilight Imperium Fourth Edition</span></a><div class="blurb">After trying to find a way to offer color-specific tokens that aren't as crazy expensive as laser cut acrylic, we decided to make our own.</div></div>
+				
+					<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/3d-printed-warp-lanes-tiles/" title="3-player game setup using the hyperlane tiles" class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/3d-printed-warp-lanes-tiles/20240131_190300.jpg?v=2');"><span class="bottom-title">Twilight Imperium Fourth Edition</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">We printed these hyperlane tiles to make it easier to setup the Hyperlanes variant if you're playing with 3, 5, or 7 players.</div></div>
+				
+					<div class="project-box"><a href="/projects/starcraft-the-board-game/reference-sheets/" title="Each faction gets their own reference." class="image-thumb " style="background-image: url('/media/i/_thumbnails/starcraft-the-board-game/reference-sheets/FactionReferences.jpg?v=1');"><span class="bottom-title">StarCraft: The Board Game</span></a><div class="blurb">This is a rework of the unit reference from the expansion rulebook and a player reference for each faction's buildings, modules, and orders.</div></div>
+				
+					<div class="project-box"><a href="/projects/tabletop-projects/custom-gaming-table/" title="Our newest gaming table!" class="image-thumb " style="background-image: url('/media/i/_thumbnails/tabletop-projects/custom-gaming-table/2023TableBuild_Final.jpg?v=4');"><span class="bottom-title">Tabletop Projects</span></a><div class="blurb">This is what we came up with for the center of a Venn diagram between "Wants a big fancy gaming table" and "Doesn't want to spend thousands on it".</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-2nd-edition/icon-reference/" title="This reference shows the icons that appear on each expansion's components." class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-2nd-edition/icon-reference/icons.jpg?v=5');"><span class="bottom-title">Runebound Second Edition</span></a><div class="blurb">We made an expansions icon reference sheet so we could easily see which content belongs to what expansion.</div></div>
+				
+					<div class="project-box"><a href="/projects/tyrants-of-the-underdark/deck-descriptions-card/" title="Reference sheet on our printed insert" class="image-thumb " style="background-image: url('/media/i/_thumbnails/tyrants-of-the-underdark/deck-descriptions-card/20240526_141847.jpg?v=3');"><span class="bottom-title">Tyrants of the Underdark</span></a><div class="blurb">We had a crazy hard time finding short descriptions for all of the decks so we created this one to have a handy reference.</div></div>
+				
+					<div class="project-box"><a href="/projects/codex-card-time-strategy/custom-playmat/" title="Our main design goals were to have them fit in the box without rolling/folding, have a low-profile patrol zone, and have a large play area free of clutter and other components." class="image-thumb " style="background-image: url('/media/i/_thumbnails/codex-card-time-strategy/custom-playmat/KelsamTabletop_CodexPlaymat_WebPreview.jpg?v=4');"><span class="bottom-title">Codex: Card-Time Strategy</span><img src="/static/images/nav-patreon-logo.png" class="paid-content-flag" /></a><div class="blurb">Our main design goals were to have them fit in the box without rolling/folding, have a low-profile patrol zone, and have a large play area.</div></div>
+				
+					<div class="project-box"><a href="/projects/world-of-warcraft-the-board-game/errata-fix-it-stickers/" title="We created a few fix-it stickers per the Errata listed in the FAQ." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-board-game/errata-fix-it-stickers/WoWBGFixItStickers.png?v=4');"><span class="bottom-title">World of WarCraft: The Board Game</span></a><div class="blurb">We created a few fix-it stickers per the Errata listed in the FAQ.</div></div>
+				
+					<div class="project-box"><a href="/projects/adrenaline/re-based-miniatures-team-play-flags/" title="These are used in place of the expansion's team bases for our re-based miniatures." class="image-thumb " style="background-image: url('/media/i/_thumbnails/adrenaline/re-based-miniatures-team-play-flags/20240131_173438.jpg?v=2');"><span class="bottom-title">Adrenaline</span></a><div class="blurb">We were unaware of the new expansion's team bases until after our minis were re-based, but made these 3D Printed counterparts that work with our custom bases.</div></div>
+				
+					<div class="project-box"><a href="/projects/legacy-of-dragonholt/story-tracking-sheet/" title="We decided it would be a lot easier to have all our story tracking on one sheet." class="image-thumb " style="background-image: url('/media/i/_thumbnails/legacy-of-dragonholt/story-tracking-sheet/trackingSheet.jpg?v=3');"><span class="bottom-title">Legacy of Dragonholt</span></a><div class="blurb">We don't track the entries that we go through, so we decided it'd be a lot easier to have all our story tracking on one sheet.</div></div>
+				
+					<div class="project-box"><a href="/projects/alchemists/re-usable-deduction-boards/" title="They fit behind the screens but are much easier to handle and write on." class="image-thumb " style="background-image: url('/media/i/_thumbnails/alchemists/re-usable-deduction-boards/pic3410533.jpg?v=1');"><span class="bottom-title">Alchemists</span></a><div class="blurb">We adjusted the sheets, bought some minimal-border picture frames and wet-erase markers, put it all together, and now have reusable boards.</div></div>
+				
+					<div class="project-box"><a href="/projects/hope/unofficial-faq/" title="The document folds into a booklet" class="image-thumb " style="background-image: url('/media/i/_thumbnails/hope/unofficial-faq/pic6688572.jpg?v=4');"><span class="bottom-title">HOPE</span></a><div class="blurb">We had some questions and the only FAQ we could find was in French, so we compiled all the answers we could find into one printable booklet.</div></div>
+				
+					<div class="project-box"><a href="/projects/tabletop-projects/game-storage/" title="We went for two 5x5 shelves and left walls out as needed, knowing that we could add shelving on the side/top if we needed it." class="image-thumb " style="background-image: url('/media/i/_thumbnails/tabletop-projects/game-storage/shelfie-2022.jpg?v=2');"><span class="bottom-title">Tabletop Projects</span></a><div class="blurb">We store most of our games vertically on IKEA Kallax shelves  for ease of access and reset during cleanup so they set up faster.</div></div>
+				
+					<div class="project-box"><a href="/projects/warcraft-the-board-game/first-player-token/" title="This token serves to mark the first player when we play." class="image-thumb " style="background-image: url('/media/i/_thumbnails/warcraft-the-board-game/first-player-token/wcBgFirstPlayerToken.jpg?v=3');"><span class="bottom-title">WarCraft: The Board Game</span></a><div class="blurb">We wanted to have a token to track the first player, so we tossed this one together.</div></div>
+				
+					<div class="project-box"><a href="/projects/chaostle/character-skills-stickers/" title="The skill stickers are printed and placed on the backs of the character cards for reference." class="image-thumb " style="background-image: url('/media/i/_thumbnails/chaostle/character-skills-stickers/IMAG0959.jpg?v=2');"><span class="bottom-title">Chaostle</span></a><div class="blurb">This is our approach to character skill reference labels. They are designed to be  adhered to the backs of your character cards.</div></div>
+				
+					<div class="project-box"><a href="/projects/tabletop-projects/do-something-marker/" title="We wanted something a little easier to pass around so we made this." class="image-thumb " style="background-image: url('/media/i/_thumbnails/tabletop-projects/do-something-marker/doSomethingModel.png?v=1');"><span class="bottom-title">Tabletop Projects</span></a><div class="blurb">We originally created this to replace a marker in Magic Maze, but it's so great for passing around that we now use it as a generic first person or turn marker.</div></div>
+				
+					<div class="project-box"><a href="/projects/alchemists/improved-cauldron-shelves/" title="We replaced the little shelf with a much larger foam-core one." class="image-thumb " style="background-image: url('/media/i/_thumbnails/alchemists/improved-cauldron-shelves/shelf.jpg?v=2');"><span class="bottom-title">Alchemists</span></a><div class="blurb">We didn't like playing on the shallow shelf that folds out of the cauldron pieces, so we made deeper shelves out of a bit of foam core.</div></div>
+				
+					<div class="project-box"><a href="/projects/earth-reborn/vacuum-tray-model/" title="" class="image-thumb " style="background-image: url('/media/i/_thumbnails/earth-reborn/vacuum-tray-model/vacuumTray3dModel.jpg?v=1');"><span class="bottom-title">Earth Reborn</span></a><div class="blurb">We drafted a 3D model of the vacuum insert tray based on the measurements file from Ludically.</div></div>
+				
+			
+				<div class="title">Apps</div>
+				
+					<div class="project-box"><a href="/projects/star-wars-rebellion/empire-map-companion-app/" title="There are options to mark systems that have been explored by probe droid (black), by other means such as loyalty, subjugation, or intel (blue), and flag systems (red, not pictured)." class="image-thumb " style="background-image: url('/media/i/_thumbnails/star-wars-rebellion/empire-map-companion-app/rebellionCompanionAppScreenshot.jpg?v=5');"><span class="bottom-title">Star Wars: Rebellion</span></a><div class="blurb">We created a companion app for Rebellion because we wanted a cleaner look and simpler experience for imperial map tracking.</div></div>
+				
+					<div class="project-box"><a href="/projects/betrayal-at-house-on-the-hill/explorer-trait-companion-app/" title="Select your Explorer when you load and it will set starting values, then you can just move them as needed." class="image-thumb " style="background-image: url('/media/i/_thumbnails/betrayal-at-house-on-the-hill/explorer-trait-companion-app/betrayalApp.jpg?v=4');"><span class="bottom-title">Betrayal at House on the Hill</span></a><div class="blurb">We had a hard time with the sliders the game uses for Explorer Traits and figured a simple companion app would be a good solution.</div></div>
+				
+					<div class="project-box"><a href="/projects/world-of-warcraft-the-board-game/combat-companion-app/" title="All the combat steps are the same, but the app manages monster stats and handles the tiny tokens." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-board-game/combat-companion-app/wowCombatApp.png?v=2');"><span class="bottom-title">World of WarCraft: The Board Game</span></a><div class="blurb">This app makes the dice and token combat system virtual. It's easier, less management, takes up less table space, and there are no tiny tokens to handle.</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-2nd-edition/custom-hero-card-generator/" title="Fill in the top and watch your card form as you type!" class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-2nd-edition/custom-hero-card-generator/heroCardMaker.jpg?v=3');"><span class="bottom-title">Runebound Second Edition</span></a><div class="blurb">This is a simple web app allowing players to create custom hero cards. Watch your own custom hero cards form as you type!</div></div>
+				
+					<div class="project-box"><a href="/projects/twilight-imperium-fourth-edition/ti4-companion-app/" title="Player stats are shown at the top for quick reference." class="image-thumb " style="background-image: url('/media/i/_thumbnails/twilight-imperium-fourth-edition/ti4-companion-app/Ti4CompanionAppKelsamTabletopOG.jpg?v=2');"><span class="bottom-title">Twilight Imperium Fourth Edition</span></a><div class="blurb">Our TI4 games have overtaken our massive table. We designed this app to manage the planet and tech cards taking over our play areas.</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-3rd-edition/token-caster-companion-app/" title="" class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-3rd-edition/token-caster-companion-app/tokenCasterFeatured.png?v=3');"><span class="bottom-title">Runebound Third Edition</span></a><div class="blurb">Using this app you can manage and cast your hero's base tokens, any tokens you get from cards, and even enemy tokens.</div></div>
+				
+					<div class="project-box"><a href="/projects/mage-wars/deck-builder-app/" title="This is the proof-of-concept for our abandoned Deck Builder App" class="image-thumb " style="background-image: url('/media/i/_thumbnails/mage-wars/deck-builder-app/openingBook.jpg?v=3');"><span class="bottom-title">Mage Wars</span></a><div class="blurb">We started this Spellbook Builder App, but it was never completed. This is the proof of concept.</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-2nd-edition/market-variant-setup-app/" title="This app shows which deck(s) each town's market cards should be drawn from, white should be face-down and yellow should be face-up." class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-2nd-edition/market-variant-setup-app/setupAid_kphtHY5.jpg?v=5');"><span class="bottom-title">Runebound Second Edition</span></a><div class="blurb">We made this tool to ease the game's setup when using our Market Variant, it randomizes the markets.</div></div>
+				
+					<div class="project-box"><a href="/projects/legacy-of-dragonholt/character-sheet-generator/" title="All fields are editable and you can add your own pictures." class="image-thumb " style="background-image: url('/media/i/_thumbnails/legacy-of-dragonholt/character-sheet-generator/charSheet.jpg?v=3');"><span class="bottom-title">Legacy of Dragonholt</span></a><div class="blurb">We wanted to have nice character sheets so we whipped up a web app. Just fill out the page, add a picture, and print.</div></div>
+				
+					<div class="project-box"><a href="/projects/world-of-warcraft-the-board-game/dice-tracker-companion-app/" title="This app's main goal is to allow players to keep a count of any dice they get without spending resources when they achieve higher levels." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-board-game/dice-tracker-companion-app/wow-bg-app.jpg?v=4');"><span class="bottom-title">World of WarCraft: The Board Game</span></a><div class="blurb">This app's main goal is to allow players to keep a count of any dice they get without spending resources when they achieve higher levels.</div></div>
+				
+					<div class="project-box"><a href="/projects/ricochet-robots/set-up-and-timer-companion-app/" title="This tool will guarantee a randomized setup and has a handy 60 second timer for use during gameplay." class="image-thumb " style="background-image: url('/media/i/_thumbnails/ricochet-robots/set-up-and-timer-companion-app/setupAndTimerApp.jpg?v=3');"><span class="bottom-title">Ricochet Robots</span></a><div class="blurb">This was our first tabletop-related piece of software. This tool will guarantee a randomized setup and has a handy 60 second timer to use during gameplay.</div></div>
+				
+					<div class="project-box"><a href="/projects/mage-wars/stats-tracker-companion-app/" title="We built a companion app for mage wars to replace the stats tracking board." class="image-thumb " style="background-image: url('/media/i/_thumbnails/mage-wars/stats-tracker-companion-app/Screenshot_2024-01-26_195900.png?v=3');"><span class="bottom-title">Mage Wars</span></a><div class="blurb">This companion app replaces the Stats Tracking Board. It can track damage, base health value, channeling value, and spending resources.</div></div>
+				
+					<div class="project-box"><a href="/projects/tabletop-projects/kelsam-score-keeper-app/" title="" class="image-thumb " style="background-image: url('/media/i/_thumbnails/tabletop-projects/kelsam-score-keeper-app/ScoreKeeperFeaturedImage.png?v=2');"><span class="bottom-title">Tabletop Projects</span></a><div class="blurb">This is the score keeper we made for simple games that just need to track player scores.</div></div>
+				
+			
+				<div class="title">Variants</div>
+				
+					<div class="project-box"><a href="/projects/worms-the-board-game/clarifications-house-rules/" title="This variant serves to increase the mayhem in our worms battles with advanced prodding, varying Starters, and increased scatter on blasting :)" class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/clarifications-house-rules/WormsHouseRulesAndClarificationsCard.png?v=5');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game</span></a><div class="blurb">This variant serves to increase the mayhem in our Worms battles!</div></div>
+				
+					<div class="project-box"><a href="/projects/world-of-warcraft-the-board-game/fully-cooperative-variant/" title="If you're playing with 2 or 3 people, you can simply all play on the same faction and ignore the existence of the other faction - sorta." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-board-game/fully-cooperative-variant/worldOfWarcraftBoardGameFul_bb3EHrC.jpg?v=2');"><span class="bottom-title">World of WarCraft: The Board Game</span></a><div class="blurb">We have found that it is better to play this game fully cooperatively instead of as 2 factions. It's faster, more exciting, and has less downtime.</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-2nd-edition/rule-variants/" title="These rule variants are designed to streamline gameplay and make it much, much faster." class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-2nd-edition/rule-variants/Runebound2ndRulesVariant.png?v=5');"><span class="bottom-title">Runebound Second Edition</span></a><div class="blurb">These rule variants are designed to streamline gameplay and make it much, much faster.  Faster level ups, item acquisition, and nerfed knock outs.</div></div>
+				
+					<div class="project-box"><a href="/projects/starcraft-the-board-game/missions-variant/" title="This variant is designed to force players to wage war and to remove &quot;camp and build&quot; options." class="image-thumb " style="background-image: url('/media/i/_thumbnails/starcraft-the-board-game/missions-variant/missions.jpg?v=4');"><span class="bottom-title">StarCraft: The Board Game</span></a><div class="blurb">This variant is designed to force players to wage war and limit "camp and build" strategies.</div></div>
+				
+					<div class="project-box"><a href="/projects/world-of-warcraft-the-adventure-game/rules-variants/" title="Cover the space between Undercity and Commander Mograine for balance reasons." class="image-thumb " style="background-image: url('/media/i/_thumbnails/world-of-warcraft-the-adventure-game/rules-variants/IMAG0968.jpg?v=3');"><span class="bottom-title">World of WarCraft: The Adventure Game</span></a><div class="blurb">For balance reasons we removed a space near Undercity and are restricting the use of Grumbaz Crowsblood to solo play.</div></div>
+				
+					<div class="project-box"><a href="/projects/dd-adventure-board-games/puppets-of-the-balor-campaign/" title="This is the adventure book that we designed for our campaign." class="image-thumb " style="background-image: url('/media/i/_thumbnails/dd-adventure-board-games/puppets-of-the-balor-campaign/puppets.jpg?v=4');"><span class="bottom-title">D&D Adventure Board Games</span></a><div class="blurb">We wanted to construct our own campaign-style game involving all of our D&D games. The result is this adventure book for the first four games.</div></div>
+				
+					<div class="project-box"><a href="/projects/mage-knight-board-game/rule-variants/" title="These variants are designed to speed up gameplay, allow players to level faster, and make taking wounds less of a setback." class="image-thumb " style="background-image: url('/media/i/_thumbnails/mage-knight-board-game/rule-variants/mage_knight_kelsam_variants.jpg?v=4');"><span class="bottom-title">Mage Knight Board Game</span></a><div class="blurb">Much like our variants for Runebound 2nd Edition, these variants are designed to speed up gameplay, allow players to level faster, and nerf taking wounds.</div></div>
+				
+					<div class="project-box"><a href="/projects/runebound-2nd-edition/market-variant/" title="This is our custom market board printed by TheGameCrafter." class="image-thumb " style="background-image: url('/media/i/_thumbnails/runebound-2nd-edition/market-variant/marketBoard.jpg?v=5');"><span class="bottom-title">Runebound Second Edition</span></a><div class="blurb">This is our approach to a wildly improved market mechanic. Instead of a single market stack, you have six distinct shops.</div></div>
+				
+					<div class="project-box"><a href="/projects/chaostle/rules-variants/" title="This variant serves to bring a bit more balance to gameplay and speed it up a great deal." class="image-thumb " style="background-image: url('/media/i/_thumbnails/chaostle/rules-variants/chaostleVariant.png?v=4');"><span class="bottom-title">Chaostle</span></a><div class="blurb">This variant serves to bring a bit more balance to gameplay and speed it up a great deal. At least 1d10 (one 10 sided die) is required to use these variants.</div></div>
+				
+					<div class="project-box"><a href="/projects/mystery-at-hogwarts/rule-variants/" title="These variants are designed to clarify rules, plug rule holes, etc." class="image-thumb " style="background-image: url('/media/i/_thumbnails/mystery-at-hogwarts/rule-variants/MysteryAtHogwartsVariants.png?v=4');"><span class="bottom-title">Harry Potter: Mystery at Hogwarts</span></a><div class="blurb">These variants are designed to clarify rules, plug rule holes, etc.</div></div>
+				
+			
+				<div class="title">Painted Miniatures</div>
+				
+					<div class="project-box"><a href="/projects/worms-the-board-game/collectors-edition-painted-minis/" title="This is the teams breakdown with black bases being our display worms. Each team's primary worms are the four in front." class="image-thumb " style="background-image: url('/media/i/_thumbnails/worms-the-board-game/collectors-edition-painted-minis/AllWorms.png?v=2');"><span class="new-flag">NEW</span><span class="bottom-title">Worms: The Board Game</span></a><div class="blurb">The Collector's Edition came with a ton of worms so we've split them into teams and selected some for display.</div></div>
+				
+					<div class="project-box"><a href="/projects/adrenaline/painted-minis/" title="All the heroes" class="image-thumb " style="background-image: url('/media/i/_thumbnails/adrenaline/painted-minis/all.jpg?v=3');"><span class="bottom-title">Adrenaline</span></a><div class="blurb">This was a fun set with a lot of the characters having little decals.</div></div>
+				
+					<div class="project-box"><a href="/projects/mansions-of-madness-second-edition/painted-minis/" title="We added a foam-core insert to store the minis on shelves in the box." class="image-thumb " style="background-image: url('/media/i/_thumbnails/mansions-of-madness-second-edition/painted-minis/IMAG1132.jpg?v=3');"><span class="bottom-title">Mansions of Madness Second Edition</span></a><div class="blurb">These are the first miniatures we ever painted. We painted a couple investigators and all of the monsters from the base game and several expansions.</div></div>
+				
+					<div class="project-box"><a href="/projects/drakon/painted-minis/" title="All minis" class="image-thumb " style="background-image: url('/media/i/_thumbnails/drakon/painted-minis/MiniAll.jpg?v=2');"><span class="bottom-title">Drakon</span></a><div class="blurb">For these miniatures we tried to stay in a standardized color scheme across all characters so they would look like a set.</div></div>
+				
+			
+				<div class="title">Quick Start Guide</div>
+				
+					<div class="project-box"><a href="/projects/seti-search-for-extraterrestrial-intelligence/quick-start-guide/" title="4 Player Setup" class="image-thumb " style="background-image: url('/media/i/_thumbnails/seti-search-for-extraterrestrial-intelligence/quick-start-guide/SETISetupPic.jpg?v=1');"><span class="bottom-title">SETI: Search for Extraterrestrial Intelligence</span></a><div class="blurb">Learn the game and start playing in about 30 minutes.</div></div>
+				
+					<div class="project-box"><a href="/projects/adrenaline/quick-start-guide/" title="4 Player Setup" class="image-thumb " style="background-image: url('/media/i/_thumbnails/adrenaline/quick-start-guide/20240530_200744.jpg?v=1');"><span class="bottom-title">Adrenaline</span></a><div class="blurb">Follow the setup rules, watch an 8 minute video, read a few additional notes and you're ready to play.</div></div>
+				
+			
+
+		
+	</div>
+	
+	
+
+
+				<div class="clear"></div>
+			</main>
+
+			<footer>
+				<a href="https://kelsam.net/" target="_blank" class="kelsamNet">
+					<span>K</span>
+					<span>E</span>
+					<span>L</span>
+					<span>S</span>
+					<span>A</span>
+					<span>M</span>
+					<span>.</span>
+					<span>N</span>
+					<span>E</span>
+					<span>T</span>
+				</a>
+
+				<div class="footerLinks">
+					<div class="socials">
+						<a href="https://boardgamegeek.com/user/Kelsam" target="_blank"><img src="/static/images/nav-bgg-logo.png" /></a>
+						<!-- a href="https://www.facebook.com/KelsamTabletop/" target="_blank"><img src="/static/images/nav-fb-logo.png" /></a -->
+						<a href="https://www.youtube.com/channel/UCmi3Q7Rj7V9AR2cJIzIfvqA/videos" target="_blank"><img src="/static/images/nav-yt-logo.png" /></a>
+						<a href="https://www.patreon.com/kelsam" target="_blank"><img src="/static/images/nav-patreon-logo.png" /></a>
+					</div>
+
+					<span>&nbsp;</span>
+
+					<a href="https://kelsam.net/about/" target="_blank">About</a>
+
+					<span>&nbsp;</span>
+
+					<a href="https://kelsam.net/contact/" target="_blank">Contact</a>
+
+					<span>&nbsp;</span>
+
+					<a href="https://kelsam.net/privacy-policy/" target="_blank">Privacy</a>
+
+					<span>&nbsp;</span>
+
+					<a href="/commercial-use/">Commercial Use</a>
+				</div>
+
+				<a href="https://kelsam.net/subscribe/?subscription=2" target="_blank" class="btn subscribe-btn">Subscribe</a>
+				
+				<div class="footerText">Want to be notified when we add new content?</div>
+
+				<div class="clear"></div>
+			</footer>
+		</div>
+	</body>
+</html>
