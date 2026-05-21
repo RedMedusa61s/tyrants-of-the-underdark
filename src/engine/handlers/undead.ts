@@ -13,10 +13,12 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          assassinateChoice, deployChoice, supplantChoice, chooseOne,
          returnOwnSpyChoice, returnEnemyTroopOrSpyChoice,
          devourFromHandCost, optionalDevourSelfThen, devourSelfThen,
-         marketDevourReplaceWithSelf,
+         marketDevourReplaceWithSelf, takeTrophyAndPlace,
+         recruitFromMarketFiltered,
          conditionalGrant, promoteFromDiscardChoice,
          assassinateAtLastPlacedSpySite,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
+import { TROOP_SPACES } from '../../data/troop-spaces';
 import { totalTrophies } from '../../game';
 
 registerAll({
@@ -70,11 +72,23 @@ registerAll({
                            { label: 'Devour this → assassinate up to 3 white troops at one site',
                              handler: devourSelfThen(times(3, assassinateChoice({ whiteOnly: true }))) }),
 
-  // Cost 4 — Banshee: spy + bonus if another spy already at that site.
-  //   The "bonus" is +3 power. ifAnotherSpyAtLastPlacedSpySite isn't
-  //   built yet; approximate with unconditional +1 power as a small
-  //   consolation. TODO.
-  'banshee':             sequence(placeSpyAtChosenSite(), grant({ power: 1 })),
+  // Cost 4 — Banshee: spy + "if there is another spy there, +3 attack."
+  //   "Another spy" = any spy other than the one we just placed (incl.
+  //   our own from an earlier turn, per a literal read of the printed
+  //   text). Check spies count at the last-placed site after our placement;
+  //   length > 1 means at least one was already there.
+  'banshee':             sequence(
+                           placeSpyAtChosenSite(),
+                           (ctx => {
+                             const siteId = (ctx.G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite;
+                             if (!siteId) return true;
+                             const spies = ctx.G.spies[siteId] ?? [];
+                             if (spies.length > 1) {
+                               ctx.G.players[ctx.actorId].power += 3;
+                               ctx.G.log.push(`P${Number(ctx.actorId) + 1} +3 Power from Banshee (another spy at ${siteId})`);
+                             }
+                             return true;
+                           })),
   // Cost 4 — Ogre Zombie: supplant a white troop anywhere
   'ogre-zombie':         supplantChoice({ whiteOnly: true, anywhere: true }),
   // Cost 4 — Revenant: assassinate 2 troops; if you have 8+ trophies,
@@ -125,13 +139,16 @@ registerAll({
                          }),
 
   // Cost 5 — Conjurer: chooseOne(place spy, return spy → recruit up to 2
-  //   cards of cost ≤3). "Recruit up to 2" approximated as a sequence
-  //   that surfaces market-pick twice, max cost 3 filter not enforced.
-  //   TODO: aspect+cost-filtered recruit prompt with optional decline.
+  //   cards of cost ≤3). Uses recruitFromMarketFiltered twice with
+  //   maxCost=3, optional declines.
   'conjurer':            chooseOne(
                            { label: 'Place a spy', handler: placeSpyAtChosenSite() },
-                           { label: 'Return a spy → +3 influence (recruit ≤3 TBD)',
-                             handler: sequence(returnOwnSpyChoice(), grant({ influence: 3 })),
+                           { label: 'Return a spy → free-recruit up to 2 cards (cost ≤3)',
+                             handler: sequence(
+                               returnOwnSpyChoice(),
+                               recruitFromMarketFiltered({ maxCost: 3 }),
+                               recruitFromMarketFiltered({ maxCost: 3 }),
+                             ),
                              available: playerHasOwnSpy }),
   // Cost 5 — Necromancer: chooseOne(+3 money, promote-from-discard OR
   //   promote-this OR promote-from-hand). Promote-from-discard is the
@@ -158,13 +175,13 @@ registerAll({
                              }
                              return true;
                            })),
-  // Cost 6 — Mummy Lord: assassinate a white + take a white trophy from
-  //   another player. Trophy-stealing is reused from takeTrophyAndPlace
-  //   in a future iteration. For now: assassinate white + +1 VP as a
-  //   placeholder for the second half.
-  'mummy-lord':          sequence(
-                           assassinateChoice({ whiteOnly: true }),
-                           (ctx => { ctx.G.players[ctx.actorId].vp += 1; ctx.G.log.push(`P${Number(ctx.actorId) + 1} +1 VP from Mummy Lord (trophy-steal TBD)`); return true; })),
+  // Cost 6 — Mummy Lord: choose twice: assassinate a white troop, OR
+  //   take a white trophy from another player and place it. We surface
+  //   the choice menu twice (the player can do either action, or both,
+  //   or both-the-same).
+  'mummy-lord':          times(2, chooseOne(
+                           { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }) },
+                           { label: 'Take a trophy and place it', handler: takeTrophyAndPlace({ count: 1 }) })),
   // Cost 6 — High Priest of Myrkul: return another player's troop or spy
   //   + eot promote (Undead aspect filter — but Undead aspect varies on
   //   cards in this deck so we leave unrestricted for now).
@@ -186,40 +203,33 @@ registerAll({
                                  }
                                  return true;
                                })) }),
-  // Cost 7 — Lich: spy + if another player has a troop at that site,
-  //   take 2 troops from their trophy hall and deploy them. The
-  //   trophy-steal-and-redeploy is a novel mechanic. Approximate the
-  //   bonus: +2 power + return one enemy troop/spy when an opponent's
-  //   troop is at the spy site.
+  // Cost 7 — Lich: place a spy. If another player has a troop at that
+  //   site, take 2 trophies from their hall and deploy them (as their
+  //   original colors). Reuses takeTrophyAndPlace for the second half.
+  //   The card text says "from THEIR trophy hall" (specifically the
+  //   player with a troop at the spy site); our approximation lets
+  //   the player pick any trophy from any opponent — strategically
+  //   close in 2P, slightly more permissive in 3P/4P.
   'lich':                sequence(
                            placeSpyAtChosenSite(),
-                           // Conditional bonus: another player's troop at last-placed spy site.
                            (ctx => {
                              const G = ctx.G;
                              const siteId = (G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite;
                              if (!siteId) return true;
                              const me = G.players[ctx.actorId];
-                             // Check if any opponent has a troop there.
+                             // Any opponent with a troop at the spy site?
                              let opponentPresent = false;
-                             for (const [pid, p] of Object.entries(G.players)) {
-                               if (pid === ctx.actorId) continue;
-                               for (const arr of Object.values(G.troops)) {
-                                 void arr;
-                               }
-                               // Use TROOP_SPACES via map-state? Simpler: scan G.troops by site.
-                               // Inline scan: any space at this site occupied by this opponent's color.
-                               for (const [spaceId, occ] of Object.entries(G.troops)) {
-                                 if (occ !== p.color) continue;
-                                 if (!spaceId.startsWith(siteId)) continue;
+                             for (const sp of TROOP_SPACES.filter(t => t.parentSite === siteId)) {
+                               const occ = G.troops[sp.id];
+                               if (occ && occ !== me.color && occ !== 'white') {
                                  opponentPresent = true;
                                  break;
                                }
-                               if (opponentPresent) break;
+                               void me; // keep TS happy when only the test runs
                              }
                              if (!opponentPresent) return true;
-                             me.power += 2;
-                             G.log.push(`P${Number(ctx.actorId) + 1} +2 Power from Lich (opponent troop at ${siteId}; trophy-steal-deploy TBD)`);
-                             return true;
+                             // Trigger the trophy-take-and-place flow inline.
+                             return takeTrophyAndPlace({ count: 2 })(ctx);
                            })),
 });
 

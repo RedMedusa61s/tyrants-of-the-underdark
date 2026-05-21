@@ -994,7 +994,7 @@ export function promoteTopOfDeck(opts?: { count?: number }): EffectHandler {
 // Surfaces a market picker filtered to slots matching aspect + cost cap. Recruit is
 // free (no influence spent).
 
-export function recruitFromMarketFiltered(opts: { aspect: string; maxCost: number }): EffectHandler {
+export function recruitFromMarketFiltered(opts: { aspect?: string; maxCost: number }): EffectHandler {
   return ctx => {
     if (!ctx.pendingChoice) {
       const eligible: number[] = [];
@@ -1003,14 +1003,15 @@ export function recruitFromMarketFiltered(opts: { aspect: string; maxCost: numbe
         if (!c) continue;
         const data = lookupCard(c.deck, c.slot);
         if (!data) continue;
-        if (data.aspect.toLowerCase() !== opts.aspect.toLowerCase()) continue;
+        if (opts.aspect && data.aspect.toLowerCase() !== opts.aspect.toLowerCase()) continue;
         if (data.cost > opts.maxCost) continue;
         eligible.push(i);
       }
       if (eligible.length === 0) return true;
+      const label = opts.aspect ? `${opts.aspect} card` : 'card';
       ctx.pendingChoice = {
         kind: 'select-market-card',
-        prompt: `Recruit a ${opts.aspect} card costing ≤${opts.maxCost} (free).`,
+        prompt: `Recruit a ${label} costing ≤${opts.maxCost} (free).`,
         options: eligible,
         optional: true,
       } as PendingChoice;
@@ -1832,6 +1833,42 @@ export function conditionalGrant(
   };
 }
 
+// ---------- Reactive-on-forced-discard ----------
+//
+// Some Aberrations cards (Grimlock, Umber Hulk, Ambassador) print a
+// reactive bonus that fires when an OPPONENT's effect forces you to
+// discard the card from your hand. The reactive runs in the context of
+// the discarded card's OWNER, with the offending player also in scope
+// (e.g. Umber Hulk forces the offender to discard one back). The discard
+// helpers below fire the reactive via fireForcedDiscardReactive() right
+// after pushing the card to discard.
+
+type ReactiveOnForcedDiscard = (
+  G: import('../game').TyrantsState,
+  ownerPid: string,
+  offenderPid: string
+) => void;
+
+const onForcedDiscardHandlers: Record<string, ReactiveOnForcedDiscard> = {};
+
+export function registerOnForcedDiscard(effectKey: string, handler: ReactiveOnForcedDiscard): void {
+  onForcedDiscardHandlers[effectKey] = handler;
+}
+
+function fireForcedDiscardReactive(
+  G: import('../game').TyrantsState,
+  card: CardRef,
+  ownerPid: string,
+  offenderPid: string,
+): void {
+  const data = lookupCard(card.deck, card.slot);
+  if (!data) return;
+  const reactive = onForcedDiscardHandlers[data.effectKey];
+  if (!reactive) return;
+  try { reactive(G, ownerPid, offenderPid); }
+  catch (e) { Mechanics.log(G, `(forced-discard reactive on ${data.name} errored: ${e})`); }
+}
+
 // ---------- Aberrations expansion: discard-from-opponents ----------
 //
 // Aberrations' theme is forcing opponents to discard from their hand. The
@@ -1857,6 +1894,7 @@ export function eachOpponentDiscardsIfMinHand(minHand: number = 3): EffectHandle
       p.hand.splice(idx, 1);
       p.discard.push(card);
       Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced)`);
+      fireForcedDiscardReactive(ctx.G, card, pid, ctx.actorId);
     }
     return true;
   };
@@ -1895,6 +1933,32 @@ export function chooseOpponentToDiscard(minHand: number = 3): EffectHandler {
     target.hand.splice(idx, 1);
     target.discard.push(card);
     Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced)`);
+    fireForcedDiscardReactive(ctx.G, card, pid, ctx.actorId);
+    return true;
+  };
+}
+
+/** Force the OWNER of a specific color (typically the player whose troop
+ *  was just killed) to discard a card from hand if they have at least
+ *  `minHand`. Used by Mindwitness — its discard targets the player whose
+ *  troop the Mindwitness just assassinated, not an arbitrary opponent. */
+export function forcePlayerOfColorToDiscardIfMinHand(
+  color: import('../game').Color | 'white',
+  actorPid: string,
+  minHand: number = 3,
+): EffectHandler {
+  return ctx => {
+    if (color === 'white') return true; // white troops aren't owned by a player
+    const targetPid = Object.keys(ctx.G.players).find(k => ctx.G.players[k].color === color);
+    if (!targetPid || targetPid === actorPid) return true;
+    const target = ctx.G.players[targetPid];
+    if (target.hand.length < minHand) return true;
+    const idx = target.hand.length - 1;
+    const card = target.hand[idx];
+    target.hand.splice(idx, 1);
+    target.discard.push(card);
+    Mechanics.log(ctx.G, `P${Number(targetPid) + 1} discarded ${card.name} (forced; troop killed)`);
+    fireForcedDiscardReactive(ctx.G, card, targetPid, actorPid);
     return true;
   };
 }
@@ -1923,6 +1987,7 @@ export function eachOpponentAtLastSpySiteDiscardsIfMinHand(minHand: number = 3):
       p.hand.splice(idx, 1);
       p.discard.push(card);
       Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced; troop at ${siteId})`);
+      fireForcedDiscardReactive(ctx.G, card, pid, ctx.actorId);
     }
     return true;
   };

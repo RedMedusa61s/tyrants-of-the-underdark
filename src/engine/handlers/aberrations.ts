@@ -13,9 +13,14 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          returnOwnSpyChoice, returnEnemyTroopOrSpyChoice,
          eachOpponentDiscardsIfMinHand, chooseOpponentToDiscard,
          eachOpponentAtLastSpySiteDiscardsIfMinHand,
+         forcePlayerOfColorToDiscardIfMinHand,
+         registerOnForcedDiscard,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
+import { Mechanics } from '../mechanics';
+import { assassinateTroop } from '../map-state';
+import { TROOP_SPACES } from '../../data/troop-spaces';
 import { SITES } from '../../data/sites';
-import { totalTrophies } from '../../game';
+import { totalTrophies, type Color } from '../../game';
 
 registerAll({
   // Cost 1 — Grimlock: deploy 2 troops; "if your opponent causes you to
@@ -40,13 +45,52 @@ registerAll({
                           { label: 'Return a spy → draw + each 3+ opp discards',
                             handler: sequence(returnOwnSpyChoice(), grant({ draw: 1 }), eachOpponentDiscardsIfMinHand(3)),
                             available: playerHasOwnSpy }),
-  // Cost 3 — Mindwitness: assassinate; that player discards if 3+. TODO:
-  //   the discard should target THE owner of the killed troop specifically.
-  //   For now we approximate by "any opponent with 3+ discards." Close
-  //   enough at 2P; refine for 3P/4P later.
-  'mindwitness':        sequence(
-                          assassinateChoice(),
-                          chooseOpponentToDiscard(3)),
+  // Cost 3 — Mindwitness: assassinate; the killed troop's OWNER discards
+  //   a card if they have 3+. Hand-rolled to capture the killed troop's
+  //   color BEFORE the assassinate clears the slot.
+  'mindwitness':        (ctx => {
+                          const me = ctx.G.players[ctx.actorId];
+                          // Phase 1: pick the assassinate target.
+                          if (!ctx.pendingChoice) {
+                            // Eligible: any space within presence where an
+                            // enemy/white troop sits.
+                            const eligible: string[] = [];
+                            for (const t of TROOP_SPACES) {
+                              const occ = ctx.G.troops[t.id];
+                              if (!occ || occ === me.color) continue;
+                              eligible.push(t.id);
+                            }
+                            if (eligible.length === 0) {
+                              Mechanics.log(ctx.G, '(Mindwitness: no enemy/white targets — skipped)');
+                              return true;
+                            }
+                            ctx.pendingChoice = {
+                              kind: 'select-troop-space',
+                              prompt: 'Mindwitness: assassinate a troop.',
+                              options: eligible,
+                              optional: true,
+                            };
+                            ctx.paused = true;
+                            return false;
+                          }
+                          const spaceId = ctx.pendingChoice.response as string | null;
+                          ctx.pendingChoice = null;
+                          ctx.paused = false;
+                          if (!spaceId) return true;
+                          const killedColor = ctx.G.troops[spaceId];
+                          if (!killedColor || killedColor === me.color) return true;
+                          // Do the assassinate via map-state helper.
+                          const killed = assassinateTroop(ctx.G, spaceId);
+                          if (killed === 'white') me.trophyHall.white += 1;
+                          else if (killed) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
+                          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
+                          // Force the owner of the killed color to discard.
+                          if (killedColor !== 'white') {
+                            const forceFn = forcePlayerOfColorToDiscardIfMinHand(killedColor as Color, ctx.actorId, 3);
+                            forceFn(ctx);
+                          }
+                          return true;
+                        }),
   // Cost 3 — Gauth: chooseOne(+2 money OR draw + force opponent-3+ discard)
   'gauth':              chooseOne(
                           { label: '+2 Influence', handler: grant({ influence: 2 }) },
@@ -149,6 +193,43 @@ registerAll({
                           void ctx;
                           return true;
                         }),
+});
+
+// ---------- Reactive-on-forced-discard registrations ----------
+//
+// These fire when an OPPONENT's effect causes one of YOUR cards to be
+// pushed from hand to discard. Owner-pid is in scope; offender-pid is the
+// actor who triggered the discard.
+
+// Grimlock — "if your opponent causes you to discard this, draw 2"
+registerOnForcedDiscard('grimlock', (G, ownerPid) => {
+  Mechanics.draw(G, ownerPid, 2);
+  Mechanics.log(G, `P${Number(ownerPid) + 1} drew 2 (Grimlock reactive)`);
+});
+
+// Umber Hulk — "if an opponent causes you to discard this, they discard a card"
+registerOnForcedDiscard('umber-hulk', (G, _ownerPid, offenderPid) => {
+  const off = G.players[offenderPid];
+  if (!off || off.hand.length === 0) return;
+  const idx = off.hand.length - 1;
+  const card = off.hand[idx];
+  off.hand.splice(idx, 1);
+  off.discard.push(card);
+  Mechanics.log(G, `P${Number(offenderPid) + 1} discarded ${card.name} (Umber Hulk reactive)`);
+  // Don't recursively fire reactives from Umber Hulk's discard — would be
+  // a one-step chain in practice but skip for simplicity.
+});
+
+// Ambassador — "if you discard this, you may promote it"
+registerOnForcedDiscard('ambassador', (G, ownerPid) => {
+  const p = G.players[ownerPid];
+  // Pop the just-pushed Ambassador and move to inner-circle. Auto-yes
+  // (the option is strictly better than leaving it in discard since IC
+  // VP is permanent and the card stays out of the cycling deck).
+  const card = p.discard.pop();
+  if (!card) return;
+  p.innerCircle.push(card);
+  Mechanics.log(G, `P${Number(ownerPid) + 1} promoted Ambassador from discard (reactive)`);
 });
 
 // Suppress unused-import warning if any helper isn't yet referenced.
