@@ -48,7 +48,8 @@ registerAll({
   'wight':               chooseOne(
                            { label: '+2 Power', handler: grant({ power: 2 }) },
                            { label: 'Devour a hand card → supplant a troop',
-                             handler: devourFromHandCost(supplantChoice()) }),
+                             handler: devourFromHandCost(supplantChoice()),
+                             available: (G, a) => G.players[a].hand.length > 0 }),
   // Cost 3 — Ghost: chooseOne(place spy, return spy → recruit top of
   //   devoured pile as if from market). Devoured pile is tracked
   //   server-side in G.devouredPile (Mechanics.devour pushes to it).
@@ -70,7 +71,8 @@ registerAll({
   'minotaur-skeleton':   chooseOne(
                            { label: 'Deploy 3 troops', handler: deployChoice({ count: 3 }) },
                            { label: 'Devour this → assassinate up to 3 white troops at one site',
-                             handler: devourSelfThen(times(3, assassinateChoice({ whiteOnly: true }))) }),
+                             handler: devourSelfThen(times(3, assassinateChoice({ whiteOnly: true }))),
+                             available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
 
   // Cost 4 — Banshee: spy + "if there is another spy there, +3 attack."
   //   "Another spy" = any spy other than the one we just placed (incl.
@@ -156,8 +158,10 @@ registerAll({
   'necromancer':         chooseOne(
                            { label: '+3 Influence', handler: grant({ influence: 3 }) },
                            { label: 'Promote this card (Necromancer → inner circle)', handler: promoteSelf() },
-                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice({ optional: true }) },
-                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice({ optional: true }) }),
+                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice({ optional: true }),
+                             available: (G, a) => G.players[a].hand.length > 0 },
+                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice({ optional: true }),
+                             available: (G, a) => G.players[a].discard.length > 0 }),
 
   // Cost 6 — Death Knight: supplant a troop + 1 VP per 5 player trophies
   'death-knight':        sequence(
@@ -182,8 +186,17 @@ registerAll({
   //   the choice menu twice (the player can do either action, or both,
   //   or both-the-same).
   'mummy-lord':          times(2, chooseOne(
-                           { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }) },
-                           { label: 'Take a trophy and place it', handler: takeTrophyAndPlace({ count: 1 }) })),
+                           { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }),
+                             available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) },
+                           { label: 'Take a trophy and place it', handler: takeTrophyAndPlace({ count: 1 }),
+                             available: (G, a) => {
+                               // At least one OTHER player must have a white trophy to take.
+                               for (const [pid, p] of Object.entries(G.players)) {
+                                 if (pid === a) continue;
+                                 if ((p.trophyHall.white ?? 0) > 0) return true;
+                               }
+                               return false;
+                             } })),
   // Cost 6 — High Priest of Myrkul: return another player's troop or spy
   //   + eot promote (Undead aspect filter — but Undead aspect varies on
   //   cards in this deck so we leave unrestricted for now).
@@ -194,6 +207,7 @@ registerAll({
   'vampire':             chooseOne(
                            { label: 'Supplant a troop', handler: supplantChoice() },
                            { label: 'Promote from discard + VP-per-3-promoted',
+                             available: (G, a) => G.players[a].discard.length > 0,
                              handler: sequence(
                                promoteFromDiscardChoice({ optional: false }),
                                (ctx => {

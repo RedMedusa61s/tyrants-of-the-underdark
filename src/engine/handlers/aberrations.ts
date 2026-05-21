@@ -15,7 +15,8 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          eachOpponentAtLastSpySiteDiscardsIfMinHand,
          forcePlayerOfColorToDiscardIfMinHand,
          registerOnForcedDiscard, playForeignCard,
-         playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
+         playerHasOwnSpy, playerCanAssassinate,
+         playerCanReturnEnemyTroop, playerCanReturnEnemySpy } from '../handler-helpers';
 import { Mechanics } from '../mechanics';
 import { assassinateTroop } from '../map-state';
 import { TROOP_SPACES } from '../../data/troop-spaces';
@@ -100,11 +101,16 @@ registerAll({
   //   promote it" — reactive part isn't implemented. Eot promote works.
   'ambassador':         flagEotPromote(),
 
-  // Cost 4 — Intellect Devourer: 3 money OR return up to 2 troops/spies
+  // Cost 4 — Intellect Devourer: 3 money OR return up to 2 troops/spies.
+  //   The return-option is gated by `available`: if there are no enemy
+  //   troops you have presence over AND no enemy spies at a site you have
+  //   presence over, only the +3 Influence path is offered.
+  //   (Reported via problem-report #35.)
   'intellect-devourer': chooseOne(
                           { label: '+3 Influence', handler: grant({ influence: 3 }) },
                           { label: 'Return up to 2 troops/spies',
-                            handler: times(2, returnEnemyTroopOrSpyChoice()) }),
+                            handler: times(2, returnEnemyTroopOrSpyChoice()),
+                            available: (G, actorId) => playerCanReturnEnemyTroop(G, actorId) || playerCanReturnEnemySpy(G, actorId) }),
   // Cost 4 — Umber Hulk: deploy 3 + reactive (if-discarded). Deploy fires;
   //   reactive deferred.
   'umber-hulk':         deployChoice({ count: 3 }),
@@ -149,6 +155,13 @@ registerAll({
   'aboleth':            chooseOne(
                           { label: 'Place 2 spies', handler: sequence(placeSpyAtChosenSite(), placeSpyAtChosenSite()) },
                           { label: 'Draw a card for each spy you have on the board',
+                            available: (G, a) => {
+                              const myColor = G.players[a].color;
+                              for (const arr of Object.values(G.spies)) {
+                                if (arr.includes(myColor)) return true;
+                              }
+                              return false;
+                            },
                             handler: (ctx => {
                               const me = ctx.G.players[ctx.actorId];
                               let n = 0;

@@ -344,7 +344,17 @@ export function returnSpy(G: TyrantsState, color: Color, siteId: SiteId): boolea
 
 import { TROOP_SPACES as ALL_TROOP_SPACES } from '../data/troop-spaces';
 const STARTING_BARRACKS_PER_PLAYER = 40;
-const STARTING_WHITE_TOTAL = ALL_TROOP_SPACES.filter(t => t.startsWithWhite).length;
+// Expected white-troop total depends on which board sections are actually in
+// play (2P = center only, 3P = center + one outer, 4P = all three). Spaces in
+// inactive sections are absent from G.troops entirely, so we scope the count
+// to keys present in G.troops at check time. Pre-2026-05 this used a global
+// constant across all sections, which fired a perpetual white-conservation
+// violation in every 2P/3P game.
+function expectedWhiteTotal(G: TyrantsState): number {
+  let n = 0;
+  for (const ts of ALL_TROOP_SPACES) if (ts.startsWithWhite && ts.id in G.troops) n++;
+  return n;
+}
 
 export interface TokenConservationViolation {
   color: string;
@@ -375,7 +385,7 @@ export function checkTokenConservation(G: TyrantsState): TokenConservationViolat
     }
     const barracksSum = Object.values(barracks).reduce((s, n) => s + n, 0);
 
-    const expected = color === 'white' ? STARTING_WHITE_TOTAL : STARTING_BARRACKS_PER_PLAYER;
+    const expected = color === 'white' ? expectedWhiteTotal(G) : STARTING_BARRACKS_PER_PLAYER;
     const actual = onBoard + trophiesSum + barracksSum;
     if (actual !== expected) {
       out.push({

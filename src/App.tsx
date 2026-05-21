@@ -144,6 +144,37 @@ const HOVER_CAPABLE =
 function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; label?: string }) {
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
+  // transformOrigin is recomputed on each hover-enter so the 2.5x enlarge
+  // stays inside the viewport — cards near a screen edge would otherwise
+  // scale outward into invisible space. We clamp the origin fraction
+  // (ox, oy) so the scaled card's bounding box fits within the viewport.
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  // On hover-enter we capture the card's viewport rect + a clamped
+  // transformOrigin. The enlarged card is then rendered as a sibling with
+  // position:fixed at that rect — that escapes any ancestor overflow:auto
+  // (e.g. SplitPlayView's cards section, which was clipping the enlarge).
+  // Per problem-reports #34 (off-screen) and #36 (still clipped after the
+  // first fix that only adjusted transformOrigin).
+  const [hoverGeom, setHoverGeom] = useState<{ rect: DOMRect; origin: string } | null>(null);
+  const computeHoverGeom = () => {
+    const el = cardRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const scale = 2.5;
+    const k = scale - 1;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    // For a card scaled by `scale` around origin fraction ox in [0,1]
+    // (0=left edge of card, 1=right edge), the scaled bounding box's
+    // left = r.left + r.width*ox*(1-scale), right = left + r.width*scale.
+    // Solve left>=0 → ox <= r.left/(r.width*k); right<=vw → ox >= (r.left+r.width*scale-vw)/(r.width*k).
+    const oxMin = Math.max(0, (r.left + r.width * scale - vw) / (r.width * k));
+    const oxMax = Math.min(1, r.left / (r.width * k));
+    const oyMin = Math.max(0, (r.top + r.height * scale - vh) / (r.height * k));
+    const oyMax = Math.min(1, r.top / (r.height * k));
+    const ox = oxMin > oxMax ? 0.5 : Math.min(oxMax, Math.max(oxMin, 0.5));
+    const oy = oyMin > oyMax ? 0.5 : Math.min(oyMax, Math.max(oyMin, 0.5));
+    setHoverGeom({ rect: r, origin: `${(ox * 100).toFixed(1)}% ${(oy * 100).toFixed(1)}%` });
+  };
   // retryTick bumps after an <img> errors mid-session; useCachedImage
   // refetches when this changes. Caps at 1 so a genuinely broken image
   // doesn't loop forever — second failure falls through to placeholder.
@@ -196,10 +227,11 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
   // Touch-only devices: never set hover from synthetic mouse events, so the
   // post-tap enlarge bug can't fire. The visual stays the same as the
   // resting state.
-  const onMouseEnter = HOVER_CAPABLE ? () => setHover(true) : undefined;
-  const onMouseLeave = HOVER_CAPABLE ? () => setHover(false) : undefined;
+  const onMouseEnter = HOVER_CAPABLE ? () => { computeHoverGeom(); setHover(true); } : undefined;
+  const onMouseLeave = HOVER_CAPABLE ? () => { setHover(false); setHoverGeom(null); } : undefined;
   return (
     <div
+      ref={cardRef}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -211,37 +243,45 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
       }}
       title={card.name}
     >
+      {/* In-flow card at scale 1 — always present so the layout stays stable. */}
       {showPlaceholder ? (
-        <PlaceholderCard card={card} hover={hover} />
+        <PlaceholderCard card={card} hover={false} />
       ) : (
         <img
-          // Key change forces React to remount the <img> element on each
-          // retry tick. This bypasses any per-element decoded-cache state
-          // iPad Safari may have gotten into — bug reports #19, #29, #30
-          // show that setting src= on an existing element isn't always
-          // enough to recover. A brand-new DOM element gets a fresh shot.
           key={`${card.image}|${retryTick}`}
           src={imgUrl}
           alt={card.name}
           onError={handleImgError}
-          // onLoad catches the silent-decode-failure case: iPad sometimes
-          // reports a successful load (no onError) but the image is
-          // visually blank — naturalWidth is 0. Treat that as an error
-          // and let the retry escalation run.
-          onLoad={(e) => {
-            if (e.currentTarget.naturalWidth === 0) handleImgError();
-          }}
+          onLoad={(e) => { if (e.currentTarget.naturalWidth === 0) handleImgError(); }}
           style={{
             width: '100%', display: 'block', borderRadius: 8,
-            boxShadow: hover ? '0 8px 32px rgba(0,0,0,0.8)' : '0 2px 8px rgba(0,0,0,0.5)',
-            transform: hover ? 'scale(2.5)' : 'scale(1)',
-            transformOrigin: 'center center',
-            transition: 'transform 120ms ease-out, box-shadow 120ms ease-out',
-            zIndex: hover ? 1000 : 1,
-            position: 'relative',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
             pointerEvents: 'none',
           }}
         />
+      )}
+      {/* Enlarged overlay: position:fixed so it escapes any ancestor
+          overflow:auto (e.g. SplitPlayView cards section). Origin is
+          clamped so the 2.5x bounding box stays inside the viewport. */}
+      {hover && hoverGeom && (
+        <div style={{
+          position: 'fixed',
+          top: hoverGeom.rect.top, left: hoverGeom.rect.left,
+          width: hoverGeom.rect.width, height: hoverGeom.rect.height,
+          transform: 'scale(2.5)',
+          transformOrigin: hoverGeom.origin,
+          zIndex: 1000,
+          pointerEvents: 'none',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+          borderRadius: 8,
+        }}>
+          {showPlaceholder ? (
+            <PlaceholderCard card={card} hover={false} />
+          ) : (
+            <img src={imgUrl} alt={card.name}
+                 style={{ width: '100%', display: 'block', borderRadius: 8 }} />
+          )}
+        </div>
       )}
       {label && <div style={{ padding: '2px 6px', fontSize: 11, opacity: 0.8 }}>{label}</div>}
     </div>
@@ -404,8 +444,19 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   useEffect(() => {
     const violations = checkTokenConservation(G);
     if (violations.length > 0) {
-      // eslint-disable-next-line no-console
-      console.warn('[TOKEN CONSERVATION VIOLATION]', violations);
+      const lastLog = G.log[G.log.length - 1] ?? '(no log entries)';
+      for (const v of violations) {
+        const sign = v.delta > 0 ? '+' : '';
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[TOKEN CONSERVATION] ${v.color}: ${sign}${v.delta} ` +
+          `(actual ${v.actual} vs expected ${v.expected}) — ` +
+          `onBoard=${v.breakdown.onBoard}, ` +
+          `trophies=${JSON.stringify(v.breakdown.trophies)}, ` +
+          `barracks=${JSON.stringify(v.breakdown.barracks)} — ` +
+          `turn ${ctx.turn} P${Number(ctx.currentPlayer) + 1} — last log: ${lastLog}`
+        );
+      }
     }
     const payload = {
       writtenAt: new Date().toISOString(),
@@ -433,11 +484,13 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         hand: p.hand.map(c => c.name),
       }])),
     };
-    fetch('/__save-log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }).catch(() => { /* ignore — endpoint only exists in dev */ });
+    if (import.meta.env.DEV) {
+      fetch('/__save-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => { /* ignore — endpoint only exists in dev */ });
+    }
   }, [G.log.length, ctx.turn, ctx.currentPlayer, ctx.gameover, G, G.log, G.turnLogs, G.snapshots, G.pendingChoice, G.players]);
   // P1 is the human; P2/P3/P4 are AI. The UI is always rendered from P1's perspective.
   const me = HUMAN_SEAT;
@@ -1160,6 +1213,9 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           }}
             style={{ padding: '4px 12px', background: tab === t ? '#3a2055' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer' }}>
             {t}
+            {t === 'play' && G.pendingChoice && G.pendingChoice.playerId === ctx.currentPlayer && (
+              <span style={{ marginLeft: 6, display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#e04050', verticalAlign: 'middle' }} />
+            )}
           </button>
         ))}
         {devMode && (
@@ -1222,7 +1278,12 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {tab === 'slots' && <div style={{ marginTop: 16 }}><SlotCalibration /></div>}
       {tab === 'dividers' && <div style={{ marginTop: 16 }}><SectionDividerCalibration /></div>}
       {tab === 'markers' && <div style={{ marginTop: 16 }}><MarkerCalibration /></div>}
-      {tab === 'log' && <div style={{ marginTop: 16 }}><GameLog G={G} onLoad={(codec) => moves.loadState(codec)} /></div>}
+      {tab === 'log' && (
+        <div style={{ marginTop: 16 }}>
+          {interactivePromptBar}
+          <GameLog G={G} onLoad={(codec) => moves.loadState(codec)} />
+        </div>
+      )}
 
       {tab === 'game' && <>
         {G.pendingChoice && (
@@ -1658,6 +1719,25 @@ function SplitPlayView(props: {
         </div>
       )}
       {interactivePromptBar}
+      {/* Generic prompt banner: when a pendingChoice is set for the current
+          player and isn't already shown by interactivePromptBar (choose-one /
+          select-player) or the humanMapPick banner above, surface the prompt
+          text here. Without this, prompts like "Devour a card from your hand"
+          (Wight, Vampire Spawn, etc.) were silently waiting for a hand click
+          with no instruction — reported as #37. */}
+      {G.pendingChoice && G.pendingChoice.playerId === ctx.currentPlayer
+        && G.pendingChoice.kind !== 'choose-one' && G.pendingChoice.kind !== 'select-player'
+        && G.pendingChoice.kind !== 'select-site' && G.pendingChoice.kind !== 'select-troop-space'
+        && !humanMapPick && (
+          <div style={{ padding: 8, background: '#3a2055', borderRadius: 4 }}>
+            <b>{G.pendingChoice.prompt}</b>
+            {G.pendingChoice.optional && (
+              <button onClick={() => moves.resolveChoice(null)} style={{ marginLeft: 12, padding: '2px 8px', fontSize: 12 }}>
+                Decline
+              </button>
+            )}
+          </div>
+        )}
       {actionBar}
       {/* Card-pile pickers that only render in the game tab by default —
           end-of-turn promote, devour-from-discard, devour-from-inner-circle.

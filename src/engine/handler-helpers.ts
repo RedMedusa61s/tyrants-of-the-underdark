@@ -699,7 +699,13 @@ export function chooseOne(...opts: ChoiceOption[]): EffectHandler {
     // Phase 1: present choice (filter to legal options), capture response on resume.
     if (state.selectedLabel === null) {
       const legal = opts.filter(o => !o.available || o.available(ctx.G, ctx.actorId));
-      if (legal.length === 0) { ctx.handlerState = null; return true; }
+      if (legal.length === 0) {
+        // All options are blocked by their `available` predicates — log it
+        // so the user understands why the card produced no visible effect.
+        Mechanics.log(ctx.G, '(chooseOne: no legal options — skipped)');
+        ctx.handlerState = null;
+        return true;
+      }
 
       if (!ctx.pendingChoice) {
         ctx.pendingChoice = {
@@ -1218,25 +1224,33 @@ export function returnOwnTroopOrSpyChoice(): EffectHandler {
   );
 }
 
-/** Return an enemy troop from a space where you have presence (rulebook p.13). */
-export function returnEnemyTroopChoice(): EffectHandler {
+/** Return an enemy troop from a space where you have presence (rulebook p.13).
+ *  Pass `{ includeWhite: true }` for cards that explicitly let you return
+ *  white (Underdark) troops too — Intellect Devourer reads "return up to 2
+ *  troops or spies", which in the rulebook covers white as well as
+ *  opposing-player colors. */
+export function returnEnemyTroopChoice(opts?: { includeWhite?: boolean }): EffectHandler {
+  const includeWhite = !!opts?.includeWhite;
   return ctx => {
     if (!ctx.pendingChoice) {
       const me = ctx.G.players[ctx.actorId];
       const eligible = TROOP_SPACES.filter(t => {
         const occ = ctx.G.troops[t.id];
-        if (!occ || occ === me.color || occ === 'white') return false;
+        if (!occ || occ === me.color) return false;
+        if (!includeWhite && occ === 'white') return false;
         if (t.parentSite) return hasPresence(ctx.G, me.color, { site: t.parentSite });
         if (t.parentRoute) return hasPresence(ctx.G, me.color, { space: t.id });
         return false;
       }).map(t => t.id);
       if (eligible.length === 0) {
-        Mechanics.log(ctx.G, '(return enemy troop: no enemy troops at any space where you have presence — skipped)');
+        Mechanics.log(ctx.G, '(return troop: no eligible troops at any space where you have presence — skipped)');
         return true;
       }
       ctx.pendingChoice = {
         kind: 'select-troop-space',
-        prompt: "Return an enemy troop (to its owner's barracks).",
+        prompt: includeWhite
+          ? "Return a troop (white or enemy) to its owner's barracks."
+          : "Return an enemy troop (to its owner's barracks).",
         options: eligible,
         optional: true,
       } as PendingChoice;
@@ -1248,7 +1262,7 @@ export function returnEnemyTroopChoice(): EffectHandler {
     ctx.paused = false;
     if (!spaceId) return true;
     const occ = ctx.G.troops[spaceId];
-    if (occ && occ !== 'white') {
+    if (occ && (occ !== 'white' || includeWhite)) {
       // Use returnTroop so the site-control recompute fires (and the
       // marker transfer / return-to-map logic runs). The earlier
       // implementation null'd the slot directly, which left
@@ -1260,6 +1274,9 @@ export function returnEnemyTroopChoice(): EffectHandler {
         const ownerEntry = Object.entries(ctx.G.players).find(([, p]) => p.color === returned);
         if (ownerEntry) ownerEntry[1].barracksLeft += 1;
         Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${returned} troop from ${spaceId}`);
+      } else if (returned === 'white') {
+        // White troops return to the common supply (not tracked per-player).
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned white troop from ${spaceId}`);
       }
     }
     return true;
@@ -1308,11 +1325,18 @@ export function returnEnemySpyChoice(): EffectHandler {
   };
 }
 
-/** "Return an enemy troop or spy" — Blue Wyrmling's secondary effect. */
-export function returnEnemyTroopOrSpyChoice(): EffectHandler {
+/** "Return an enemy troop or spy" — Blue Wyrmling's secondary effect.
+ *  Pass `{ includeWhite: true }` to also let the player return white
+ *  (Underdark) troops — used by Intellect Devourer. */
+export function returnEnemyTroopOrSpyChoice(opts?: { includeWhite?: boolean }): EffectHandler {
+  const includeWhite = !!opts?.includeWhite;
   return chooseOne(
-    { label: 'Return an enemy troop', handler: returnEnemyTroopChoice(), available: playerCanReturnEnemyTroop },
-    { label: 'Return an enemy spy',   handler: returnEnemySpyChoice(),   available: playerCanReturnEnemySpy },
+    {
+      label: includeWhite ? 'Return a troop (white or enemy)' : 'Return an enemy troop',
+      handler: returnEnemyTroopChoice({ includeWhite }),
+      available: includeWhite ? playerCanReturnAnyTroop : playerCanReturnEnemyTroop,
+    },
+    { label: 'Return an enemy spy', handler: returnEnemySpyChoice(), available: playerCanReturnEnemySpy },
   );
 }
 
@@ -1323,6 +1347,19 @@ export function playerCanReturnEnemyTroop(G: import('../game').TyrantsState, act
   for (const t of TROOP_SPACES) {
     const occ = G.troops[t.id];
     if (!occ || occ === me.color || occ === 'white') continue;
+    if (t.parentSite && hasPresence(G, me.color, { site: t.parentSite })) return true;
+    if (t.parentRoute && hasPresence(G, me.color, { space: t.id })) return true;
+  }
+  return false;
+}
+
+/** Same as playerCanReturnEnemyTroop but also accepts white troops as
+ *  eligible — used by Intellect Devourer. */
+export function playerCanReturnAnyTroop(G: import('../game').TyrantsState, actorId: string): boolean {
+  const me = G.players[actorId];
+  for (const t of TROOP_SPACES) {
+    const occ = G.troops[t.id];
+    if (!occ || occ === me.color) continue;
     if (t.parentSite && hasPresence(G, me.color, { site: t.parentSite })) return true;
     if (t.parentRoute && hasPresence(G, me.color, { space: t.id })) return true;
   }
