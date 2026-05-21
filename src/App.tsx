@@ -1579,6 +1579,46 @@ function SplitPlayView(props: {
         </div>
       )}
       {actionBar}
+      {/* Card-pile pickers that only render in the game tab by default —
+          end-of-turn promote, devour-from-discard, devour-from-inner-circle.
+          Without these in split view the user has no way to resolve those
+          prompts and the game stalls (reported as issue #34). */}
+      {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === ctx.currentPlayer && (
+        <div>
+          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Played this turn — pick one to promote</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+            {G.cardsPlayedThisTurn.map((c, i) => {
+              const eligibleIdxs = (G.pendingChoice!.options as number[] | undefined);
+              const isEligible = !eligibleIdxs || eligibleIdxs.includes(i);
+              return (
+                <Card key={i} card={c}
+                  label={isEligible ? 'promote' : '—'}
+                  onClick={isEligible ? () => moves.resolveChoice(i) : undefined} />
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === ctx.currentPlayer && (
+        <div>
+          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Discard — pick one</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+            {p.discard.map((c, i) => (
+              <Card key={i} card={c} label="pick" onClick={() => moves.resolveChoice(i)} />
+            ))}
+          </div>
+        </div>
+      )}
+      {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === ctx.currentPlayer && (
+        <div>
+          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Inner Circle — pick one to devour</h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+            {p.innerCircle.map((c, i) => (
+              <Card key={i} card={c} label="devour" onClick={() => moves.resolveChoice(i)} />
+            ))}
+          </div>
+        </div>
+      )}
       <div onMouseEnter={enterMap} onMouseLeave={leaveMap} style={sectionBox('map')}>
         <MapView G={G}
           clickableSites={startingClickable} onSiteClick={handleSiteClick}
