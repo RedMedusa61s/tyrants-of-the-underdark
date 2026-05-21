@@ -9,7 +9,7 @@
 // (TODO comments mark the gaps); iterate as we go.
 
 import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, times,
-         assassinateChoice, deployChoice, chooseOne,
+         assassinateChoice, assassinateAtLastReturnedSpySite, deployChoice, chooseOne,
          returnOwnSpyChoice, returnEnemyTroopOrSpyChoice,
          eachOpponentDiscardsIfMinHand, chooseOpponentToDiscard,
          eachOpponentAtLastSpySiteDiscardsIfMinHand,
@@ -35,7 +35,11 @@ registerAll({
   'cloaker':            chooseOne(
                           { label: 'Place a spy', handler: placeSpyAtChosenSite() },
                           { label: 'Return a spy → assassinate at that site',
-                            handler: sequence(returnOwnSpyChoice(), assassinateChoice()),
+                            // assassinate is bound to the site of the returned spy,
+                            // not "any space where you have presence" — otherwise
+                            // returning your only spy at a site makes the site
+                            // unreachable (#39).
+                            handler: sequence(returnOwnSpyChoice(), assassinateAtLastReturnedSpySite()),
                             available: playerHasOwnSpy }),
 
   // Cost 3 — Chuul: spy + each opponent there discards if 3+

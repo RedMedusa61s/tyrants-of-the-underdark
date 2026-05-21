@@ -426,6 +426,60 @@ export function returnOwnSpyChoice(opts?: { optional?: boolean }): EffectHandler
 }
 
 /** Supplant a troop at the most-recently returned spy's site (used by Spellspinner). */
+/** Assassinate a troop at the site where you just returned a spy.
+ *  Mirror of supplantAtLastReturnedSpySite but no redeploy. Used by
+ *  Cloaker: "Return a spy → assassinate a troop at that site." Without
+ *  this binding, the generic assassinateChoice() runs a presence-filter
+ *  after the spy is gone — and if the spy was your only presence at
+ *  that site, you can no longer reach it (reported as #39). */
+export function assassinateAtLastReturnedSpySite(): EffectHandler {
+  return ctx => {
+    const Gx = ctx.G as unknown as { _lastReturnedSpySite?: string };
+    const stashed = ctx.handlerState as { siteId?: string } | null;
+    const siteId = stashed?.siteId ?? Gx._lastReturnedSpySite;
+    if (!siteId) { ctx.handlerState = null; return true; }
+    ctx.handlerState = { siteId };
+    if (!ctx.pendingChoice) {
+      const me = ctx.G.players[ctx.actorId];
+      // Any non-self troop at that site (rulebook treats white troops as
+      // legal assassinate targets, same as any other "assassinate a troop"
+      // clause; trophy goes to the player's white pile).
+      const eligible = TROOP_SPACES.filter(t => t.parentSite === siteId).map(t => t.id)
+        .filter(id => {
+          const occ = ctx.G.troops[id];
+          return occ && occ !== me.color;
+        });
+      if (eligible.length === 0) {
+        Mechanics.log(ctx.G, `(assassinate at ${siteId}: no eligible targets — skipped)`);
+        ctx.handlerState = null;
+        Gx._lastReturnedSpySite = undefined;
+        return true;
+      }
+      ctx.pendingChoice = {
+        kind: 'select-troop-space',
+        prompt: `Assassinate a troop at ${siteId}.`,
+        options: eligible,
+        optional: true,
+      } as PendingChoice;
+      ctx.paused = true;
+      return false;
+    }
+    const spaceId = ctx.pendingChoice.response as string | null;
+    ctx.pendingChoice = null;
+    ctx.paused = false;
+    ctx.handlerState = null;
+    Gx._lastReturnedSpySite = undefined;
+    if (!spaceId) return true;
+    const me = ctx.G.players[ctx.actorId];
+    const killed = assassinateTroop(ctx.G, spaceId);
+    if (!killed) return true;
+    if (killed === 'white') me.trophyHall.white += 1;
+    else if (killed !== me.color) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
+    return true;
+  };
+}
+
 export function supplantAtLastReturnedSpySite(): EffectHandler {
   return ctx => {
     // Stash the target site in handlerState so it survives across the
