@@ -92,7 +92,11 @@ export const Mechanics = {
       return;
     }
     Mechanics.log(G, `${card.name} devoured`);
-    // (No devoured pile tracking yet — card just leaves play.)
+    // Track the devoured card so cards that interact with the pile (Ghost
+    // — "treat the top of devoured as if in market") can reference it.
+    // turn.onBegin backfills the field on legacy saves.
+    if (!G.devouredPile) G.devouredPile = [];
+    G.devouredPile.push(card);
   },
 
   recruitFromMarket(G: TyrantsState, playerId: string, marketIndex: number): boolean {

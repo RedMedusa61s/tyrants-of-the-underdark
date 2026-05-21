@@ -14,7 +14,7 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          returnOwnSpyChoice, returnEnemyTroopOrSpyChoice,
          devourFromHandCost, optionalDevourSelfThen, devourSelfThen,
          marketDevourReplaceWithSelf, takeTrophyAndPlace,
-         recruitFromMarketFiltered,
+         recruitFromMarketFiltered, recruitFromDevouredPile,
          conditionalGrant, promoteFromDiscardChoice,
          assassinateAtLastPlacedSpySite,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
@@ -48,14 +48,13 @@ registerAll({
                            { label: '+2 Power', handler: grant({ power: 2 }) },
                            { label: 'Devour a hand card → supplant a troop',
                              handler: devourFromHandCost(supplantChoice()) }),
-  // Cost 3 — Ghost: chooseOne(place spy, return spy → recover top devoured)
-  //   "Treat top of devoured as if in market" — we don't currently track a
-  //   devoured pile. Approximate: return-spy → +1 power +1 money as a
-  //   placeholder consolation. TODO when devoured-pile tracking exists.
+  // Cost 3 — Ghost: chooseOne(place spy, return spy → recruit top of
+  //   devoured pile as if from market). Devoured pile is tracked
+  //   server-side in G.devouredPile (Mechanics.devour pushes to it).
   'ghost':               chooseOne(
                            { label: 'Place a spy', handler: placeSpyAtChosenSite() },
-                           { label: 'Return a spy → +1 P +1 I (devoured-pile recovery TBD)',
-                             handler: sequence(returnOwnSpyChoice(), grant({ power: 1, influence: 1 })),
+                           { label: 'Return a spy → recruit top of devoured pile',
+                             handler: sequence(returnOwnSpyChoice(), recruitFromDevouredPile()),
                              available: playerHasOwnSpy }),
   // Cost 3 — Flesh Golem: +2 power; optional devour-self → assassinate
   'flesh-golem':         sequence(

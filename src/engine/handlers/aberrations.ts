@@ -14,7 +14,7 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          eachOpponentDiscardsIfMinHand, chooseOpponentToDiscard,
          eachOpponentAtLastSpySiteDiscardsIfMinHand,
          forcePlayerOfColorToDiscardIfMinHand,
-         registerOnForcedDiscard,
+         registerOnForcedDiscard, playForeignCard,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 import { Mechanics } from '../mechanics';
 import { assassinateTroop } from '../map-state';
@@ -169,29 +169,29 @@ registerAll({
   //   can still pick targets independently). Money-per-kill TODO.
   'death-tyrant':       times(3, assassinateChoice()),
 
-  // Cost 7 — Elder Brain: promote your top card + play-from-inner-circle.
-  //   Top-of-deck promote: peeks at the next card to be drawn and moves it
-  //   straight to inner circle. The "play card from inner-circle as if in
-  //   hand" half is complex — TODO. For now we only do the promote-top.
-  'elder-brain':        (ctx => {
-                          const me = ctx.G.players[ctx.actorId];
-                          if (me.deck.length === 0) return true;
-                          const top = me.deck.shift()!;
-                          me.innerCircle.push(top);
-                          // log via Mechanics? avoid import cycle — use ctx.G.log directly.
-                          ctx.G.log.push(`P${Number(ctx.actorId) + 1} promoted ${top.name} from top of deck`);
-                          return true;
-                        }),
+  // Cost 7 — Elder Brain: promote your top card + play a card from
+  //   inner-circle as if it were in hand (it stays in inner circle).
+  'elder-brain':        sequence(
+                          (ctx => {
+                            const me = ctx.G.players[ctx.actorId];
+                            if (me.deck.length === 0) return true;
+                            const top = me.deck.shift()!;
+                            me.innerCircle.push(top);
+                            ctx.G.log.push(`P${Number(ctx.actorId) + 1} promoted ${top.name} from top of deck`);
+                            return true;
+                          }),
+                          playForeignCard({
+                            source: 'inner-circle',
+                            cleanup: 'leave-in-place',
+                            promptLabel: 'Elder Brain: play a card from your inner circle (stays there)',
+                          })),
   // Cost 6 — Ulitharid: play a card in the market that costs 4 or less,
-  //   then devour it. TODO — needs a "play-this-card-as-if-from-hand"
-  //   primitive. For now, settle for devourMarketChoice (a no-cost market
-  //   devour).
-  'ulitharid':          (ctx => {
-                          // Compose at runtime to avoid a circular import.
-                          // Stub: devour a market card (no play). Real
-                          // implementation in a future iteration.
-                          void ctx;
-                          return true;
+  //   then devour it.
+  'ulitharid':          playForeignCard({
+                          source: 'market',
+                          maxCost: 4,
+                          cleanup: 'devour-from-market',
+                          promptLabel: 'Ulitharid: play a market card (cost ≤4) then devour it',
                         }),
 });
 

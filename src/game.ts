@@ -178,6 +178,11 @@ export interface TyrantsState {
    *  eligible options to played cards of that aspect — the Air / Fire /
    *  Water Myrmidons all restrict to 'Obedience' per their printed text. */
   pendingEotPromotions: Array<CardRef & { aspectFilter?: string }>;
+  /** Persistent pile of every card that Mechanics.devour has consumed
+   *  this game. Aberrations/Undead expansion mechanics reference it
+   *  (Ghost's "top of devoured" recovery). Older saves don't have it;
+   *  turn.onBegin backfills to []. */
+  devouredPile: CardRef[];
 
   /** Turn number at which the end-game trigger fired (deploy-last-troop or market empty).
    *  The game ends at the end of the round containing this turn (rulebook p.14). */
@@ -425,6 +430,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       turnAspectsPlayed: {},
       cardsPlayedThisTurn: [],
       pendingEotPromotions: [],
+      devouredPile: [],
       markerInfluenceGrantedThisTurn: [],
       markerTcGrantedThisTurn: [],
       activeTurnColor: null,
@@ -477,6 +483,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       G.markerInfluenceGrantedThisTurn = [];
       // Backfill on legacy saves loaded before this field existed.
       G.markerTcGrantedThisTurn = [];
+      if (!G.devouredPile) G.devouredPile = [];
 
       // Per-turn marker effect for chits the active player held coming into
       // this turn. Pays both the influence (cobweb) and any VP printed on

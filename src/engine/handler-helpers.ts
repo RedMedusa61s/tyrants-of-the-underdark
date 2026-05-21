@@ -2111,6 +2111,181 @@ export function marketDevourReplaceWithSelf(): EffectHandler {
   };
 }
 
+// ---------- Recruit from devoured pile (Ghost) ----------
+//
+// "Treat the top card of the devoured pile as if it were in the market."
+// Surface a prompt offering the top devoured card at its printed cost.
+// Decline is always available. If the player can't afford the cost the
+// prompt skips silently. Recruited card lands in the player's discard
+// like any normal market recruit; the devoured pile shrinks.
+
+export function recruitFromDevouredPile(): EffectHandler {
+  return ctx => {
+    const G = ctx.G;
+    if (!G.devouredPile || G.devouredPile.length === 0) return true;
+    if (!ctx.pendingChoice) {
+      const top = G.devouredPile[G.devouredPile.length - 1];
+      const data = lookupCard(top.deck, top.slot);
+      if (!data) return true;
+      const me = G.players[ctx.actorId];
+      if (me.influence < data.cost) {
+        Mechanics.log(G, `(devoured-pile recruit: ${top.name} costs ${data.cost}, only ${me.influence} influence — skipped)`);
+        return true;
+      }
+      ctx.pendingChoice = {
+        kind: 'choose-one',
+        prompt: `Recruit ${top.name} (cost ${data.cost}) from the devoured pile?`,
+        options: ['Decline', `Recruit (−${data.cost} influence)`],
+      } as PendingChoice;
+      ctx.paused = true;
+      return false;
+    }
+    const pick = ctx.pendingChoice.response as number | null;
+    ctx.pendingChoice = null;
+    ctx.paused = false;
+    if (pick == null || pick === 0) return true;
+    const pileNow = ctx.G.devouredPile ?? [];
+    const top = pileNow.pop();
+    if (!top) return true;
+    const data = lookupCard(top.deck, top.slot);
+    if (!data) return true;
+    if (!Mechanics.expendInfluence(ctx.G, ctx.actorId, data.cost)) {
+      // Couldn't pay — put the card back.
+      pileNow.push(top);
+      return true;
+    }
+    ctx.G.players[ctx.actorId].discard.push(top);
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} recruited ${top.name} from devoured pile (cost ${data.cost})`);
+    return true;
+  };
+}
+
+// ---------- Play a card from a non-hand zone ----------
+//
+// Ulitharid: "Play a card in the market that costs 4 or less, then
+// devour it." Elder Brain: "Play a card from your inner-circle as if
+// it were in your hand (it stays there)." Both need a primitive that
+// looks up the picked card's effect handler and runs it as if normally
+// played, threading any pendingChoice back through the calling card.
+//
+// Implementation: trampoline pattern. The outer Ulitharid/Elder Brain
+// handler holds the state machine (phase, picked card, child-state);
+// each engine resume re-enters the outer handler, which dispatches to
+// the inner card's registered handler with a child ctx carrying the
+// foreign card. game.ts's resolveChoice always re-enters the outer
+// handler (because pendingChoice.cardKey is stamped with the OUTER
+// card's key), so the trampoline is transparent.
+
+export function playForeignCard(opts: {
+  source: 'market' | 'inner-circle';
+  maxCost?: number;
+  /** After resolution, what to do with the picked card. */
+  cleanup: 'devour-from-market' | 'leave-in-place';
+  promptLabel?: string;
+}): EffectHandler {
+  return ctx => {
+    interface State {
+      phase: 'pick' | 'play';
+      pickedRef?: CardRef;
+      pickedMarketIdx?: number;   // remembered so cleanup knows the slot
+      pickedInnerCircleIdx?: number;
+      childState?: unknown;
+    }
+    let state = (ctx.handlerState as State | null) ?? { phase: 'pick' };
+
+    // --- Phase: pick the source card ---
+    if (state.phase === 'pick') {
+      if (!ctx.pendingChoice) {
+        if (opts.source === 'market') {
+          const eligible: number[] = [];
+          for (let i = 0; i < ctx.G.market.row.length; i++) {
+            const c = ctx.G.market.row[i];
+            if (!c) continue;
+            const data = lookupCard(c.deck, c.slot);
+            if (!data) continue;
+            if (opts.maxCost != null && data.cost > opts.maxCost) continue;
+            eligible.push(i);
+          }
+          if (eligible.length === 0) { ctx.handlerState = null; return true; }
+          ctx.pendingChoice = {
+            kind: 'select-market-card',
+            prompt: opts.promptLabel ?? `Pick a market card to play${opts.maxCost != null ? ` (cost ≤${opts.maxCost})` : ''}`,
+            options: eligible,
+            optional: true,
+          } as PendingChoice;
+        } else { // inner-circle
+          const me = ctx.G.players[ctx.actorId];
+          if (me.innerCircle.length === 0) { ctx.handlerState = null; return true; }
+          ctx.pendingChoice = {
+            kind: 'select-card-in-inner-circle',
+            prompt: opts.promptLabel ?? 'Pick a card from your inner circle to play (it stays there)',
+            options: me.innerCircle.map((_, i) => i),
+            optional: true,
+          } as PendingChoice;
+        }
+        ctx.paused = true;
+        ctx.handlerState = state;
+        return false;
+      }
+      const idx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (idx == null) { ctx.handlerState = null; return true; }
+      let pickedRef: CardRef | undefined;
+      if (opts.source === 'market') {
+        const c = ctx.G.market.row[idx];
+        if (c) pickedRef = { ...c };
+        state = { phase: 'play', pickedRef, pickedMarketIdx: idx, childState: null };
+      } else {
+        const me = ctx.G.players[ctx.actorId];
+        const c = me.innerCircle[idx];
+        if (c) pickedRef = { ...c };
+        state = { phase: 'play', pickedRef, pickedInnerCircleIdx: idx, childState: null };
+      }
+      if (!pickedRef) { ctx.handlerState = null; return true; }
+      ctx.handlerState = state;
+    }
+
+    // --- Phase: dispatch to the picked card's handler ---
+    if (state.phase === 'play' && state.pickedRef) {
+      const data = lookupCard(state.pickedRef.deck, state.pickedRef.slot);
+      const handler = data ? CardRegistry.get(data.effectKey) : undefined;
+      if (handler) {
+        const childCtx: EffectContext = {
+          ...ctx,
+          card: state.pickedRef,
+          pendingChoice: ctx.pendingChoice,
+          handlerState: state.childState ?? null,
+          paused: ctx.paused,
+        };
+        const done = handler(childCtx);
+        if (!done) {
+          ctx.pendingChoice = childCtx.pendingChoice;
+          ctx.paused = childCtx.paused;
+          ctx.handlerState = { ...state, childState: childCtx.handlerState };
+          return false;
+        }
+      } else {
+        Mechanics.log(ctx.G, `(${state.pickedRef.name}: no handler — played as no-op)`);
+      }
+      // Cleanup: market-devour swaps in top of deck; leave-in-place is a no-op
+      // (the inner-circle card never moved).
+      if (opts.cleanup === 'devour-from-market') {
+        const slotIdx = state.pickedMarketIdx ?? -1;
+        if (slotIdx >= 0 && ctx.G.market.row[slotIdx]) {
+          const removed = ctx.G.market.row[slotIdx]!;
+          Mechanics.devour(ctx.G, removed);
+          ctx.G.market.row[slotIdx] = ctx.G.market.deck.shift() ?? null;
+        }
+      }
+      ctx.handlerState = null;
+      return true;
+    }
+    ctx.handlerState = null;
+    return true;
+  };
+}
+
 // ---------- Tiny convenience: register many handlers at once ----------
 
 export function registerAll(table: Record<string, EffectHandler>) {
