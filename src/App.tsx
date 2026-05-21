@@ -1445,7 +1445,7 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
             })}
           </div>
           <div style={{ fontSize: 11, opacity: 0.55, margin: '8px 0 4px' }}>
-            Aberrations &amp; Undead expansion (optional):
+            Aberrations &amp; Undead expansion:
           </div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
             {HALF_DECKS.filter(d => EXPANSION_HALF_DECKS.has(d)).map(d => {
