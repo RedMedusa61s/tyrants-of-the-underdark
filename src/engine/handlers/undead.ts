@@ -15,6 +15,7 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          devourFromHandCost, optionalDevourSelfThen, devourSelfThen,
          marketDevourReplaceWithSelf, takeTrophyAndPlace,
          recruitFromMarketFiltered, recruitFromDevouredPile,
+         promoteFromHandChoice, promoteSelf,
          conditionalGrant, promoteFromDiscardChoice,
          assassinateAtLastPlacedSpySite,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
@@ -149,12 +150,14 @@ registerAll({
                                recruitFromMarketFiltered({ maxCost: 3 }),
                              ),
                              available: playerHasOwnSpy }),
-  // Cost 5 — Necromancer: chooseOne(+3 money, promote-from-discard OR
-  //   promote-this OR promote-from-hand). Promote-from-discard is the
-  //   most directly useful (we have a helper for it).
+  // Cost 5 — Necromancer: chooseOne over four branches per the printed
+  //   text — "+3 money OR promote this card OR promote a card from your
+  //   hand OR promote a card from your discard."
   'necromancer':         chooseOne(
                            { label: '+3 Influence', handler: grant({ influence: 3 }) },
-                           { label: 'Promote a card from discard', handler: promoteFromDiscardChoice({ optional: true }) }),
+                           { label: 'Promote this card (Necromancer → inner circle)', handler: promoteSelf() },
+                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice({ optional: true }) },
+                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice({ optional: true }) }),
 
   // Cost 6 — Death Knight: supplant a troop + 1 VP per 5 player trophies
   'death-knight':        sequence(

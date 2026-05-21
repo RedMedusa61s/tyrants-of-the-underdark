@@ -2121,6 +2121,58 @@ export function marketDevourReplaceWithSelf(): EffectHandler {
   };
 }
 
+// ---------- Promote from non-played-this-turn zones ----------
+//
+// Promote-from-played-this-turn (the most common shape — Air/Fire/Water
+// Myrmidons, Drow Negotiator, etc.) goes through the EoT
+// pendingEotPromotions queue. The Necromancer (Undead expansion) offers
+// promote-from-hand and promote-self as additional sources — these
+// fire immediately within the card's effect resolution rather than at
+// end of turn.
+
+/** Pick one card from the player's hand and promote it (move to inner
+ *  circle). Optional decline. Used by Necromancer's "promote a card
+ *  from your hand" branch. */
+export function promoteFromHandChoice(opts?: { optional?: boolean }): EffectHandler {
+  return ctx => {
+    if (!ctx.pendingChoice) {
+      const me = ctx.G.players[ctx.actorId];
+      if (me.hand.length === 0) return true;
+      ctx.pendingChoice = {
+        kind: 'select-card-in-hand',
+        prompt: 'Promote a card from your hand (it moves to your inner circle)',
+        options: me.hand.map((_, i) => i),
+        optional: opts?.optional ?? true,
+      } as PendingChoice;
+      ctx.paused = true;
+      return false;
+    }
+    const idx = ctx.pendingChoice.response as number | null;
+    ctx.pendingChoice = null;
+    ctx.paused = false;
+    if (idx == null) return true;
+    const me = ctx.G.players[ctx.actorId];
+    const card = me.hand[idx];
+    if (!card) return true;
+    me.hand.splice(idx, 1);
+    Mechanics.promote(ctx.G, ctx.actorId, card);
+    return true;
+  };
+}
+
+/** Promote THIS card (ctx.card) — move the card being played to the
+ *  inner circle instead of letting it land in discard. Sets the
+ *  returnedToSupply flag so the engine's playCard cleanup skips the
+ *  normal discard push. Used by Necromancer's "promote this card"
+ *  branch and Revenant's 8+-trophy bonus (via a similar pattern). */
+export function promoteSelf(): EffectHandler {
+  return ctx => {
+    Mechanics.promote(ctx.G, ctx.actorId, ctx.card);
+    ctx.handlerState = { returnedToSupply: true };
+    return true;
+  };
+}
+
 // ---------- Recruit from devoured pile (Ghost) ----------
 //
 // "Treat the top card of the devoured pile as if it were in the market."
