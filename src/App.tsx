@@ -88,8 +88,13 @@ export function isSplitViewMode(): boolean {
 // ~2/3 of games to a competent human; truly hard would need deeper
 // lookahead or opponent-reply modeling.
 type AiStyle = 'random' | 'easy' | 'heuristic';
-type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons';
-const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons'];
+type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead';
+const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead'];
+// Half-decks introduced in the Aberrations & Undead expansion. The new-game
+// dialog separates these from the base half-decks under an "Expansion" header
+// so unfamiliar players see clearly which decks are base-game and which need
+// the expansion. Game logic treats all six identically.
+const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead']);
 type ThirdPlayerSide = 'left' | 'right';
 interface GameConfig {
   numPlayers: number;
@@ -1423,7 +1428,7 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
             Market half-decks (pick 2) <span style={{ opacity: 0.5, fontSize: 11 }}>· {halfDecks.length}/2 selected</span>
           </label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
-            {HALF_DECKS.map(d => {
+            {HALF_DECKS.filter(d => !EXPANSION_HALF_DECKS.has(d)).map(d => {
               const on = halfDecks.includes(d);
               const idx = halfDecks.indexOf(d);
               return (
@@ -1432,6 +1437,27 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
                     padding: '6px 12px', cursor: 'pointer', borderRadius: 4,
                     background: on ? '#5a3380' : '#2a1840',
                     color: '#e6e1f2', border: '1px solid #3a2055',
+                    fontSize: 12, position: 'relative',
+                  }}>
+                  {d}{on && <span style={{ marginLeft: 6, opacity: 0.7 }}>#{idx + 1}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.55, margin: '8px 0 4px' }}>
+            Aberrations &amp; Undead expansion (optional):
+          </div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+            {HALF_DECKS.filter(d => EXPANSION_HALF_DECKS.has(d)).map(d => {
+              const on = halfDecks.includes(d);
+              const idx = halfDecks.indexOf(d);
+              return (
+                <button key={d} onClick={() => toggleDeck(d)}
+                  title="From the Aberrations &amp; Undead expansion. Card-effect mechanics are still being wired in — selecting these now gives you the card art and basic flow, but some cards' special effects may be no-ops until that's complete."
+                  style={{
+                    padding: '6px 12px', cursor: 'pointer', borderRadius: 4,
+                    background: on ? '#5a3380' : '#2a1840',
+                    color: '#e6e1f2', border: '1px dashed #6a4595',
                     fontSize: 12, position: 'relative',
                   }}>
                   {d}{on && <span style={{ marginLeft: 6, opacity: 0.7 }}>#{idx + 1}</span>}

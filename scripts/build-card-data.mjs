@@ -25,6 +25,8 @@ function normalizeSet(raw, name) {
   if (lower === 'fungus') return 'demons';
   if (lower === 'dragon') return 'dragons';
   if (lower === 'elementals') return 'elemental';
+  if (lower === 'aberration') return 'aberrations';
+  // 'aberrations' and 'undead' map straight through.
   return lower;
 }
 
@@ -140,7 +142,7 @@ if (unmatched.length) {
 
 // Unmatched sheet rows (cards in the sheet that don't appear in our half-decks).
 const namedSheetKeys = new Set(allCards.map(c => `${c.deck.startsWith('starter-')||['house-guards','priestesses','insane-outcasts'].includes(c.deck) ? 'core' : c.deck}::${norm(c.name)}`));
-const orphanSheetRows = [...sheetByKey.values()].filter(r => !namedSheetKeys.has(`${r.set}::${norm(r.name)}`) && ['drow','dragons','elemental','demons','core'].includes(r.set));
+const orphanSheetRows = [...sheetByKey.values()].filter(r => !namedSheetKeys.has(`${r.set}::${norm(r.name)}`) && ['drow','dragons','elemental','demons','aberrations','undead','core'].includes(r.set));
 if (orphanSheetRows.length) {
   console.log(`\n  ${orphanSheetRows.length} sheet rows for in-scope sets not assigned to any slot:`);
   for (const r of orphanSheetRows) console.log(`    ${r.set}::${r.name}`);

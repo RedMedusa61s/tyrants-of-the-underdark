@@ -137,6 +137,54 @@ const TABLE: Record<string, CardCategory> = {
   // → not a hand mutator. Bias influence.
   'zuggtmoy':           'influence',
 
+  // ---- Aberrations half-deck (expansion) ----
+  // Theme: forcing opponents to discard from hand. Most cards have a primary
+  // tactical effect (assassinate, deploy, supplant, spy) plus a discard rider.
+  'elder-brain':          'tactical',   // promote top + play-from-inner-circle
+  'ulitharid':            'tactical',   // market manipulation (play+devour)
+  'puppeteer':            'influence',  // +2 money + eot promote
+  'intellect-devourer':   'tactical',   // or 3 money / or return 2
+  'ambassador':           'other',      // eot promote + self-promote-on-discard
+  'aboleth':              'hand',       // 2 spies OR draw N (hand-mutating)
+  'chuul':                'tactical',   // spy + discard rider
+  'brainwashed-slave':    'tactical',   // spy or return-spy chooseOne
+  'nothic':               'tactical',   // spy / return-spy with draw + discard
+  'cloaker':              'tactical',   // spy / return-spy to assassinate
+  'neogi':                'tactical',   // deploy 4 + eot all-discard
+  'quaggoth':             'tactical',   // assassinate-white-per-site
+  'grimlock':             'tactical',   // deploy 2 + reactive draw
+  'death-tyrant':         'tactical',   // assassinate up to 3 + money
+  'cranium-rats':         'tactical',   // deploy 2 + discard
+  'beholder':             'tactical',   // assassinate + power-per-trophy
+  'mindwitness':          'tactical',   // assassinate + discard
+  'gauth':                'tactical',   // 2 money / draw + discard
+  'spectator':            'power',      // 2 attack 1 money
+  'umber-hulk':           'tactical',   // deploy 3 + reactive discard
+
+  // ---- Undead half-deck (expansion) ----
+  // Theme: devouring (often self) for triggered effects, plus trophy / promote
+  // interactions. Most are tactical.
+  'lich':                 'tactical',   // spy + steal-trophies-deploy
+  'vampire':              'tactical',   // supplant or promote-from-discard
+  'death-knight':         'tactical',   // supplant + VP-per-trophy
+  'mummy-lord':           'tactical',   // assassinate + take-trophy
+  'high-priest-of-myrkul':'tactical',   // return troop/spy + eot promote-undead
+  'revenant':             'tactical',   // assassinate 2 + self-promote-at-trophies
+  'banshee':              'tactical',   // spy + +power-if-other-spy
+  'vampire-spawn':        'tactical',   // 1 money + return troop/spy
+  'conjurer':             'tactical',   // spy / return-spy to recruit
+  'necromancer':          'influence',  // 3 money / promote alt
+  'cultist-of-myrkul':    'influence',  // 2 money / devour-self for eot promote
+  'ravenous-zombies':     'tactical',   // 1 attack + assassinate-white
+  'skeletal-horde':       'tactical',   // deploy 2 / devour-self deploy 3
+  'wight':                'tactical',   // 2 attack / devour-from-hand supplant
+  'ghost':                'tactical',   // spy / return-spy market-recovery
+  'carrion-crawler':      'tactical',   // 3 attack + market-devour-replace
+  'wraith':               'tactical',   // spy + devour-self assassinate
+  'flesh-golem':          'tactical',   // 2 attack + devour-self assassinate
+  'ogre-zombie':          'tactical',   // supplant-white-anywhere
+  'minotaur-skeleton':    'tactical',   // deploy 3 / devour-self assassinate-white
+
   // ---- Elemental half-deck ----
   // Focus triggers are commutative (per-aspect chain tally); don't bump category.
   'aerisi-kalinoth':         'tactical',   // spy + auto-recruit

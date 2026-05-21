@@ -199,7 +199,7 @@
     "slot": 11,
     "name": "Bounty Hunter",
     "image": "assets/cards/drow/11-unnamed.jpg",
-    "cost": 4,
+    "cost": 5,
     "deckVp": 2,
     "innerCircleVp": 4,
     "aspect": "Malice",
@@ -216,7 +216,7 @@
     "slot": 12,
     "name": "Bounty Hunter",
     "image": "assets/cards/drow/12-unnamed.jpg",
-    "cost": 4,
+    "cost": 5,
     "deckVp": 2,
     "innerCircleVp": 4,
     "aspect": "Malice",
@@ -498,7 +498,7 @@
     "slot": 28,
     "name": "Masters of Sorcere",
     "image": "assets/cards/drow/28-unnamed.jpg",
-    "cost": 5,
+    "cost": 3,
     "deckVp": 2,
     "innerCircleVp": 5,
     "aspect": "Guile",
@@ -708,7 +708,7 @@
     "slot": 0,
     "name": "Black Dragon",
     "image": "assets/cards/dragons/00-unnamed.jpg",
-    "cost": 7,
+    "cost": 8,
     "deckVp": 3,
     "innerCircleVp": 7,
     "aspect": "Conquest",
@@ -1050,7 +1050,7 @@
     "slot": 19,
     "name": "Green Dragon",
     "image": "assets/cards/dragons/19-unnamed.jpg",
-    "cost": 7,
+    "cost": 8,
     "deckVp": 3,
     "innerCircleVp": 7,
     "aspect": "Guile",
@@ -1335,7 +1335,7 @@
     "slot": 33,
     "name": "White Dragon",
     "image": "assets/cards/dragons/33-unnamed.jpg",
-    "cost": 6,
+    "cost": 8,
     "deckVp": 2,
     "innerCircleVp": 5,
     "aspect": "Conquest",
@@ -2868,14 +2868,731 @@
     "effectKey": "zuggtmoy",
     "_matchedSheet": true
   },
+  "aberrations::0": {
+    "deck": "aberrations",
+    "slot": 0,
+    "name": "Elder Brain",
+    "image": "assets/cards/aberrations/00-elder-brain.jpg",
+    "cost": 7,
+    "deckVp": 4,
+    "innerCircleVp": 9,
+    "aspect": "Ambition",
+    "type": "Aberration",
+    "rarity": 1,
+    "benefits": [
+      "promote your top card",
+      "Play a card from your inner-circle as if it were in your hand (it stays there)"
+    ],
+    "effectKey": "elder-brain",
+    "_matchedSheet": true
+  },
+  "aberrations::1": {
+    "deck": "aberrations",
+    "slot": 1,
+    "name": "Ulitharid",
+    "image": "assets/cards/aberrations/01-ulitharid.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Ambition",
+    "type": "Illithid",
+    "rarity": 1,
+    "benefits": [
+      "Play a card in the market that costs 4 or less, then devour it."
+    ],
+    "effectKey": "ulitharid",
+    "_matchedSheet": true
+  },
+  "aberrations::2": {
+    "deck": "aberrations",
+    "slot": 2,
+    "name": "Puppeteer",
+    "image": "assets/cards/aberrations/02-puppeteer.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 6,
+    "aspect": "Ambition",
+    "type": "Illithid",
+    "rarity": 2,
+    "benefits": [
+      "2 money",
+      "eot promote another card played this turn"
+    ],
+    "effectKey": "puppeteer",
+    "_matchedSheet": true
+  },
+  "aberrations::3": {
+    "deck": "aberrations",
+    "slot": 3,
+    "name": "Intellect Devourer",
+    "image": "assets/cards/aberrations/03-intellect-devourer.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Aberration",
+    "rarity": 2,
+    "benefits": [
+      "or 3 money",
+      "or return up to 2 troops/spies"
+    ],
+    "effectKey": "intellect-devourer",
+    "_matchedSheet": true
+  },
+  "aberrations::4": {
+    "deck": "aberrations",
+    "slot": 4,
+    "name": "Ambassador",
+    "image": "assets/cards/aberrations/04-ambassador.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Illithid",
+    "rarity": 4,
+    "benefits": [
+      "eot promote another played card",
+      "if you discard this, you may promote it"
+    ],
+    "effectKey": "ambassador",
+    "_matchedSheet": true
+  },
+  "aberrations::5": {
+    "deck": "aberrations",
+    "slot": 5,
+    "name": "Aboleth",
+    "image": "assets/cards/aberrations/05-aboleth.jpg",
+    "cost": 7,
+    "deckVp": 4,
+    "innerCircleVp": 7,
+    "aspect": "Guile",
+    "type": "Aberration",
+    "rarity": 1,
+    "benefits": [
+      "or place 2 spies",
+      "or draw a card for each spy you have on board"
+    ],
+    "effectKey": "aboleth",
+    "_matchedSheet": true
+  },
+  "aberrations::6": {
+    "deck": "aberrations",
+    "slot": 6,
+    "name": "Chuul",
+    "image": "assets/cards/aberrations/06-chuul.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Aberration",
+    "rarity": 2,
+    "benefits": [
+      "spy",
+      "each opponent there discards a card if they have 3+"
+    ],
+    "effectKey": "chuul",
+    "_matchedSheet": true
+  },
+  "aberrations::7": {
+    "deck": "aberrations",
+    "slot": 7,
+    "name": "Brainwashed Slave",
+    "image": "assets/cards/aberrations/07-brainwashed-slave.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Aberration",
+    "rarity": 2,
+    "benefits": [
+      "or spy",
+      "or return a spy for 2 attack 2 money"
+    ],
+    "effectKey": "brainwashed-slave",
+    "_matchedSheet": true
+  },
+  "aberrations::8": {
+    "deck": "aberrations",
+    "slot": 8,
+    "name": "Nothic",
+    "image": "assets/cards/aberrations/08-nothic.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Aberration",
+    "rarity": 2,
+    "benefits": [
+      "or spy",
+      "or return a spy to draw a card, each 3+ opponent discards a card"
+    ],
+    "effectKey": "nothic",
+    "_matchedSheet": true
+  },
+  "aberrations::9": {
+    "deck": "aberrations",
+    "slot": 9,
+    "name": "Cloaker",
+    "image": "assets/cards/aberrations/09-cloaker.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Aberration",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return spy to assassinate a troop there"
+    ],
+    "effectKey": "cloaker",
+    "_matchedSheet": true
+  },
+  "aberrations::10": {
+    "deck": "aberrations",
+    "slot": 10,
+    "name": "Neogi",
+    "image": "assets/cards/aberrations/10-neogi.jpg",
+    "cost": 7,
+    "deckVp": 4,
+    "innerCircleVp": 8,
+    "aspect": "Conquest",
+    "type": "Aberration",
+    "rarity": 1,
+    "benefits": [
+      "deploy 4 troops",
+      "eot each opponent discards a card"
+    ],
+    "effectKey": "neogi",
+    "_matchedSheet": true
+  },
+  "aberrations::11": {
+    "deck": "aberrations",
+    "slot": 11,
+    "name": "Quaggoth",
+    "image": "assets/cards/aberrations/11-quaggoth.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Quaggoth",
+    "rarity": 2,
+    "benefits": [
+      "assassinate a white troop for each site you control"
+    ],
+    "effectKey": "quaggoth",
+    "_matchedSheet": true
+  },
+  "aberrations::12": {
+    "deck": "aberrations",
+    "slot": 12,
+    "name": "Grimlock",
+    "image": "assets/cards/aberrations/12-grimlock.jpg",
+    "cost": 1,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Conquest",
+    "type": "Grimlock",
+    "rarity": 2,
+    "benefits": [
+      "deploy 2 troops",
+      "if your opponent causes you to discard this, draw 2"
+    ],
+    "effectKey": "grimlock",
+    "_matchedSheet": true
+  },
+  "aberrations::13": {
+    "deck": "aberrations",
+    "slot": 13,
+    "name": "Death Tyrant",
+    "image": "assets/cards/aberrations/13-death-tyrant.jpg",
+    "cost": 7,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Malice",
+    "type": "Aberration",
+    "rarity": 1,
+    "benefits": [
+      "Assassinate up to 3 troops at a single site.",
+      "For each troop removed gain 1 money."
+    ],
+    "effectKey": "death-tyrant",
+    "_matchedSheet": true
+  },
+  "aberrations::14": {
+    "deck": "aberrations",
+    "slot": 14,
+    "name": "Cranium Rats",
+    "image": "assets/cards/aberrations/14-cranium-rats.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Beast",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "Choose an opponent with 3+ cards to discard a card."
+    ],
+    "effectKey": "cranium-rats",
+    "_matchedSheet": true
+  },
+  "aberrations::15": {
+    "deck": "aberrations",
+    "slot": 15,
+    "name": "Beholder",
+    "image": "assets/cards/aberrations/15-beholder.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Malice",
+    "type": "Aberration",
+    "rarity": 1,
+    "benefits": [
+      "assassinate a troop",
+      "gain 1 attack for every 3 troops in your trophy hall"
+    ],
+    "effectKey": "beholder",
+    "_matchedSheet": true
+  },
+  "aberrations::16": {
+    "deck": "aberrations",
+    "slot": 16,
+    "name": "Mindwitness",
+    "image": "assets/cards/aberrations/16-mindwitness.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Aberration",
+    "rarity": 3,
+    "benefits": [
+      "assassinate a troop",
+      "that player discards a card if they have 3+"
+    ],
+    "effectKey": "mindwitness",
+    "_matchedSheet": true
+  },
+  "aberrations::17": {
+    "deck": "aberrations",
+    "slot": 17,
+    "name": "Gauth",
+    "image": "assets/cards/aberrations/17-gauth.jpg",
+    "cost": 3,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Aberration",
+    "rarity": 2,
+    "benefits": [
+      "or 2 money",
+      "or draw a card, choose an opponent with 3+ cards to discard a card"
+    ],
+    "effectKey": "gauth",
+    "_matchedSheet": true
+  },
+  "aberrations::18": {
+    "deck": "aberrations",
+    "slot": 18,
+    "name": "Spectator",
+    "image": "assets/cards/aberrations/18-spectator.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Aberration",
+    "rarity": 3,
+    "benefits": [
+      "2 attack 1 money"
+    ],
+    "effectKey": "spectator",
+    "_matchedSheet": true
+  },
+  "aberrations::39": {
+    "deck": "aberrations",
+    "slot": 39,
+    "name": "Umber Hulk",
+    "image": "assets/cards/aberrations/39-umber-hulk.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Monstrosity",
+    "rarity": 2,
+    "benefits": [
+      "deploy 3 troops",
+      "if an opponent causes you to discard this, they discard a card"
+    ],
+    "effectKey": "umber-hulk",
+    "_matchedSheet": true
+  },
+  "undead::19": {
+    "deck": "undead",
+    "slot": 19,
+    "name": "Banshee",
+    "image": "assets/cards/undead/19-banshee.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Undead",
+    "rarity": 2,
+    "benefits": [
+      "spy",
+      "if there is another spy there, +3 attack"
+    ],
+    "effectKey": "banshee",
+    "_matchedSheet": true
+  },
+  "undead::20": {
+    "deck": "undead",
+    "slot": 20,
+    "name": "Vampire Spawn",
+    "image": "assets/cards/undead/20-vampire-spawn.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Ambition",
+    "type": "Undead",
+    "rarity": 3,
+    "benefits": [
+      "1 money",
+      "return another player's troop/spy"
+    ],
+    "effectKey": "vampire-spawn",
+    "_matchedSheet": true
+  },
+  "undead::21": {
+    "deck": "undead",
+    "slot": 21,
+    "name": "Death Knight",
+    "image": "assets/cards/undead/21-death-knight.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 7,
+    "aspect": "Malice",
+    "type": "Undead",
+    "rarity": 1,
+    "benefits": [
+      "supplant a troop",
+      "gain 1 VP for every 5 player trophies you have"
+    ],
+    "effectKey": "death-knight",
+    "_matchedSheet": true
+  },
+  "undead::22": {
+    "deck": "undead",
+    "slot": 22,
+    "name": "Conjurer",
+    "image": "assets/cards/undead/22-conjurer.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or spy",
+      "or return a spy to recruit up to 2 cards that cost 3 or less"
+    ],
+    "effectKey": "conjurer",
+    "_matchedSheet": true
+  },
+  "undead::23": {
+    "deck": "undead",
+    "slot": 23,
+    "name": "Ghost",
+    "image": "assets/cards/undead/23-ghost.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Undead",
+    "rarity": 2,
+    "benefits": [
+      "or spy",
+      "or return a spy to treat the top devoured card as if in market"
+    ],
+    "effectKey": "ghost",
+    "_matchedSheet": true
+  },
+  "undead::24": {
+    "deck": "undead",
+    "slot": 24,
+    "name": "Wight",
+    "image": "assets/cards/undead/24-wight.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Undead",
+    "rarity": 4,
+    "benefits": [
+      "or 2 attack",
+      "or devour a card from hand to supplant a troop"
+    ],
+    "effectKey": "wight",
+    "_matchedSheet": true
+  },
+  "undead::25": {
+    "deck": "undead",
+    "slot": 25,
+    "name": "Mummy Lord",
+    "image": "assets/cards/undead/25-mummy-lord.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Conquest",
+    "type": "Undead",
+    "rarity": 1,
+    "benefits": [
+      "choose twice:",
+      "assassinate a white troop",
+      "take a white trophy from another player and place it anwhere"
+    ],
+    "effectKey": "mummy-lord",
+    "_matchedSheet": true
+  },
+  "undead::26": {
+    "deck": "undead",
+    "slot": 26,
+    "name": "Ravenous Zombies",
+    "image": "assets/cards/undead/26-ravenous-zombies.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Undead",
+    "rarity": 2,
+    "benefits": [
+      "1 attack",
+      "assassinate a white troop"
+    ],
+    "effectKey": "ravenous-zombies",
+    "_matchedSheet": true
+  },
+  "undead::27": {
+    "deck": "undead",
+    "slot": 27,
+    "name": "Cultist of Myrkul",
+    "image": "assets/cards/undead/27-cultist-of-myrkul.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or 2 money",
+      "or devour this card to EOT promote up to 2 other cards played"
+    ],
+    "effectKey": "cultist-of-myrkul",
+    "_matchedSheet": true
+  },
+  "undead::28": {
+    "deck": "undead",
+    "slot": 28,
+    "name": "Vampire",
+    "image": "assets/cards/undead/28-vampire.jpg",
+    "cost": 7,
+    "deckVp": 4,
+    "innerCircleVp": 7,
+    "aspect": "Ambition",
+    "type": "Undead",
+    "rarity": 1,
+    "benefits": [
+      "or supplant a troop",
+      "or promote a card from your discard, then gain 1VP for every 3 promoted cards"
+    ],
+    "effectKey": "vampire",
+    "_matchedSheet": true
+  },
+  "undead::29": {
+    "deck": "undead",
+    "slot": 29,
+    "name": "Skeletal Horde",
+    "image": "assets/cards/undead/29-skeletal-horde.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Undead",
+    "rarity": 3,
+    "benefits": [
+      "deploy 2 troops",
+      "devour this card to deploy 3 troops"
+    ],
+    "effectKey": "skeletal-horde",
+    "_matchedSheet": true
+  },
+  "undead::30": {
+    "deck": "undead",
+    "slot": 30,
+    "name": "Wraith",
+    "image": "assets/cards/undead/30-wraith.jpg",
+    "cost": 2,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Guile",
+    "type": "Undead",
+    "rarity": 2,
+    "benefits": [
+      "spy",
+      "devour this card to assassinate a troop there"
+    ],
+    "effectKey": "wraith",
+    "_matchedSheet": true
+  },
+  "undead::31": {
+    "deck": "undead",
+    "slot": 31,
+    "name": "Ogre Zombie",
+    "image": "assets/cards/undead/31-ogre-zombie.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Undead",
+    "rarity": 2,
+    "benefits": [
+      "supplant a white troop anywhere"
+    ],
+    "effectKey": "ogre-zombie",
+    "_matchedSheet": true
+  },
+  "undead::32": {
+    "deck": "undead",
+    "slot": 32,
+    "name": "Lich",
+    "image": "assets/cards/undead/32-lich.jpg",
+    "cost": 7,
+    "deckVp": 4,
+    "innerCircleVp": 7,
+    "aspect": "Guile",
+    "type": "Undead",
+    "rarity": 1,
+    "benefits": [
+      "spy",
+      "if another player has a troop there, take 2 troops from their trophy hall and deploy them"
+    ],
+    "effectKey": "lich",
+    "_matchedSheet": true
+  },
+  "undead::33": {
+    "deck": "undead",
+    "slot": 33,
+    "name": "High Priest of Myrkul",
+    "image": "assets/cards/undead/33-high-priest-of-myrkul.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 1,
+    "benefits": [
+      "return another player's troop or spy",
+      "EOT promote any undead cards you played"
+    ],
+    "effectKey": "high-priest-of-myrkul",
+    "_matchedSheet": true
+  },
+  "undead::34": {
+    "deck": "undead",
+    "slot": 34,
+    "name": "Necromancer",
+    "image": "assets/cards/undead/34-necromancer.jpg",
+    "cost": 5,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 2,
+    "benefits": [
+      "or 3 money",
+      "or promote this card, or from hand, or from discard"
+    ],
+    "effectKey": "necromancer",
+    "_matchedSheet": true
+  },
+  "undead::35": {
+    "deck": "undead",
+    "slot": 35,
+    "name": "Minotaur Skeleton",
+    "image": "assets/cards/undead/35-minotaur-skeleton.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Undead",
+    "rarity": 2,
+    "benefits": [
+      "or deploy 3 troops",
+      "or devour this card to assassinate up to 3 white troops at a single site"
+    ],
+    "effectKey": "minotaur-skeleton",
+    "_matchedSheet": true
+  },
+  "undead::36": {
+    "deck": "undead",
+    "slot": 36,
+    "name": "Flesh Golem",
+    "image": "assets/cards/undead/36-flesh-golem.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Construct",
+    "rarity": 2,
+    "benefits": [
+      "2 attack",
+      "devour this card to assassinate a troop"
+    ],
+    "effectKey": "flesh-golem",
+    "_matchedSheet": true
+  },
+  "undead::37": {
+    "deck": "undead",
+    "slot": 37,
+    "name": "Carrion Crawler",
+    "image": "assets/cards/undead/37-carrion-crawler.jpg",
+    "cost": 2,
+    "deckVp": 0,
+    "innerCircleVp": 2,
+    "aspect": "Malice",
+    "type": "Monstrosity",
+    "rarity": 2,
+    "benefits": [
+      "3 attack",
+      "devour a card in the market and replace it with this one"
+    ],
+    "effectKey": "carrion-crawler",
+    "_matchedSheet": true
+  },
+  "undead::38": {
+    "deck": "undead",
+    "slot": 38,
+    "name": "Revenant",
+    "image": "assets/cards/undead/38-revenant.jpg",
+    "cost": 4,
+    "deckVp": 1,
+    "innerCircleVp": 4,
+    "aspect": "Malice",
+    "type": "Undead",
+    "rarity": 1,
+    "benefits": [
+      "assassinate two troops,",
+      "If you have 8+ trophies, promote this card"
+    ],
+    "effectKey": "revenant",
+    "_matchedSheet": true
+  },
   "house-guards::40": {
     "deck": "house-guards",
     "slot": 40,
     "name": "House Guard",
     "image": "assets/cards/house-guards/40-unnamed.jpg",
     "cost": 3,
-    "deckVp": 1,
-    "innerCircleVp": 3,
+    "deckVp": 13,
+    "innerCircleVp": 0,
     "aspect": "Obedience",
     "type": "Drow",
     "rarity": 15,
@@ -2883,23 +3600,6 @@
       "2 attack"
     ],
     "effectKey": "house-guard",
-    "_matchedSheet": true
-  },
-  "priestesses::43": {
-    "deck": "priestesses",
-    "slot": 43,
-    "name": "Priestess of Lolth",
-    "image": "assets/cards/priestesses/43-unnamed.jpg",
-    "cost": 2,
-    "deckVp": 1,
-    "innerCircleVp": 2,
-    "aspect": "Obedience",
-    "type": "Drow",
-    "rarity": 15,
-    "benefits": [
-      "2 money"
-    ],
-    "effectKey": "priestess-of-lolth",
     "_matchedSheet": true
   },
   "insane-outcasts::41": {
@@ -2920,6 +3620,23 @@
     "effectKey": "insane-outcast",
     "_matchedSheet": true
   },
+  "priestesses::43": {
+    "deck": "priestesses",
+    "slot": 43,
+    "name": "Priestess of Lolth",
+    "image": "assets/cards/priestesses/43-unnamed.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Obedience",
+    "type": "Drow",
+    "rarity": 15,
+    "benefits": [
+      "2 money"
+    ],
+    "effectKey": "priestess-of-lolth",
+    "_matchedSheet": true
+  },
   "starter-1::42": {
     "deck": "starter-1",
     "slot": 42,
@@ -2932,7 +3649,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -2949,7 +3666,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -2966,7 +3683,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -2983,7 +3700,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3000,7 +3717,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3017,7 +3734,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3034,7 +3751,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3051,7 +3768,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
