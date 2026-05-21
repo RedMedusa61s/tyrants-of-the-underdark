@@ -772,6 +772,52 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     moves.playCard(i);
   };
 
+  // A compact "button-driven" prompt bar for pendingChoice kinds that aren't
+  // resolved by clicking the map (choose-one, select-player). The full
+  // game-tab prompt block has more context (the prompt header + the
+  // resolve-by-clicking-map hint for select-site/space), but those click-
+  // driven prompts work fine in the map tab via humanMapPick handling and
+  // SplitPlayView's panel pickers. This bar is for the cases where the user
+  // needs to push a button to resolve — without it the user is stuck on
+  // map/play and has to flip back to the game tab. Reported on Intellect
+  // Devourer's times(2, …) loops which surface a chooseOne each iteration.
+  const interactivePromptBar = (() => {
+    const pc = G.pendingChoice;
+    if (!pc) return null;
+    if (pc.playerId !== ctx.currentPlayer) return null;
+    if (pc.kind !== 'choose-one' && pc.kind !== 'select-player') return null;
+    return (
+      <div style={{ marginBottom: 8, padding: 10, background: '#3a2055', borderRadius: 4 }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 6 }}>{pc.prompt}</div>
+        {pc.kind === 'choose-one' && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {((pc.options as string[] | undefined) ?? []).map((label, i) => (
+              <button key={i} onClick={() => moves.resolveChoice(i)}
+                style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+        {pc.kind === 'select-player' && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {((pc.options as string[] | undefined) ?? []).map(pid => (
+              <button key={pid} onClick={() => moves.resolveChoice(pid)}
+                style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+                P{Number(pid) + 1} ({G.players[pid].color})
+              </button>
+            ))}
+          </div>
+        )}
+        {pc.optional && (
+          <button onClick={() => moves.resolveChoice(null)} style={{ marginTop: 8, padding: '4px 12px', fontSize: 12 }}>
+            Decline
+          </button>
+        )}
+      </div>
+    );
+  })();
+
   const actionBar = (
     <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
       {actionBtn(deployLabel, canDeploy, baseAction?.kind === 'deploy',
@@ -1137,6 +1183,11 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               )}
             </div>
           )}
+          {/* choose-one / select-player prompts surfaced here too — without
+              this the user has to flip back to the game tab to resolve each
+              iteration of cards like Intellect Devourer that loop chooseOne
+              under times(). */}
+          {interactivePromptBar}
           {/* Action bar rendered ABOVE the map so it's reachable without
               scrolling past the (large) board image. Per user feedback —
               this is the bar most likely needed while looking at the map
@@ -1158,6 +1209,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           clickableMarketSlots={clickableMarketSlots}
           humanMapPick={humanMapPick}
           actionBar={actionBar}
+          interactivePromptBar={interactivePromptBar}
         />
       )}
       {tab === 'calibrate' && <div style={{ marginTop: 16 }}><MapView calibrate /></div>}
@@ -1565,10 +1617,11 @@ function SplitPlayView(props: {
   clickableMarketSlots: Set<number> | null | undefined;
   humanMapPick: { prompt: string; optional?: boolean } | null;
   actionBar: React.ReactNode;
+  interactivePromptBar: React.ReactNode;
 }) {
   const { G, ctx, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
-          clickableMarketSlots, humanMapPick, actionBar } = props;
+          clickableMarketSlots, humanMapPick, actionBar, interactivePromptBar } = props;
   const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
 
   // Hover expansion: on hover-capable devices, mouse enter/leave drive
@@ -1604,6 +1657,7 @@ function SplitPlayView(props: {
           )}
         </div>
       )}
+      {interactivePromptBar}
       {actionBar}
       {/* Card-pile pickers that only render in the game tab by default —
           end-of-turn promote, devour-from-discard, devour-from-inner-circle.
