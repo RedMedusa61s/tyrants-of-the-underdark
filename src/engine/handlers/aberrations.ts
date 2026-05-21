@@ -127,7 +127,10 @@ registerAll({
                             if (ctx.G.siteControl[site.id] === me.color) n++;
                           }
                           if (n === 0) return true;
-                          return times(n, assassinateChoice({ whiteOnly: true }))(ctx);
+                          // Use a single multi-count assassinateChoice rather than
+                          // times(n, single-shot) so the "(N left)" prompt counts
+                          // down 3→2→1 instead of always showing "1 left" (#38).
+                          return assassinateChoice({ count: n, whiteOnly: true })(ctx);
                         }),
   // Cost 5 — Beholder: assassinate a troop + 1 power per 3 trophies
   'beholder':           sequence(
@@ -180,7 +183,7 @@ registerAll({
   //   money each. Approximate as 3 normal assassinates (the "at single
   //   site" restriction is a strategic narrowing; engine-wise the player
   //   can still pick targets independently). Money-per-kill TODO.
-  'death-tyrant':       times(3, assassinateChoice()),
+  'death-tyrant':       assassinateChoice({ count: 3 }),
 
   // Cost 7 — Elder Brain: promote your top card + play a card from
   //   inner-circle as if it were in hand (it stays in inner circle).

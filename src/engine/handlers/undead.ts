@@ -71,7 +71,7 @@ registerAll({
   'minotaur-skeleton':   chooseOne(
                            { label: 'Deploy 3 troops', handler: deployChoice({ count: 3 }) },
                            { label: 'Devour this → assassinate up to 3 white troops at one site',
-                             handler: devourSelfThen(times(3, assassinateChoice({ whiteOnly: true }))),
+                             handler: devourSelfThen(assassinateChoice({ count: 3, whiteOnly: true })),
                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
 
   // Cost 4 — Banshee: spy + "if there is another spy there, +3 attack."
