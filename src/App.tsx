@@ -542,7 +542,14 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     if (showingModal) return;
     if (!isAiTurn && !aiHasPendingChoice) return;
     const handle = setTimeout(() => {
-      const seatIdx = Number(ctx.currentPlayer);
+      // When the prompt is for an AI player but it isn't their turn (e.g.
+      // a forced-discard triggered by the human's card targets an AI), use
+      // the *prompted* player's seat for AI decision-making — not the
+      // current player's seat.
+      const aiPid = aiHasPendingChoice && G.pendingChoice!.playerId
+        ? G.pendingChoice!.playerId
+        : ctx.currentPlayer;
+      const seatIdx = Number(aiPid);
       const style = session?.config.aiStyles[seatIdx - 1] ?? 'random';
       let decided: AiMove | null = null;
       if (style === 'heuristic' && aiLookahead) {
@@ -576,17 +583,17 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           }
           return s.G;
         };
-        decided = decideHeuristicMoveWithWeights(G, ctx.currentPlayer, DEFAULT_WEIGHTS, simulate, rollout);
+        decided = decideHeuristicMoveWithWeights(G, aiPid, DEFAULT_WEIGHTS, simulate, rollout);
       } else if (style === 'easy') {
         // Easy tier: heuristic with lookahead disabled. The useLookahead
         // weight is respected by the AI's lookahead-aware code paths, so
         // setting it to 0 collapses the AI to pre-rollout strength (which
         // beat humans ~8% of the time vs ~32% for the standard tier).
         const easyWeights = { ...DEFAULT_WEIGHTS, useLookahead: 0 };
-        decided = decideHeuristicMoveWithWeights(G, ctx.currentPlayer, easyWeights);
+        decided = decideHeuristicMoveWithWeights(G, aiPid, easyWeights);
       } else {
         const decide = AI_FNS[style] ?? decideAiMove;
-        decided = decide(G, ctx.currentPlayer);
+        decided = decide(G, aiPid);
       }
       if (!decided) return;
       const fn = (moves as Record<string, (...args: unknown[]) => void>)[decided.name];
@@ -841,7 +848,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const interactivePromptBar = (() => {
     const pc = G.pendingChoice;
     if (!pc) return null;
-    if (pc.playerId !== ctx.currentPlayer) return null;
+    if (pc.playerId !== HUMAN_SEAT) return null;
     if (pc.kind !== 'choose-one' && pc.kind !== 'select-player') return null;
     return (
       <div style={{ marginBottom: 8, padding: 10, background: '#3a2055', borderRadius: 4 }}>
@@ -1217,7 +1224,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           }}
             style={{ padding: '4px 12px', background: tab === t ? '#3a2055' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer' }}>
             {t}
-            {t === 'play' && G.pendingChoice && G.pendingChoice.playerId === ctx.currentPlayer && (
+            {t === 'play' && G.pendingChoice && G.pendingChoice.playerId === HUMAN_SEAT && (
               <span style={{ marginLeft: 6, display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#e04050', verticalAlign: 'middle' }} />
             )}
           </button>
@@ -1299,7 +1306,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               {G.pendingChoice.kind === 'select-site' && ' Click a glowing site on the map.'}
               {G.pendingChoice.kind === 'select-troop-space' && ' Click a glowing troop space on the map.'}
             </div>
-            {G.pendingChoice.kind === 'choose-one' && G.pendingChoice.playerId === ctx.currentPlayer && (
+            {G.pendingChoice.kind === 'choose-one' && G.pendingChoice.playerId === HUMAN_SEAT && (
               <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {((G.pendingChoice.options as string[] | undefined) ?? []).map((label, i) => (
                   <button key={i} onClick={() => moves.resolveChoice(i)} style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
@@ -1308,7 +1315,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                 ))}
               </div>
             )}
-            {G.pendingChoice.kind === 'select-player' && G.pendingChoice.playerId === ctx.currentPlayer && (
+            {G.pendingChoice.kind === 'select-player' && G.pendingChoice.playerId === HUMAN_SEAT && (
               <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {((G.pendingChoice.options as string[] | undefined) ?? []).map(pid => (
                   <button key={pid} onClick={() => moves.resolveChoice(pid)}
@@ -1370,7 +1377,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           })}
         </div>
 
-        {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === ctx.currentPlayer && (
+        {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === HUMAN_SEAT && (
           <>
             <h2 style={{ marginTop: 24 }}>Discard — pick one</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1381,7 +1388,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
-        {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === ctx.currentPlayer && (
+        {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === HUMAN_SEAT && (
           <>
             <h2 style={{ marginTop: 24 }}>Inner Circle — pick one to devour</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1392,7 +1399,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
-        {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === ctx.currentPlayer && (
+        {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === HUMAN_SEAT && (
           <>
             <h2 style={{ marginTop: 24 }}>Played this turn — pick one to promote</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1406,7 +1413,12 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         <h2 style={{ marginTop: 24 }}>Your Hand</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
           {p.hand.map((c, i) => {
-            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === ctx.currentPlayer;
+            // The discard/devour-from-hand prompt is always answered by the
+            // prompted player — usually the current player, but for forced
+            // discards (Mindwitness, Chuul, Neogi, …) the prompt may target
+            // the human while it's an AI's turn. Gate on HUMAN_SEAT, not
+            // currentPlayer.
+            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === HUMAN_SEAT;
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
@@ -1684,7 +1696,7 @@ function SplitPlayView(props: {
   actionBar: React.ReactNode;
   interactivePromptBar: React.ReactNode;
 }) {
-  const { G, ctx, myTurn, p, moves, playCardSafe,
+  const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
           clickableMarketSlots, humanMapPick, actionBar, interactivePromptBar } = props;
   const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
@@ -1729,7 +1741,7 @@ function SplitPlayView(props: {
           text here. Without this, prompts like "Devour a card from your hand"
           (Wight, Vampire Spawn, etc.) were silently waiting for a hand click
           with no instruction — reported as #37. */}
-      {G.pendingChoice && G.pendingChoice.playerId === ctx.currentPlayer
+      {G.pendingChoice && G.pendingChoice.playerId === HUMAN_SEAT
         && G.pendingChoice.kind !== 'choose-one' && G.pendingChoice.kind !== 'select-player'
         && G.pendingChoice.kind !== 'select-site' && G.pendingChoice.kind !== 'select-troop-space'
         && !humanMapPick && (
@@ -1747,7 +1759,7 @@ function SplitPlayView(props: {
           end-of-turn promote, devour-from-discard, devour-from-inner-circle.
           Without these in split view the user has no way to resolve those
           prompts and the game stalls (reported as issue #34). */}
-      {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === ctx.currentPlayer && (
+      {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === HUMAN_SEAT && (
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Played this turn — pick one to promote</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1763,7 +1775,7 @@ function SplitPlayView(props: {
           </div>
         </div>
       )}
-      {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === ctx.currentPlayer && (
+      {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === HUMAN_SEAT && (
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Discard — pick one</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1773,7 +1785,7 @@ function SplitPlayView(props: {
           </div>
         </div>
       )}
-      {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === ctx.currentPlayer && (
+      {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === HUMAN_SEAT && (
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Inner Circle — pick one to devour</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1794,7 +1806,10 @@ function SplitPlayView(props: {
             <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85 }}>Your Hand ({p.hand.length})</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
               {p.hand.map((c, i) => {
-                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === ctx.currentPlayer;
+                // See same-named check in the play tab above — the
+                // prompted player owns this choice (HUMAN_SEAT for forced
+                // discards triggered on the human's hand during an AI turn).
+                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === HUMAN_SEAT;
                 const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
                 const onClick = isChoosing

@@ -622,7 +622,14 @@ export const TyrantsGame: Game<TyrantsState> = {
       };
       const done = handler(ctx2);
       if (!done && ctx2.pendingChoice) {
-        G.pendingChoice = { ...ctx2.pendingChoice, playerId: pid, cardKey: `${card.deck}::${card.slot}` };
+        G.pendingChoice = {
+          ...ctx2.pendingChoice,
+          // Default playerId to the actor — for cross-player prompts the
+          // handler should have already set playerId to the target.
+          playerId: ctx2.pendingChoice.playerId ?? pid,
+          actorId: pid,
+          cardKey: `${card.deck}::${card.slot}`,
+        };
         G.pausedHandlerState = ctx2.handlerState;
         p.discard.push(card);
         G.cardsPlayedThisTurn.push(card);
@@ -687,8 +694,11 @@ export const TyrantsGame: Game<TyrantsState> = {
         return;
       }
 
-      // Look up the card by cardKey from the player's discard (we stashed it there).
-      const p = G.players[pc.playerId];
+      // The suspended handler's card lives in the ACTOR's discard, which may
+      // differ from the responder (pc.playerId) for cross-player prompts
+      // (forced discard etc.). Fall back to playerId for legacy self-prompts.
+      const actorPid = pc.actorId ?? pc.playerId;
+      const p = G.players[actorPid];
       const cardIdx = p.discard.findIndex(c => `${c.deck}::${c.slot}` === pc.cardKey);
       const card = p.discard[cardIdx];
       if (!card) { G.pendingChoice = null; return; }
@@ -698,7 +708,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (!handler) { G.pendingChoice = null; return; }
 
       const ctx2: EffectContext = {
-        card, actorId: pc.playerId, G,
+        card, actorId: actorPid, G,
         pendingChoice: { ...pc, response },
         paused: true,
         handlerState: G.pausedHandlerState,
@@ -706,7 +716,16 @@ export const TyrantsGame: Game<TyrantsState> = {
       };
       const done = handler(ctx2);
       if (!done) {
-        G.pendingChoice = ctx2.pendingChoice ? { ...ctx2.pendingChoice, playerId: pc.playerId, cardKey: pc.cardKey } : null;
+        // Preserve cardKey and the actor (whose handler is still suspended).
+        // The handler MAY have set its own playerId on the new pendingChoice
+        // when targeting a different player (forced-discard chain over
+        // multiple opponents) — honor that, otherwise default to the actor.
+        G.pendingChoice = ctx2.pendingChoice
+          ? { ...ctx2.pendingChoice,
+              playerId: ctx2.pendingChoice.playerId ?? actorPid,
+              actorId: actorPid,
+              cardKey: pc.cardKey }
+          : null;
         G.pausedHandlerState = ctx2.handlerState;
         return;
       }

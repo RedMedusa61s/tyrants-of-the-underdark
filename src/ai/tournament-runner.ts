@@ -81,7 +81,12 @@ function runOneGame(
   // explore counterfactual board positions. boardgame.io's reducer is
   // pure, so calling it doesn't mutate the input state.
   const simulate: SimulateMoveFn = (G, playerId, moveName, args) => {
-    const wrapped = { ...state, G };
+    // Override ctx.currentPlayer to match the simulating player so the
+    // reducer doesn't reject as a wrong-turn move. Matches what the live
+    // app does in its simulate closure (App.tsx). Without this, every
+    // lookahead call for a non-current-player floods stderr with
+    // "ERROR: invalid move" — noise, but it spooked us during debugging.
+    const wrapped = { ...state, G, ctx: { ...state.ctx, currentPlayer: playerId } };
     const next = reducer(wrapped, makeMoveAction(moveName, args, playerId));
     if (next === wrapped) return null; // INVALID_MOVE
     return next.G;
@@ -94,7 +99,7 @@ function runOneGame(
   // where end-of-turn consequences differ from the immediate post-move
   // state — e.g. "Master of Melee → unlocks Advance Scout → 2 trophies."
   const rollout: RolloutToTurnEndFn = (G, playerId, moveName, args) => {
-    let s: BgState = { ...state, G };
+    let s: BgState = { ...state, G, ctx: { ...state.ctx, currentPlayer: playerId } };
     s = reducer(s, makeMoveAction(moveName, args, playerId));
     if (s.G === G) return null; // INVALID_MOVE (reducer rejected)
     // Continue with pure heuristic (no simulator/rollout passed) until
@@ -128,17 +133,38 @@ function runOneGame(
   let safety = opts.safetyLimit ?? 20000;
   while (safety-- > 0) {
     if (state.ctx.gameover) break;
-    const pid = state.ctx.currentPlayer;
+    // Cross-player pendingChoice (forced-discard etc.): the prompted player
+    // — not the turn-holder — must resolve before the turn can continue.
+    // Without this branch the loop stalls trying to endTurn with a prompt
+    // still live ("ERROR: invalid move: endTurn").
+    const pc = state.G.pendingChoice;
+    const pid = pc?.playerId && pc.playerId !== state.ctx.currentPlayer
+      ? pc.playerId
+      : state.ctx.currentPlayer;
     const seat = seats[Number(pid)];
     const weights = seat === 'A' ? weightsA : weightsB;
     const move = decideHeuristicMoveWithWeights(state.G, pid, weights, simulate, rollout);
     if (!move) {
-      state = reducer(state, makeMoveAction('endTurn', [], pid));
+      // Always endTurn under the real current player; if the cross-player
+      // resolver has no move (shouldn't happen — pendingChoice was set),
+      // fall through to letting the turn-holder advance.
+      state = reducer(state, makeMoveAction('endTurn', [], state.ctx.currentPlayer));
       continue;
     }
-    const next = reducer(state, makeMoveAction(move.name, move.args as unknown[], pid));
-    if (next === state) {
-      state = reducer(state, makeMoveAction('endTurn', [], pid));
+    // For cross-player prompts (forced discard): the responder isn't the
+    // turn-holder, so boardgame.io's reducer would reject their move if we
+    // submitted it under state.ctx.currentPlayer. Briefly fake ctx so the
+    // reducer accepts; restore the real currentPlayer afterward.
+    const isCrossPlayer = pid !== state.ctx.currentPlayer;
+    const submitState = isCrossPlayer
+      ? { ...state, ctx: { ...state.ctx, currentPlayer: pid } }
+      : state;
+    const submittedNext = reducer(submitState, makeMoveAction(move.name, move.args as unknown[], pid));
+    const next = isCrossPlayer
+      ? { ...submittedNext, ctx: { ...submittedNext.ctx, currentPlayer: state.ctx.currentPlayer } }
+      : submittedNext;
+    if (next === submitState || next === state) {
+      state = reducer(state, makeMoveAction('endTurn', [], state.ctx.currentPlayer));
     } else {
       state = next;
     }

@@ -28,8 +28,17 @@ export interface PendingChoice {
   optional?: boolean;
   response?: unknown;         // filled in by UI/AI before resume
   // Added by the game-level dispatcher when the choice is stored on G:
-  /** The player who owns this choice (filled in by game.ts when the prompt is published). */
+  /** The player who owns / answers this choice (filled in by game.ts when the
+   *  prompt is published). Usually the same as the actor, but for cross-player
+   *  prompts (an opponent forcing this player to discard) `playerId` is the
+   *  *target* and `actorId` below is the player whose card is mid-resolution. */
   playerId?: string;
+  /** The player whose card effect is suspended waiting on this choice. Equal
+   *  to `playerId` for self-targeted prompts; differs when one player's card
+   *  asks another player to act (forced discard etc.). The suspended handler's
+   *  card lives in `G.players[actorId].discard`; omitted = falls back to
+   *  `playerId` (legacy behavior). */
+  actorId?: string;
   /** "<deck>::<slot>" key of the card whose effect surfaced this choice. Lets
    *  AI / UI distinguish e.g. an Insane Outcast's "discard to return" prompt
    *  from a Succubus / Marilith "devour from hand" prompt. */

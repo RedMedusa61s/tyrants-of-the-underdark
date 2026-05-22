@@ -1978,63 +1978,122 @@ function fireForcedDiscardReactive(
 // devour which removes it entirely). Per the printed expansion's
 // triggers, most discard effects gate on the target having at least N
 // cards in hand ("...if they have 3+").
+//
+// IMPORTANT: per the rules, the player being forced to discard chooses
+// which card from their hand to discard — not the player who triggered the
+// effect, and not "the rightmost card." Earlier implementations popped
+// the last hand slot; we now publish a cross-player `select-card-in-hand`
+// pendingChoice routed to the target, and the AI / human picks per their
+// own discard heuristic (own worst card).
 
-/** Force EACH opponent (excluding ctx.actorId) to discard one random card
- *  from their hand if they have at least `minHand` cards. Picks the
- *  rightmost card index as the "discarded" one — order doesn't affect
- *  game state since hand is shuffled into discard at turn end anyway,
- *  and the AI's hand has no semantic positioning. Logged per-opponent. */
+/** Apply a chosen discard from a target's hand and fire any reactive. Pure
+ *  helper used after a `select-card-in-hand` prompt resolves. */
+function applyForcedDiscard(
+  G: import('../game').TyrantsState, targetPid: string, idx: number | null, offenderPid: string,
+): void {
+  if (idx == null) return;
+  const target = G.players[targetPid];
+  const card = target.hand[idx];
+  if (!card) return;
+  target.hand.splice(idx, 1);
+  target.discard.push(card);
+  Mechanics.log(G, `P${Number(targetPid) + 1} discarded ${card.name} (forced)`);
+  fireForcedDiscardReactive(G, card, targetPid, offenderPid);
+}
+
+/** Force EACH opponent (excluding ctx.actorId) with at least `minHand`
+ *  cards to choose a card from their hand to discard. Loops over the
+ *  qualifying targets, surfacing one `select-card-in-hand` prompt at a
+ *  time (each routed to the respective target). State is preserved across
+ *  the inter-prompt pauses via handlerState. */
 export function eachOpponentDiscardsIfMinHand(minHand: number = 3): EffectHandler {
   return ctx => {
-    for (const [pid, p] of Object.entries(ctx.G.players)) {
-      if (pid === ctx.actorId) continue;
-      if (p.hand.length < minHand) continue;
-      const idx = p.hand.length - 1;
-      const card = p.hand[idx];
-      if (!card) continue;
-      p.hand.splice(idx, 1);
-      p.discard.push(card);
-      Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced)`);
-      fireForcedDiscardReactive(ctx.G, card, pid, ctx.actorId);
+    interface S { remaining: string[]; activeTarget: string | null }
+    const state = (ctx.handlerState as S | null) ?? {
+      remaining: Object.keys(ctx.G.players)
+        .filter(pid => pid !== ctx.actorId && ctx.G.players[pid].hand.length >= minHand),
+      activeTarget: null,
+    };
+    // Process response from the active target (if any).
+    if (state.activeTarget !== null && ctx.pendingChoice) {
+      const idx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      applyForcedDiscard(ctx.G, state.activeTarget, idx, ctx.actorId);
+      state.activeTarget = null;
     }
+    // Pump the queue: prompt the next eligible target, or finish.
+    while (state.remaining.length > 0) {
+      const next = state.remaining[0];
+      state.remaining = state.remaining.slice(1);
+      // Re-check hand size — a chained reactive may have changed it.
+      if (ctx.G.players[next].hand.length < minHand) continue;
+      ctx.pendingChoice = {
+        kind: 'select-card-in-hand',
+        prompt: `P${Number(next) + 1}: pick a card to discard (forced by P${Number(ctx.actorId) + 1}'s effect).`,
+        playerId: next,
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { remaining: state.remaining, activeTarget: next };
+      return false;
+    }
+    ctx.handlerState = null;
     return true;
   };
 }
 
-/** Choose ONE opponent (with at least `minHand` cards in hand) to discard a
- *  random card. If no opponent qualifies, the effect skips silently. */
+/** Actor picks ONE opponent (with at least `minHand` cards). That opponent
+ *  then chooses which card from their own hand to discard. Two-phase prompt:
+ *  first a `select-player` to the actor, then a `select-card-in-hand` to the
+ *  chosen target. State across the pauses is held in `handlerState`. */
 export function chooseOpponentToDiscard(minHand: number = 3): EffectHandler {
   return ctx => {
-    if (!ctx.pendingChoice) {
-      const eligible = Object.keys(ctx.G.players).filter(id => {
-        if (id === ctx.actorId) return false;
-        return ctx.G.players[id].hand.length >= minHand;
-      });
-      if (eligible.length === 0) {
-        Mechanics.log(ctx.G, `(force discard: no opponent has ${minHand}+ cards in hand — skipped)`);
-        return true;
+    interface S { phase: 'pick-target' | 'pick-card'; target?: string }
+    const state = (ctx.handlerState as S | null) ?? { phase: 'pick-target' };
+    if (state.phase === 'pick-target') {
+      if (!ctx.pendingChoice) {
+        const eligible = Object.keys(ctx.G.players).filter(id => {
+          if (id === ctx.actorId) return false;
+          return ctx.G.players[id].hand.length >= minHand;
+        });
+        if (eligible.length === 0) {
+          Mechanics.log(ctx.G, `(force discard: no opponent has ${minHand}+ cards in hand — skipped)`);
+          ctx.handlerState = null;
+          return true;
+        }
+        ctx.pendingChoice = {
+          kind: 'select-player',
+          prompt: `Choose an opponent (with ${minHand}+ cards) to discard a card.`,
+          options: eligible,
+          optional: true,
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = { phase: 'pick-target' };
+        return false;
       }
+      const targetPid = ctx.pendingChoice.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (!targetPid) { ctx.handlerState = null; return true; }
+      if (ctx.G.players[targetPid].hand.length < minHand) { ctx.handlerState = null; return true; }
+      // Surface the discard prompt to the target.
       ctx.pendingChoice = {
-        kind: 'select-player',
-        prompt: `Choose an opponent (with ${minHand}+ cards) to discard a card`,
-        options: eligible,
-        optional: true,
+        kind: 'select-card-in-hand',
+        prompt: `P${Number(targetPid) + 1}: pick a card to discard (forced by P${Number(ctx.actorId) + 1}'s effect).`,
+        playerId: targetPid,
       } as PendingChoice;
       ctx.paused = true;
+      ctx.handlerState = { phase: 'pick-card', target: targetPid };
       return false;
     }
-    const pid = ctx.pendingChoice.response as string | null;
-    ctx.pendingChoice = null;
-    ctx.paused = false;
-    if (!pid) return true;
-    const target = ctx.G.players[pid];
-    if (!target || target.hand.length === 0) return true;
-    const idx = target.hand.length - 1;
-    const card = target.hand[idx];
-    target.hand.splice(idx, 1);
-    target.discard.push(card);
-    Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced)`);
-    fireForcedDiscardReactive(ctx.G, card, pid, ctx.actorId);
+    // phase === 'pick-card': process target's discard pick.
+    if (ctx.pendingChoice) {
+      const idx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (state.target) applyForcedDiscard(ctx.G, state.target, idx, ctx.actorId);
+    }
+    ctx.handlerState = null;
     return true;
   };
 }
@@ -2049,47 +2108,82 @@ export function forcePlayerOfColorToDiscardIfMinHand(
   minHand: number = 3,
 ): EffectHandler {
   return ctx => {
-    if (color === 'white') return true; // white troops aren't owned by a player
+    if (color === 'white') { ctx.handlerState = null; return true; } // white has no owner
+    interface S { activeTarget?: string }
+    const state = (ctx.handlerState as S | null) ?? {};
+    // Resume: target has picked.
+    if (state.activeTarget && ctx.pendingChoice) {
+      const idx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      applyForcedDiscard(ctx.G, state.activeTarget, idx, actorPid);
+      ctx.handlerState = null;
+      Mechanics.log(ctx.G, `(troop-killed discard fulfilled for P${Number(state.activeTarget) + 1})`);
+      return true;
+    }
+    // Initial: find target, surface prompt.
     const targetPid = Object.keys(ctx.G.players).find(k => ctx.G.players[k].color === color);
-    if (!targetPid || targetPid === actorPid) return true;
-    const target = ctx.G.players[targetPid];
-    if (target.hand.length < minHand) return true;
-    const idx = target.hand.length - 1;
-    const card = target.hand[idx];
-    target.hand.splice(idx, 1);
-    target.discard.push(card);
-    Mechanics.log(ctx.G, `P${Number(targetPid) + 1} discarded ${card.name} (forced; troop killed)`);
-    fireForcedDiscardReactive(ctx.G, card, targetPid, actorPid);
-    return true;
+    if (!targetPid || targetPid === actorPid) { ctx.handlerState = null; return true; }
+    if (ctx.G.players[targetPid].hand.length < minHand) { ctx.handlerState = null; return true; }
+    ctx.pendingChoice = {
+      kind: 'select-card-in-hand',
+      prompt: `P${Number(targetPid) + 1}: pick a card to discard (your troop was killed).`,
+      playerId: targetPid,
+    } as PendingChoice;
+    ctx.paused = true;
+    ctx.handlerState = { activeTarget: targetPid };
+    return false;
   };
 }
 
-/** Each opponent with a TROOP at the site of the last-placed spy discards
- *  a card if they have at least `minHand` cards. Used by Chuul ("place a
- *  spy; each opponent there discards a card if they have 3+"). */
+/** Each opponent with a TROOP at the site of the last-placed spy gets a
+ *  cross-player prompt to discard a card if they have at least `minHand`
+ *  cards. Used by Chuul. Iterates qualifying opponents via handlerState,
+ *  one prompt at a time. */
 export function eachOpponentAtLastSpySiteDiscardsIfMinHand(minHand: number = 3): EffectHandler {
   return ctx => {
+    interface S { remaining: string[]; activeTarget: string | null; siteId: string }
     const G = ctx.G;
-    const siteId = (G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite;
-    if (!siteId) return true;
-    const me = G.players[ctx.actorId];
-    const presentColors = new Set<string>();
-    for (const sp of TROOP_SPACES.filter(t => t.parentSite === siteId)) {
-      const occ = G.troops[sp.id];
-      if (occ && occ !== me.color && occ !== 'white') presentColors.add(occ);
+    let state = ctx.handlerState as S | null;
+    if (!state) {
+      const siteId = (G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite;
+      if (!siteId) return true;
+      const me = G.players[ctx.actorId];
+      const presentColors = new Set<string>();
+      for (const sp of TROOP_SPACES.filter(t => t.parentSite === siteId)) {
+        const occ = G.troops[sp.id];
+        if (occ && occ !== me.color && occ !== 'white') presentColors.add(occ);
+      }
+      const remaining = Object.entries(G.players)
+        .filter(([pid, p]) => pid !== ctx.actorId
+          && presentColors.has(p.color)
+          && p.hand.length >= minHand)
+        .map(([pid]) => pid);
+      state = { remaining, activeTarget: null, siteId };
     }
-    for (const [pid, p] of Object.entries(G.players)) {
-      if (pid === ctx.actorId) continue;
-      if (!presentColors.has(p.color)) continue;
-      if (p.hand.length < minHand) continue;
-      const idx = p.hand.length - 1;
-      const card = p.hand[idx];
-      if (!card) continue;
-      p.hand.splice(idx, 1);
-      p.discard.push(card);
-      Mechanics.log(ctx.G, `P${Number(pid) + 1} discarded ${card.name} (forced; troop at ${siteId})`);
-      fireForcedDiscardReactive(ctx.G, card, pid, ctx.actorId);
+    // Process active target's pick.
+    if (state.activeTarget !== null && ctx.pendingChoice) {
+      const idx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      applyForcedDiscard(G, state.activeTarget, idx, ctx.actorId);
+      state.activeTarget = null;
     }
+    // Pump the queue.
+    while (state.remaining.length > 0) {
+      const next = state.remaining[0];
+      state.remaining = state.remaining.slice(1);
+      if (G.players[next].hand.length < minHand) continue;
+      ctx.pendingChoice = {
+        kind: 'select-card-in-hand',
+        prompt: `P${Number(next) + 1}: pick a card to discard (your troop at ${state.siteId} was spied on).`,
+        playerId: next,
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { remaining: state.remaining, activeTarget: next, siteId: state.siteId };
+      return false;
+    }
+    ctx.handlerState = null;
     return true;
   };
 }
