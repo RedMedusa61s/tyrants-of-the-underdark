@@ -1403,9 +1403,21 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           <>
             <h2 style={{ marginTop: 24 }}>Played this turn — pick one to promote</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {G.cardsPlayedThisTurn.map((c, i) => (
-                <Card key={i} card={c} label="promote" onClick={() => moves.resolveChoice(i)} />
-              ))}
+              {G.cardsPlayedThisTurn.map((c, i) => {
+                // Gate clickability by the engine's eligible-indices list
+                // (Ambassador / Cultist of Myrkul / Myrmidons exclude the
+                // trigger card itself, and aspect-filtered triggers exclude
+                // mismatched aspects). Showing un-clickable cards alongside
+                // clickable ones gives the player context for "wait, why
+                // can't I promote that one?"
+                const eligibleIdxs = G.pendingChoice!.options as number[] | undefined;
+                const isEligible = !eligibleIdxs || eligibleIdxs.includes(i);
+                return (
+                  <Card key={i} card={c}
+                    label={isEligible ? 'promote' : '—'}
+                    onClick={isEligible ? () => moves.resolveChoice(i) : undefined} />
+                );
+              })}
             </div>
           </>
         )}

@@ -794,7 +794,15 @@ export function chooseOne(...opts: ChoiceOption[]): EffectHandler {
       ctx.handlerState = { selectedLabel: state.selectedLabel, childState: childCtx.handlerState };
       return false;
     }
-    ctx.handlerState = null;
+    // Propagate well-known top-level flags the engine reads off the
+    // outermost handlerState (currently just `returnedToSupply` —
+    // devourSelfThen / Insane Outcast). Otherwise wiping with `null`
+    // erased the flag and the card stayed in cardsPlayedThisTurn /
+    // discard — visible as Cultist of Myrkul being offered for end-of-
+    // turn promotion after it self-devoured.
+    const childFlags = childCtx.handlerState as { returnedToSupply?: boolean } | null;
+    if (childFlags?.returnedToSupply) ctx.handlerState = { returnedToSupply: true };
+    else ctx.handlerState = null;
     return true;
   };
 }
@@ -932,13 +940,20 @@ export function sequence(...steps: EffectHandler[]): EffectHandler {
         ctx.handlerState = { stepIdx: state.stepIdx, childState: childCtx.handlerState };
         return false;
       }
-      // Sub-handler completed; advance.
-      state = { stepIdx: state.stepIdx + 1, childState: null };
+      // Sub-handler completed; advance. Carry forward any returnedToSupply
+      // flag the sub-handler set so a devour-self inside a sequence still
+      // takes effect when the outer sequence ends (e.g. Revenant promotes
+      // itself via handlerState.returnedToSupply after the assassinate
+      // phase completes).
+      const childFlags = childCtx.handlerState as { returnedToSupply?: boolean } | null;
+      const carry = childFlags?.returnedToSupply ? true : (state as { returnedToSupply?: boolean }).returnedToSupply ?? false;
+      state = { stepIdx: state.stepIdx + 1, childState: null, ...(carry ? { returnedToSupply: true } : {}) } as SeqState & { returnedToSupply?: boolean };
       // After resume of a sub-handler, clear pendingChoice for the next step.
       ctx.pendingChoice = null;
       ctx.paused = false;
     }
-    ctx.handlerState = null;
+    const finalFlags = state as { returnedToSupply?: boolean };
+    ctx.handlerState = finalFlags.returnedToSupply ? { returnedToSupply: true } : null;
     return true;
   };
 }
@@ -2213,6 +2228,14 @@ export function devourSelfThen(after: EffectHandler): EffectHandler {
       return false;
     }
     Mechanics.log(ctx.G, `(devoured ${ctx.card.name} self)`);
+    // Push to the devoured pile so Ghost ("recruit top of devoured pile")
+    // and any future devoured-pile lookups can see this card. Without this
+    // the card vanishes entirely — not in deck/hand/discard, not even
+    // accessible to recovery effects. The `returnedToSupply` flag then
+    // tells game.ts to skip the usual "push to discard + cardsPlayedThisTurn"
+    // path, since the card is leaving play.
+    if (!ctx.G.devouredPile) ctx.G.devouredPile = [];
+    ctx.G.devouredPile.push({ ...ctx.card });
     ctx.handlerState = { returnedToSupply: true };
     return true;
   };
@@ -2262,6 +2285,10 @@ export function optionalDevourSelfThen(after: EffectHandler, label?: string): Ef
         return false;
       }
       Mechanics.log(ctx.G, `(devoured ${ctx.card.name} self)`);
+      // Same as devourSelfThen: push to the devoured pile for tracking
+      // and downstream effects (Ghost / future devoured-pile lookups).
+      if (!ctx.G.devouredPile) ctx.G.devouredPile = [];
+      ctx.G.devouredPile.push({ ...ctx.card });
       ctx.handlerState = { returnedToSupply: true };
       return true;
     }
