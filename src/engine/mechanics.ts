@@ -81,6 +81,13 @@ export const Mechanics = {
       // (No supply tracking yet; just drop the card.)
       return;
     }
+    // Defensively remove the card from cardsPlayedThisTurn too. Without
+    // this, promoting a card you just played (e.g. Necromancer picking
+    // itself from discard) leaves the same card eligible for a SECOND
+    // EOT promote prompt later in the same turn — duplicate copy in
+    // inner circle (reported as #45).
+    const ptIdx = G.cardsPlayedThisTurn.findIndex(c => c.deck === card.deck && c.slot === card.slot);
+    if (ptIdx >= 0) G.cardsPlayedThisTurn.splice(ptIdx, 1);
     pl.innerCircle.push(card);
     Mechanics.log(G, `P${Number(playerId) + 1} promoted ${card.name}`);
   },
