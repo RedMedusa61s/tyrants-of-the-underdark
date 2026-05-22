@@ -94,42 +94,37 @@ registerAll({
   // Cost 4 — Ogre Zombie: supplant a white troop anywhere
   'ogre-zombie':         supplantChoice({ whiteOnly: true, anywhere: true }),
   // Cost 4 — Revenant: assassinate 2 troops; if you have 8+ trophies,
-  //   self-promote (move this card to inner circle). Self-promote = the
-  //   played Revenant goes to inner circle instead of discard.
+  //   self-promote (move this card to inner circle instead of discard).
+  //
+  // The earlier hand-rolled step-counter wrapper had a latent bug
+  // (problem-report #42): it returned false BETWEEN the two assassinates
+  // without setting a pendingChoice, so the engine's resolveChoice path
+  // saw "not done, no prompt" and stalled — only the first assassinate
+  // ever fired. Replaced with sequence(assassinateChoice({count:2}), …)
+  // which is engine-safe and also gets the correct "(2 left) → (1 left)"
+  // prompt counter (cf. #38).
   'revenant':            (ctx => {
-                           const me = ctx.G.players[ctx.actorId];
-                           // First: pop the two assassinates as a sequence.
-                           // We need to be re-entry-safe across the
-                           // pendingChoice pause. Delegate to a composed
-                           // handler and add the self-promote bonus at the
-                           // end via handlerState.
-                           // For simplicity here we use a synchronous
-                           // approximation: queue 2 assassinates, then on
-                           // completion, if trophies >= 8 push self into
-                           // inner circle.
-                           interface S { step: number; sub?: unknown }
-                           const state = (ctx.handlerState as S | null) ?? { step: 0 };
-                           // Step 0..1: run the 2 assassinates via times().
-                           if (state.step < 2) {
-                             const handler = assassinateChoice();
-                             const sub: { handlerState: unknown; pendingChoice: import('../types').PendingChoice | null; paused: boolean | undefined } = {
-                               handlerState: state.sub ?? null,
-                               pendingChoice: ctx.pendingChoice ?? null,
-                               paused: ctx.paused,
-                             };
-                             const childCtx = { ...ctx, ...sub } as typeof ctx;
+                           // Run the 2-assassinate stage via the count=2 helper
+                           // (no inter-pick stall, correct "(2 left)/(1 left)"
+                           // prompt label). When that stage finishes we check
+                           // the trophy threshold and optionally self-promote.
+                           // Inner state distinguishes the two phases.
+                           interface RS { phase: 'assassinate' | 'promote'; sub?: unknown; returnedToSupply?: boolean }
+                           const state = (ctx.handlerState as RS | null) ?? { phase: 'assassinate', sub: null };
+                           if (state.phase === 'assassinate') {
+                             const handler = assassinateChoice({ count: 2 });
+                             const childCtx = { ...ctx, handlerState: state.sub ?? null,
+                                                 pendingChoice: ctx.pendingChoice, paused: ctx.paused } as typeof ctx;
                              const done = handler(childCtx);
                              ctx.pendingChoice = childCtx.pendingChoice;
                              ctx.paused = childCtx.paused;
                              if (!done) {
-                               ctx.handlerState = { step: state.step, sub: childCtx.handlerState };
+                               ctx.handlerState = { phase: 'assassinate', sub: childCtx.handlerState };
                                return false;
                              }
-                             ctx.handlerState = { step: state.step + 1, sub: null };
-                             if (state.step + 1 < 2) return false;
+                             // Assassinate phase complete — fall through to promote check.
                            }
-                           // After both assassinates: check trophies and
-                           // optionally self-promote.
+                           const me = ctx.G.players[ctx.actorId];
                            if (totalTrophies(me) >= 8) {
                              ctx.G.log.push(`P${Number(ctx.actorId) + 1} promoted Revenant (8+ trophies)`);
                              me.innerCircle.push({ ...ctx.card });
