@@ -3592,7 +3592,7 @@
     "image": "assets/cards/house-guards/40-unnamed.jpg",
     "cost": 3,
     "deckVp": 1,
-    "innerCircleVp": 1,
+    "innerCircleVp": 3,
     "aspect": "Obedience",
     "type": "Drow",
     "rarity": 15,

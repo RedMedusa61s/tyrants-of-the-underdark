@@ -8,6 +8,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { allCards } from '../card-data';
+import { useCachedImage } from '../image-cache';
+
+/** Card image rendered through the IndexedDB sheet-slice cache. The dev
+ *  tabs previously used a plain `<img src="/cards/foo.jpg">` which only
+ *  worked in `vite dev` (where publicDir serves at root); in production
+ *  with the GH-Pages base path the URL resolved to a 404 and the images
+ *  disappeared. Going through useCachedImage matches how the main Card
+ *  component renders, so the dev tabs work in every deploy mode. */
+function CachedCardImg({ path, alt, style }: { path: string; alt: string; style: React.CSSProperties }) {
+  const url = useCachedImage(path);
+  return <img src={url} alt={alt} style={style} />;
+}
 
 const STORAGE_KEY = 'totu.card-text-overrides';
 type Overrides = Record<string, string>;
@@ -77,7 +89,7 @@ export function CardTextVerify() {
               background: '#1a1228', borderRadius: 4, padding: 6,
               border: edited ? '2px solid #ffcc44' : '2px solid transparent',
             }}>
-              <img src={'/' + c.image.replace(/^assets\//, '')} alt={c.name}
+              <CachedCardImg path={c.image} alt={c.name}
                 style={{ width: '100%', display: 'block', borderRadius: 4 }} />
               <div style={{ fontSize: 11, marginTop: 4, opacity: 0.85, display: 'flex', justifyContent: 'space-between' }}>
                 <span>{c.name}</span>

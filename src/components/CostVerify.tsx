@@ -4,6 +4,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { allCards } from '../card-data';
+import { useCachedImage } from '../image-cache';
+
+/** See note in CardTextVerify.tsx — same wrapper, same reason. */
+function CachedCardImg({ path, alt, style }: { path: string; alt: string; style: React.CSSProperties }) {
+  const url = useCachedImage(path);
+  return <img src={url} alt={alt} style={style} />;
+}
 
 const STORAGE_KEY = 'totu.field-overrides';
 type FieldOverrides = { cost?: number; deckVp?: number; innerCircleVp?: number; aspect?: string };
@@ -119,7 +126,7 @@ export function CostVerify() {
           const aspectOverridden = o.aspect !== undefined;
           return (
             <div key={c.name} style={{ background: '#1a1228', borderRadius: 4, padding: 4 }}>
-              <img src={'/' + c.image.replace(/^assets\//, '')} alt={c.name}
+              <CachedCardImg path={c.image} alt={c.name}
                 style={{ width: '100%', display: 'block', borderRadius: 4 }} />
               <div style={{ fontSize: 11, marginTop: 4, opacity: 0.85 }}>{c.name}</div>
               <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 3 }}>

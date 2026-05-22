@@ -10,6 +10,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import manifest from '../../assets/cards.json';
+import { useCachedImage } from '../image-cache';
+
+/** See CardTextVerify.tsx for the rationale — dev tabs need to go through
+ *  the IndexedDB sheet-slice cache to load images in production. */
+function CachedCardImg({ path, alt, style }: { path: string; alt: string; style: React.CSSProperties }) {
+  const url = useCachedImage(path);
+  return <img src={url} alt={alt} style={style} />;
+}
 import dedupRaw from '../../assets/dedup-groups.json';
 import sheetCsv from '../../assets/raw-card-data.csv?raw';
 
@@ -178,8 +186,7 @@ export function CardCalibration() {
           const groupSize = gi != null ? DEDUP[activeDeck][gi].slots.length : 1;
           return (
             <div key={c.slot} style={{ background: '#1a1228', borderRadius: 4, padding: 4 }}>
-              <img src={'/' + c.image.replace(/^assets\//, '')}
-                alt={`slot ${c.slot}`}
+              <CachedCardImg path={c.image} alt={`slot ${c.slot}`}
                 style={{ width: '100%', display: 'block', borderRadius: 4 }} />
               <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2 }}>
                 slot {c.slot}{groupSize > 1 ? ` · group×${groupSize}` : ''}
