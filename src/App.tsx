@@ -613,11 +613,15 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     ? new Set((humanMarketPick.options as number[] | undefined) ?? [])
     : null;
 
-  // When split-view turns ON, the game and map tabs disappear from the bar.
-  // If the user happened to be on one of them, slide them over to 'play'
-  // so they aren't stuck staring at a tab that's no longer accessible.
+  // Keep `tab` consistent with the current `splitView` mode.
+  // - Turning ON split view: 'game' / 'map' tabs hide from the bar, so move
+  //   the user to 'play' if they were on one of those.
+  // - Turning OFF split view: the 'play' tab hides, so move the user to
+  //   'game' (the dashboard view) instead of leaving them on a hidden tab
+  //   that silently fails to render — user-reported.
   useEffect(() => {
     if (splitView && (tab === 'game' || tab === 'map')) setTab('play');
+    else if (!splitView && tab === 'play') setTab('game');
   }, [splitView, tab]);
 
   // Auto-focus the map tab whenever the human needs to click something on the board.
