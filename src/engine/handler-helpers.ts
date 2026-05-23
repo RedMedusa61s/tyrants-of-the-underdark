@@ -2313,7 +2313,10 @@ export function marketDevourReplaceWithSelf(): EffectHandler {
         kind: 'select-market-card',
         prompt: `Devour a card from the market; ${ctx.card.name} replaces it.`,
         options: eligible,
-        optional: true,
+        // Mandatory per card text — the swap isn't conditional, it's part
+        // of the printed effect. User question on #50 confirmed: "decline"
+        // shouldn't be an option here.
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       return false;

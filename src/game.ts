@@ -661,8 +661,12 @@ export const TyrantsGame: Game<TyrantsState> = {
               c => c.deck === card.deck && c.slot === card.slot
             );
             if (di >= 0) G.players[playerId].discard.splice(di, 1);
+            // Mechanics.promote already removes the card from
+            // cardsPlayedThisTurn (defensive — added in baf375c for #45).
+            // Splicing again here would drop a *different* card at the
+            // same index — reported as #47 / #48 when two identical
+            // EOT-promote triggers ran the queue.
             Mechanics.promote(G, playerId, card);
-            G.cardsPlayedThisTurn.splice(idx, 1);
           }
         }
         // Consume the trigger we were responding to.

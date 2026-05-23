@@ -18,7 +18,7 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          playerHasOwnSpy, playerCanAssassinate,
          playerCanReturnEnemyTroop, playerCanReturnEnemySpy } from '../handler-helpers';
 import { Mechanics } from '../mechanics';
-import { assassinateTroop } from '../map-state';
+import { assassinateTroop, hasPresence } from '../map-state';
 import { TROOP_SPACES } from '../../data/troop-spaces';
 import { SITES } from '../../data/sites';
 import { totalTrophies, type Color } from '../../game';
@@ -57,12 +57,23 @@ registerAll({
                           const me = ctx.G.players[ctx.actorId];
                           // Phase 1: pick the assassinate target.
                           if (!ctx.pendingChoice) {
-                            // Eligible: any space within presence where an
-                            // enemy/white troop sits.
+                            // Eligible: any space where you have presence
+                            // occupied by an enemy/white troop. The earlier
+                            // implementation skipped the presence check and
+                            // let Mindwitness assassinate anywhere on the
+                            // map — reported as #49. "Assassinate a troop"
+                            // on a card inherits the rulebook constraint
+                            // (p.13) unless the text says "anywhere."
                             const eligible: string[] = [];
                             for (const t of TROOP_SPACES) {
                               const occ = ctx.G.troops[t.id];
                               if (!occ || occ === me.color) continue;
+                              const hasPres = t.parentSite
+                                ? hasPresence(ctx.G, me.color, { site: t.parentSite })
+                                : t.parentRoute
+                                  ? hasPresence(ctx.G, me.color, { space: t.id })
+                                  : false;
+                              if (!hasPres) continue;
                               eligible.push(t.id);
                             }
                             if (eligible.length === 0) {
