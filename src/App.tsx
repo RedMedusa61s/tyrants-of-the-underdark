@@ -1364,11 +1364,22 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
             const remaining = G.auxStacks?.[stack] ?? 0;
             const cost = data.cost ?? 999;
+            // Sentinel picks from a free-recruit prompt (e.g. Conjurer):
+            //  -1 = House Guard, -2 = Priestess.  When the picker offers
+            //  these, clicking the aux-stack card resolves the choice.
+            const sentinel = stack === 'houseGuards' ? -1 : -2;
+            const freeRecruitPickable = !!clickableMarketSlots && clickableMarketSlots.has(sentinel);
             const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
             const label = remaining === 0
               ? `empty · ${data.name}`
-              : `recruit (${cost} Inf) · ${remaining} left`;
-            const onClick = canRecruit ? () => moves.recruitFromAuxStack(stack) : undefined;
+              : freeRecruitPickable
+                ? `pick (free) · ${remaining} left`
+                : `recruit (${cost} Inf) · ${remaining} left`;
+            const onClick = freeRecruitPickable
+              ? () => moves.resolveChoice(sentinel)
+              : canRecruit
+                ? () => moves.recruitFromAuxStack(stack)
+                : undefined;
             return (
               <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
                 <Card card={card} label={label} onClick={onClick} />
@@ -1859,11 +1870,21 @@ function SplitPlayView(props: {
                 const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
                 const remaining = G.auxStacks?.[stack] ?? 0;
                 const cost = data.cost ?? 999;
+                // Sentinel picks from a free-recruit prompt; see main play
+                // tab's equivalent block. -1 = House Guard, -2 = Priestess.
+                const sentinel = stack === 'houseGuards' ? -1 : -2;
+                const freeRecruitPickable = !!clickableMarketSlots && clickableMarketSlots.has(sentinel);
                 const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
                 const label = remaining === 0
                   ? `empty · ${data.name}`
-                  : `recruit (${cost} Inf) · ${remaining} left`;
-                const onClick = canRecruit ? () => moves.recruitFromAuxStack(stack) : undefined;
+                  : freeRecruitPickable
+                    ? `pick (free) · ${remaining} left`
+                    : `recruit (${cost} Inf) · ${remaining} left`;
+                const onClick = freeRecruitPickable
+                  ? () => moves.resolveChoice(sentinel)
+                  : canRecruit
+                    ? () => moves.recruitFromAuxStack(stack)
+                    : undefined;
                 return (
                   <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
                     <Card card={card} label={label} onClick={onClick} />

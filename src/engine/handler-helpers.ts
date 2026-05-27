@@ -1069,7 +1069,20 @@ export function promoteTopOfDeck(opts?: { count?: number }): EffectHandler {
 // Surfaces a market picker filtered to slots matching aspect + cost cap. Recruit is
 // free (no influence spent).
 
-export function recruitFromMarketFiltered(opts: { aspect?: string; maxCost: number }): EffectHandler {
+/** Free recruit (paid by an effect, not by influence) of a single card from
+ *  the market row, with an optional aspect filter and cost ceiling.
+ *
+ *  When `includeAuxStacks` is true, House Guards (cost 3) and Priestesses
+ *  (cost 5) are also offered as eligible picks if their cost meets the
+ *  ceiling and there are copies left in the aux stack. Encoded as
+ *  sentinel indices: -1 = houseGuards, -2 = priestesses. UI renders
+ *  these alongside the market row; resolve dispatches to the right
+ *  Mechanics helper. Used by Conjurer (#53). */
+export function recruitFromMarketFiltered(opts: {
+  aspect?: string;
+  maxCost: number;
+  includeAuxStacks?: boolean;
+}): EffectHandler {
   return ctx => {
     if (!ctx.pendingChoice) {
       const eligible: number[] = [];
@@ -1081,6 +1094,22 @@ export function recruitFromMarketFiltered(opts: { aspect?: string; maxCost: numb
         if (opts.aspect && data.aspect.toLowerCase() !== opts.aspect.toLowerCase()) continue;
         if (data.cost > opts.maxCost) continue;
         eligible.push(i);
+      }
+      if (opts.includeAuxStacks) {
+        // House Guard: cost 3, drow/Obedience. Priestess of Lolth: cost 5,
+        // drow/Obedience. Aspect filter applies; both are Obedience.
+        const HG = lookupCard('house-guards', 40);
+        const PR = lookupCard('priestesses', 43);
+        if (HG && ctx.G.auxStacks.houseGuards > 0
+          && HG.cost <= opts.maxCost
+          && (!opts.aspect || HG.aspect.toLowerCase() === opts.aspect.toLowerCase())) {
+          eligible.push(-1);
+        }
+        if (PR && ctx.G.auxStacks.priestesses > 0
+          && PR.cost <= opts.maxCost
+          && (!opts.aspect || PR.aspect.toLowerCase() === opts.aspect.toLowerCase())) {
+          eligible.push(-2);
+        }
       }
       if (eligible.length === 0) return true;
       const label = opts.aspect ? `${opts.aspect} card` : 'card';
@@ -1097,7 +1126,17 @@ export function recruitFromMarketFiltered(opts: { aspect?: string; maxCost: numb
     ctx.pendingChoice = null;
     ctx.paused = false;
     if (idx == null) return true;
-    Mechanics.recruitFromMarket(ctx.G, ctx.actorId, idx);
+    if (idx === -1) {
+      const HG = lookupCard('house-guards', 40);
+      if (HG) Mechanics.recruitFromAuxStack(ctx.G, ctx.actorId, 'houseGuards',
+        { deck: HG.deck, slot: HG.slot, name: HG.name, image: HG.image });
+    } else if (idx === -2) {
+      const PR = lookupCard('priestesses', 43);
+      if (PR) Mechanics.recruitFromAuxStack(ctx.G, ctx.actorId, 'priestesses',
+        { deck: PR.deck, slot: PR.slot, name: PR.name, image: PR.image });
+    } else {
+      Mechanics.recruitFromMarket(ctx.G, ctx.actorId, idx);
+    }
     return true;
   };
 }

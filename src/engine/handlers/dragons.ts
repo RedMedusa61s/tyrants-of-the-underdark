@@ -2,7 +2,7 @@
 
 import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
          assassinateChoice, deployChoice, supplantChoice, chooseOne,
-         returnOwnSpyChoice, moveEnemyTroopChoice, conditionalGrant,
+         returnOwnSpyChoice, returnEnemySpyChoice, moveEnemyTroopChoice, conditionalGrant,
          ifAnotherPlayerTroopAtLastPlacedSpySite, devourMarketChoice,
          supplantAtLastPlacedSpySite, supplantAtLastReturnedSpySite,
          returnEnemyTroopOrSpyChoice, playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
@@ -21,6 +21,28 @@ const grantVpPerControlMarkerHeld: EffectHandler = ctx => {
     Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +${n} VP from Green Dragon (control markers held)`);
   } else {
     Mechanics.log(ctx.G, `(Green Dragon: no control markers held — +0 VP)`);
+  }
+  return true;
+};
+
+/** Per Red Dragon's in-play text: +1 VP per *total*-controlled site (a
+ *  site you hold AND no opponent has a spy on). Distinct from Green
+ *  Dragon's "control marker" count — total control is the stricter
+ *  condition where the marker shows the higher VP face. */
+const grantVpPerTotalControlledSite: EffectHandler = ctx => {
+  const me = ctx.G.players[ctx.actorId];
+  let n = 0;
+  for (const [siteId, m] of Object.entries(ctx.G.controlMarkers)) {
+    if (m.holder !== me.color) continue;
+    const spies = ctx.G.spies[siteId] ?? [];
+    const opposingSpy = spies.some(c => c !== me.color);
+    if (!opposingSpy) n++;
+  }
+  if (n > 0) {
+    me.vp += n;
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +${n} VP from Red Dragon (total-controlled sites)`);
+  } else {
+    Mechanics.log(ctx.G, `(Red Dragon: no total-controlled sites — +0 VP)`);
   }
   return true;
 };
@@ -67,6 +89,12 @@ registerAll({
   'green-dragon':         chooseOne(
                             { label: 'Place a spy + supplant a troop at that site', handler: sequence(placeSpyAtChosenSite(), supplantAtLastPlacedSpySite()) },
                             { label: 'Return a spy + supplant a troop at that site + 1 VP per control marker held', handler: sequence(returnOwnSpyChoice(), supplantAtLastReturnedSpySite(), grantVpPerControlMarkerHeld), available: playerHasOwnSpy }),
-  'red-dragon':           sequence(supplantChoice(), returnOwnSpyChoice({ optional: true })),
+  // Red Dragon: "Supplant a troop. Return an enemy spy. +1 VP per
+  // total-controlled site." Previously this returned the player's OWN
+  // spy and skipped the VP grant entirely (#52). Spy-return is optional
+  // since enemy spies may not exist where the player has presence.
+  'red-dragon':           sequence(supplantChoice(),
+                                   returnEnemySpyChoice(),
+                                   grantVpPerTotalControlledSite),
   'white-dragon':         deployChoice({ count: 3 }),
 });
