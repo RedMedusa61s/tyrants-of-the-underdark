@@ -75,19 +75,22 @@ export const Mechanics = {
 
   promote(G: TyrantsState, playerId: string, card: CardRef) {
     const pl = p(G, playerId);
+    // Defensively remove the card from cardsPlayedThisTurn first — applies
+    // to BOTH the normal promote path and the Insane-Outcast-returns-to-
+    // supply branch. Without this, picking an Outcast in an EOT promote
+    // prompt would consume the trigger but leave the Outcast in the
+    // played list, so the next EOT trigger offers it AGAIN — reported as
+    // #56 (user clicked Outcast twice and got two no-op "returns to
+    // supply" messages instead of two real promotes). Original motivation
+    // for the splice was Necromancer self-promote-from-discard (#45).
+    const ptIdx = G.cardsPlayedThisTurn.findIndex(c => c.deck === card.deck && c.slot === card.slot);
+    if (ptIdx >= 0) G.cardsPlayedThisTurn.splice(ptIdx, 1);
     // Insane Outcast self-eject: if would be promoted, return to supply instead.
     if (card.deck === 'insane-outcasts') {
       Mechanics.log(G, `P${Number(playerId) + 1} cannot promote ${card.name} (returns to supply)`);
       // (No supply tracking yet; just drop the card.)
       return;
     }
-    // Defensively remove the card from cardsPlayedThisTurn too. Without
-    // this, promoting a card you just played (e.g. Necromancer picking
-    // itself from discard) leaves the same card eligible for a SECOND
-    // EOT promote prompt later in the same turn — duplicate copy in
-    // inner circle (reported as #45).
-    const ptIdx = G.cardsPlayedThisTurn.findIndex(c => c.deck === card.deck && c.slot === card.slot);
-    if (ptIdx >= 0) G.cardsPlayedThisTurn.splice(ptIdx, 1);
     pl.innerCircle.push(card);
     Mechanics.log(G, `P${Number(playerId) + 1} promoted ${card.name}`);
   },
