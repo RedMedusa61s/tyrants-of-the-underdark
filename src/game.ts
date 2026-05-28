@@ -178,8 +178,10 @@ export interface TyrantsState {
    *  eligible options to played cards of that aspect — the Air / Fire /
    *  Water Myrmidons all restrict to 'Obedience' per their printed text.
    *  `optional` tracks whether the printed text says "you may promote" —
-   *  per the designer-confirmed BGG rules thread, the default is
-   *  mandatory ("if possible") when the word "may" is absent. */
+   *  default is mandatory ("if possible") when the word "may" is absent.
+   *  This follows the community consensus reading on BGG thread 1712589;
+   *  the actual designers (Peter Lee / Rodney Thompson / Andrew Veen)
+   *  haven't ruled on it publicly. */
   pendingEotPromotions: Array<EotPromoteTrigger>;
   /** Persistent pile of every card that Mechanics.devour has consumed
    *  this game. Aberrations/Undead expansion mechanics reference it

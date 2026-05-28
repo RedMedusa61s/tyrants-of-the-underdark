@@ -42,12 +42,14 @@ export function flagEotPromote(
     // is carried as a property on the queued entry; game.ts filters the
     // 'select-played-card' eligible list by aspect when set.
     //
-    // Per the BGG rules thread (designer-confirmed): if a card's text says
-    // "promote" without "may", the action is MANDATORY when possible.
-    // We default this trigger to mandatory; callers whose printed card text
-    // is "you may promote..." can pass `optional: true` to make it
-    // declinable. The flag is carried on the trigger so game.ts's endTurn
-    // prompt can use it.
+    // Default to mandatory. The reading is that "may" cards are optional
+    // and "promote..." (no "may") cards are mandatory — community
+    // consensus on BGG thread 1712589 (NOT a designer ruling; the actual
+    // designers Peter Lee / Rodney Thompson / Andrew Veen didn't weigh
+    // in there). It's the consistent reading of the printed effects, so
+    // we use it as the default. Callers whose printed text is
+    // "you may promote..." opt out with `optional: true`. The flag is
+    // carried on the trigger so game.ts's endTurn prompt can use it.
     const trigger: import('../game').EotPromoteTrigger = { ...ctx.card };
     if (opts?.aspectFilter) trigger.aspectFilter = opts.aspectFilter;
     if (opts?.optional) trigger.optional = true;
