@@ -31,7 +31,9 @@ export function grant(opts: { power?: number; influence?: number; draw?: number 
 // turn-end step will surface as a "select a played card to promote" prompt. The
 // played-card list lives on the per-turn promotion queue.
 
-export function flagEotPromote(opts?: { count?: number; aspectFilter?: string }): EffectHandler {
+export function flagEotPromote(
+  opts?: { count?: number; aspectFilter?: string; optional?: boolean },
+): EffectHandler {
   return ctx => {
     const n = opts?.count ?? 1;
     // Push the triggering card N times so the endTurn picker can exclude it from each
@@ -39,12 +41,19 @@ export function flagEotPromote(opts?: { count?: number; aspectFilter?: string })
     // optional aspectFilter (e.g. 'Obedience' for the Air/Fire/Water Myrmidons)
     // is carried as a property on the queued entry; game.ts filters the
     // 'select-played-card' eligible list by aspect when set.
-    const trigger = opts?.aspectFilter
-      ? { ...ctx.card, aspectFilter: opts.aspectFilter }
-      : ctx.card;
+    //
+    // Per the BGG rules thread (designer-confirmed): if a card's text says
+    // "promote" without "may", the action is MANDATORY when possible.
+    // We default this trigger to mandatory; callers whose printed card text
+    // is "you may promote..." can pass `optional: true` to make it
+    // declinable. The flag is carried on the trigger so game.ts's endTurn
+    // prompt can use it.
+    const trigger: import('../game').EotPromoteTrigger = { ...ctx.card };
+    if (opts?.aspectFilter) trigger.aspectFilter = opts.aspectFilter;
+    if (opts?.optional) trigger.optional = true;
     for (let i = 0; i < n; i++) ctx.G.pendingEotPromotions.push(trigger);
     const tag = opts?.aspectFilter ? ` ${opts.aspectFilter} card` : ' another card';
-    Mechanics.log(ctx.G, `(eot: queued ${n} promote —${tag} played this turn)`);
+    Mechanics.log(ctx.G, `(eot: queued ${n} promote —${tag} played this turn${opts?.optional ? ', optional' : ''})`);
     return true;
   };
 }

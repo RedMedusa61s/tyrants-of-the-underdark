@@ -176,8 +176,11 @@ export interface TyrantsState {
    *  Most entries are bare CardRef (any-played-card promote, e.g. Earth
    *  Elemental Myrmidon). Entries with `aspectFilter` set restrict the
    *  eligible options to played cards of that aspect — the Air / Fire /
-   *  Water Myrmidons all restrict to 'Obedience' per their printed text. */
-  pendingEotPromotions: Array<CardRef & { aspectFilter?: string }>;
+   *  Water Myrmidons all restrict to 'Obedience' per their printed text.
+   *  `optional` tracks whether the printed text says "you may promote" —
+   *  per the designer-confirmed BGG rules thread, the default is
+   *  mandatory ("if possible") when the word "may" is absent. */
+  pendingEotPromotions: Array<EotPromoteTrigger>;
   /** Persistent pile of every card that Mechanics.devour has consumed
    *  this game. Aberrations/Undead expansion mechanics reference it
    *  (Ghost's "top of devoured" recovery). Older saves don't have it;
@@ -215,6 +218,15 @@ function toCardRef(deck: string, slot: number): CardRef {
   if (!c) throw new Error(`Unknown card ${deck}::${slot}`);
   return { deck, slot, name: c.name, image: c.image };
 }
+
+/** Queued end-of-turn promote trigger. `aspectFilter` restricts the
+ *  eligible options to played cards of that aspect (Myrmidons). `optional`
+ *  flips the prompt from mandatory (default — RAW for "promote..." without
+ *  "may") to declinable. */
+export type EotPromoteTrigger = CardRef & {
+  aspectFilter?: string;
+  optional?: boolean;
+};
 
 // Two of four half-decks make the market for a game (rulebook "first game" suggests Drow + Dragons).
 // Each half-deck has 40 cards total (one entry per slot in card-data covers the printed
@@ -686,9 +698,11 @@ export const TyrantsGame: Game<TyrantsState> = {
           const aspectTag = t.aspectFilter ? ` ${t.aspectFilter}` : '';
           G.pendingChoice = {
             kind: 'select-played-card',
-            prompt: `End of turn — promote another${aspectTag} card played this turn (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
+            prompt: `End of turn — promote ${t.optional ? 'an optional' : 'a'}${aspectTag} card played this turn (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
             options: eligible,
-            optional: true,
+            // Mandatory by default; only declinable when the trigger
+            // explicitly says so (printed "you may promote..." cards).
+            optional: !!t.optional,
             playerId: pc.playerId,
             cardKey: '__eot__',
           };
@@ -914,9 +928,11 @@ export const TyrantsGame: Game<TyrantsState> = {
         const aspectTag = trigger2.aspectFilter ? ` ${trigger2.aspectFilter}` : '';
         G.pendingChoice = {
           kind: 'select-played-card',
-          prompt: `End of turn — promote another${aspectTag} card played this turn (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
+          prompt: `End of turn — promote ${trigger2.optional ? 'an optional' : 'a'}${aspectTag} card played this turn (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
           options: eligible2,
-          optional: true,
+          // See companion site at the top of resolveChoice — mandatory by
+          // default, declinable only when the trigger flags itself optional.
+          optional: !!trigger2.optional,
           playerId: ctx.currentPlayer,
           cardKey: '__eot__',
         };
