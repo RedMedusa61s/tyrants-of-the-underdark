@@ -1889,7 +1889,7 @@ interface OrcusIterState {
  *  used by Lich ("take 2 trophies from THEIR hall" where "they" is the
  *  opponent with a troop at the spy site). When omitted, any player's
  *  hall is eligible (Orcus's behavior). */
-export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string }): EffectHandler {
+export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whiteOnly?: boolean }): EffectHandler {
   return ctx => {
     let state = (ctx.handlerState as OrcusIterState | null) ?? { remaining: opts.count };
 
@@ -1920,7 +1920,7 @@ export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string }): 
       ctx.pendingChoice = null;
       ctx.paused = false;
       if (idx == null) { ctx.handlerState = null; return true; } // declined → stop
-      const choices = enumerateTrophies(ctx.G, opts.ownerPid);
+      const choices = enumerateTrophies(ctx.G, opts.ownerPid, opts.whiteOnly);
       const sel = choices[idx];
       if (!sel) { ctx.handlerState = null; return true; }
       state = { remaining: state.remaining, picked: sel };
@@ -1958,11 +1958,13 @@ export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string }): 
 function enumerateTrophies(
   G: import('../game').TyrantsState,
   ownerPid?: string,
+  whiteOnly?: boolean,
 ): Array<{ playerId: string; color: Color | 'white'; label: string }> {
   const out: Array<{ playerId: string; color: Color | 'white'; label: string }> = [];
   for (const [pid, p] of Object.entries(G.players)) {
     if (ownerPid != null && pid !== ownerPid) continue;
     for (const [color, n] of Object.entries(p.trophyHall)) {
+      if (whiteOnly && color !== 'white') continue;
       if (n > 0) out.push({
         playerId: pid,
         color: color as Color | 'white',

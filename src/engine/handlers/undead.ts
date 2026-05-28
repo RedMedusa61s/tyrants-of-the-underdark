@@ -183,14 +183,21 @@ registerAll({
   //   take a white trophy from another player and place it. We surface
   //   the choice menu twice (the player can do either action, or both,
   //   or both-the-same).
+  // "Choose 2 times: Assassinate a white troop OR take a white troop from
+  //  ANY trophy hall and deploy it anywhere on the board." Two corrections
+  //  vs the pre-#57 implementation:
+  //    - Take-trophy now restricts to WHITE trophies (was offering any
+  //      colour, including player-colour trophies).
+  //    - Availability includes the actor's own white trophies — "any
+  //      trophy hall" per the card text means own + opponents'.
   'mummy-lord':          times(2, chooseOne(
                            { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }),
                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) },
-                           { label: 'Take a trophy and place it', handler: takeTrophyAndPlace({ count: 1 }),
-                             available: (G, a) => {
-                               // At least one OTHER player must have a white trophy to take.
-                               for (const [pid, p] of Object.entries(G.players)) {
-                                 if (pid === a) continue;
+                           { label: 'Take a white trophy from any hall and place it',
+                             handler: takeTrophyAndPlace({ count: 1, whiteOnly: true }),
+                             available: (G) => {
+                               // Any player's trophy hall (including the actor's own).
+                               for (const p of Object.values(G.players)) {
                                  if ((p.trophyHall.white ?? 0) > 0) return true;
                                }
                                return false;
