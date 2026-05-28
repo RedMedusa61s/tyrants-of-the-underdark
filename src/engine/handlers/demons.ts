@@ -63,7 +63,9 @@ registerAll({
   'vrock':                chooseOne(
                             { label: 'Place a spy', handler: placeSpyAtChosenSite() },
                             { label: 'Return a spy → +5 Power', handler: sequence(returnOwnSpyChoice(), grant({ power: 5 })), available: playerHasOwnSpy }),
+  // "promote up to 2 other cards played this turn" — "up to" makes both
+  // promotes optional.
   'zuggtmoy':             devourFromInnerCircleCost(sequence(
                             grant({ influence: 3 }),
-                            flagEotPromote({ count: 2 }))),
+                            flagEotPromote({ count: 2, optional: true }))),
 });

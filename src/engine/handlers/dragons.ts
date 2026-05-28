@@ -85,7 +85,8 @@ registerAll({
   // Big dragons — in-play effect resolved here; final-scoring riders run automatically
   // from engine/scoring.ts (Black/Blue/Green/Red/White Dragon lookups).
   'black-dragon':         supplantChoice({ whiteOnly: true, anywhere: true }),
-  'blue-dragon':          flagEotPromote({ count: 2 }),
+  // "promote up to 2 other cards played this turn" — "up to" = optional.
+  'blue-dragon':          flagEotPromote({ count: 2, optional: true }),
   'green-dragon':         chooseOne(
                             { label: 'Place a spy + supplant a troop at that site', handler: sequence(placeSpyAtChosenSite(), supplantAtLastPlacedSpySite()) },
                             { label: 'Return a spy + supplant a troop at that site + 1 VP per control marker held', handler: sequence(returnOwnSpyChoice(), supplantAtLastReturnedSpySite(), grantVpPerControlMarkerHeld), available: playerHasOwnSpy }),

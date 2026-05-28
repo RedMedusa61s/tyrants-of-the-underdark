@@ -34,7 +34,10 @@ registerAll({
   'cultist-of-myrkul':   chooseOne(
                            { label: '+2 Influence', handler: grant({ influence: 2 }) },
                            { label: 'Devour this card → EoT promote x2',
-                             handler: devourSelfThen(flagEotPromote({ count: 2 })) }),
+                             // "promote up to 2 other cards played this turn" — "up to"
+                             // makes the promote count player-choosable; flip to optional
+                             // so the player can decline each prompt.
+                             handler: devourSelfThen(flagEotPromote({ count: 2, optional: true })) }),
   // Cost 2 — Carrion Crawler: +3 power + replace a market card with self
   //   (the card-being-played enters the market in place of a devoured one)
   'carrion-crawler':     sequence(grant({ power: 3 }), marketDevourReplaceWithSelf()),
@@ -195,7 +198,18 @@ registerAll({
   // Cost 6 — High Priest of Myrkul: return another player's troop or spy
   //   + eot promote (Undead aspect filter — but Undead aspect varies on
   //   cards in this deck so we leave unrestricted for now).
-  'high-priest-of-myrkul': sequence(returnEnemyTroopOrSpyChoice(), flagEotPromote()),
+  // "At end of turn, you may promote any number of Undead cards played
+  // this turn." Three nuances vs the default flagEotPromote behavior:
+  //   - `optional: true` (printed "you may").
+  //   - aspect filter is technically wrong — the card says "Undead" (a
+  //     creature type) not an aspect. Until we model creature types,
+  //     leave the filter off; the prompt is at least optional so the
+  //     player can decline non-Undead promotes manually.
+  //   - "any number" should chain prompts as long as eligibles remain
+  //     AND the player keeps picking. We don't model that — we queue 1.
+  //     Worth a follow-up but doesn't break correctness of single uses.
+  'high-priest-of-myrkul': sequence(returnEnemyTroopOrSpyChoice(),
+                                    flagEotPromote({ optional: true })),
 
   // Cost 7 — Vampire: chooseOne(supplant a troop, promote a card from
   //   discard then +1 VP per 3 promoted cards in inner circle).
