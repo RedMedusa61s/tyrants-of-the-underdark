@@ -47,7 +47,7 @@ count,name,cost,vp1,vp2,set,gain ratio,gain approx,benefit1,benefit2,benefit3,ty
 2,Information Broker,5,2,5,Drow,0.40,2,or spy,or return spy for 3 cards,,Guile,Drow,,,,,
 2,Spy Master,2,1,2,Drow,1.00,2,spy,,,Guile,Drow,,,,,
 2,Infiltrator,3,1,2,Drow,1.00,3,"spy, troop there for 1 attack",,,Guile,Drow,,,,,
-2,Bounty Hunter,5,2,4,Drow,0.60,3,3 atk,,,Malice,Drow,,,,,
+2,Bounty Hunter,4,2,4,Drow,0.60,3,3 atk,,,Malice,Drow,,,,,
 15,House Guard,3,1,3,Drow,0.67,2,2 attack,,,Obedience,Drow,,,,,
 2,Drow Negotiator,3,1,2,Drow,0.67,2,"If there are 4+ cards promoted, gain 3 money.",eot promote a card played this turn,,Ambition,Drow,,,,,
 2,Underdark Ranger,4,2,4,Drow,0.75,3,assassinate 2 white troops,,,Conquest,Drow,,,,,
