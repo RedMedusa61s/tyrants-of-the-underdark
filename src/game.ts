@@ -671,15 +671,15 @@ export const TyrantsGame: Game<TyrantsState> = {
           const playerId = pc.playerId;
           const card = G.cardsPlayedThisTurn[idx];
           if (card) {
+            // Remove from the played list by EXACT index (unambiguous even
+            // with duplicate same-type cards — #47 / #48). Mechanics.promote
+            // no longer touches cardsPlayedThisTurn, so this is the sole
+            // removal for the EOT path.
+            G.cardsPlayedThisTurn.splice(idx, 1);
             const di = G.players[playerId].discard.findIndex(
               c => c.deck === card.deck && c.slot === card.slot
             );
             if (di >= 0) G.players[playerId].discard.splice(di, 1);
-            // Mechanics.promote already removes the card from
-            // cardsPlayedThisTurn (defensive — added in baf375c for #45).
-            // Splicing again here would drop a *different* card at the
-            // same index — reported as #47 / #48 when two identical
-            // EOT-promote triggers ran the queue.
             Mechanics.promote(G, playerId, card);
           }
         }

@@ -75,16 +75,15 @@ export const Mechanics = {
 
   promote(G: TyrantsState, playerId: string, card: CardRef) {
     const pl = p(G, playerId);
-    // Defensively remove the card from cardsPlayedThisTurn first — applies
-    // to BOTH the normal promote path and the Insane-Outcast-returns-to-
-    // supply branch. Without this, picking an Outcast in an EOT promote
-    // prompt would consume the trigger but leave the Outcast in the
-    // played list, so the next EOT trigger offers it AGAIN — reported as
-    // #56 (user clicked Outcast twice and got two no-op "returns to
-    // supply" messages instead of two real promotes). Original motivation
-    // for the splice was Necromancer self-promote-from-discard (#45).
-    const ptIdx = G.cardsPlayedThisTurn.findIndex(c => c.deck === card.deck && c.slot === card.slot);
-    if (ptIdx >= 0) G.cardsPlayedThisTurn.splice(ptIdx, 1);
+    // NOTE: this used to defensively splice `cardsPlayedThisTurn` by the
+    // first entry matching deck+slot. That was wrong for any promote whose
+    // source ISN'T the play area (Matron Mother / Necromancer promote-from-
+    // discard, promote-from-hand, promote-top-of-deck): with duplicate
+    // cards (Nobles, Soldiers, House Guards) it evicted a *different* same-
+    // type card the player actually played this turn, so the end-of-turn
+    // "promote a card played this turn" prompt could no longer target it
+    // (#59). Removal from the played list is now the caller's job — the EOT
+    // path splices by exact index, and promoteSelf removes its own entry.
     // Insane Outcast self-eject: if would be promoted, return to supply instead.
     if (card.deck === 'insane-outcasts') {
       Mechanics.log(G, `P${Number(playerId) + 1} cannot promote ${card.name} (returns to supply)`);

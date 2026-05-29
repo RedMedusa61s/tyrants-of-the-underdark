@@ -2434,6 +2434,16 @@ export function promoteFromHandChoice(opts?: { optional?: boolean }): EffectHand
  *  branch and Revenant's 8+-trophy bonus (via a similar pattern). */
 export function promoteSelf(): EffectHandler {
   return ctx => {
+    // If the handler paused for a choice before reaching here, the engine
+    // already pushed this card into discard + cardsPlayedThisTurn (so a
+    // cross-player prompt could find it). Pull those entries back out before
+    // promoting, otherwise the card lingers in discard and the end-of-turn
+    // "promote a card played this turn" prompt would offer it again.
+    const me = ctx.G.players[ctx.actorId];
+    const di = me.discard.findIndex(c => c.deck === ctx.card.deck && c.slot === ctx.card.slot);
+    if (di >= 0) me.discard.splice(di, 1);
+    const pi = ctx.G.cardsPlayedThisTurn.findIndex(c => c.deck === ctx.card.deck && c.slot === ctx.card.slot);
+    if (pi >= 0) ctx.G.cardsPlayedThisTurn.splice(pi, 1);
     Mechanics.promote(ctx.G, ctx.actorId, ctx.card);
     ctx.handlerState = { returnedToSupply: true };
     return true;
