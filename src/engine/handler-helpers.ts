@@ -2073,7 +2073,7 @@ function applyForcedDiscard(
  *  qualifying targets, surfacing one `select-card-in-hand` prompt at a
  *  time (each routed to the respective target). State is preserved across
  *  the inter-prompt pauses via handlerState. */
-export function eachOpponentDiscardsIfMinHand(minHand: number = 3): EffectHandler {
+export function eachOpponentDiscardsIfMinHand(minHand: number = 4): EffectHandler {
   return ctx => {
     interface S { remaining: string[]; activeTarget: string | null }
     const state = (ctx.handlerState as S | null) ?? {
@@ -2113,7 +2113,7 @@ export function eachOpponentDiscardsIfMinHand(minHand: number = 3): EffectHandle
  *  then chooses which card from their own hand to discard. Two-phase prompt:
  *  first a `select-player` to the actor, then a `select-card-in-hand` to the
  *  chosen target. State across the pauses is held in `handlerState`. */
-export function chooseOpponentToDiscard(minHand: number = 3): EffectHandler {
+export function chooseOpponentToDiscard(minHand: number = 4): EffectHandler {
   return ctx => {
     interface S { phase: 'pick-target' | 'pick-card'; target?: string }
     const state = (ctx.handlerState as S | null) ?? { phase: 'pick-target' };
@@ -2172,7 +2172,7 @@ export function chooseOpponentToDiscard(minHand: number = 3): EffectHandler {
 export function forcePlayerOfColorToDiscardIfMinHand(
   color: import('../game').Color | 'white',
   actorPid: string,
-  minHand: number = 3,
+  minHand: number = 4,
 ): EffectHandler {
   return ctx => {
     if (color === 'white') { ctx.handlerState = null; return true; } // white has no owner
@@ -2207,7 +2207,7 @@ export function forcePlayerOfColorToDiscardIfMinHand(
  *  cross-player prompt to discard a card if they have at least `minHand`
  *  cards. Used by Chuul. Iterates qualifying opponents via handlerState,
  *  one prompt at a time. */
-export function eachOpponentAtLastSpySiteDiscardsIfMinHand(minHand: number = 3): EffectHandler {
+export function eachOpponentAtLastSpySiteDiscardsIfMinHand(minHand: number = 4): EffectHandler {
   return ctx => {
     interface S { remaining: string[]; activeTarget: string | null; siteId: string }
     const G = ctx.G;

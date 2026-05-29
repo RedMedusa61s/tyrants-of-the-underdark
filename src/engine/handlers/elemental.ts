@@ -6,7 +6,7 @@
 import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
          assassinateChoice, deployChoice, supplantChoice, chooseOne,
          returnOwnSpyChoice, focus, recruitFromMarketFiltered,
-         returnOwnTroopOrSpyChoice, assassinateAtLastPlacedSpySite,
+         returnEnemyTroopOrSpyChoice, assassinateAtLastPlacedSpySite,
          playerHasOwnSpy } from '../handler-helpers';
 
 registerAll({
@@ -35,7 +35,11 @@ registerAll({
                               { label: 'Place a spy', handler: placeSpyAtChosenSite() },
                               { label: 'Return a spy → deploy 3 troops', handler: sequence(returnOwnSpyChoice(), deployChoice({ count: 3 })), available: playerHasOwnSpy }),
                             focus('Guile', grant({ draw: 1 }))),
-  'earth-elemental':      sequence(grant({ influence: 1 }), returnOwnTroopOrSpyChoice(), focus('Guile', grant({ draw: 1 }))),
+  // Card text: "+1 Influence. Return another player's troop or spy.
+  //   Ambition Focus -> Draw a card." Previously this returned the player's
+  //   OWN troop/spy and checked a Guile focus — both wrong vs the printed
+  //   card (its aspect is Ambition).
+  'earth-elemental':      sequence(grant({ influence: 1 }), returnEnemyTroopOrSpyChoice(), focus('Ambition', grant({ draw: 1 }))),
   'fire-elemental':       sequence(
                             chooseOne(
                               { label: '+2 Power', handler: grant({ power: 2 }) },

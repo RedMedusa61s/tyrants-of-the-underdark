@@ -29,8 +29,10 @@ registerAll({
   //   (no engine hook for cards-discarded-by-other-player). Deploy fires.
   'grimlock':           deployChoice({ count: 2 }),
 
-  // Cost 2 — Cranium Rats: deploy 2 + choose opponent (with 3+) to discard
-  'cranium-rats':       sequence(deployChoice({ count: 2 }), chooseOpponentToDiscard(3)),
+  // Cost 2 — Cranium Rats: deploy 2 + choose opponent with MORE THAN 3 cards
+  //   (i.e. 4+) to discard. Cards read "more than 3 cards" — a player at
+  //   exactly 3 keeps their hand.
+  'cranium-rats':       sequence(deployChoice({ count: 2 }), chooseOpponentToDiscard(4)),
   // Cost 2 — Cloaker: spy / return spy to assassinate at that site
   'cloaker':            chooseOne(
                           { label: 'Place a spy', handler: placeSpyAtChosenSite() },
@@ -42,17 +44,17 @@ registerAll({
                             handler: sequence(returnOwnSpyChoice(), assassinateAtLastReturnedSpySite()),
                             available: playerHasOwnSpy }),
 
-  // Cost 3 — Chuul: spy + each opponent there discards if 3+
-  'chuul':              sequence(placeSpyAtChosenSite(), eachOpponentAtLastSpySiteDiscardsIfMinHand(3)),
+  // Cost 3 — Chuul: spy + each opponent there with more than 3 cards (4+) discards
+  'chuul':              sequence(placeSpyAtChosenSite(), eachOpponentAtLastSpySiteDiscardsIfMinHand(4)),
   // Cost 3 — Nothic: spy / return spy → draw + each-opponent-3+-discards
   'nothic':             chooseOne(
                           { label: 'Place a spy', handler: placeSpyAtChosenSite() },
-                          { label: 'Return a spy → draw + each 3+ opp discards',
-                            handler: sequence(returnOwnSpyChoice(), grant({ draw: 1 }), eachOpponentDiscardsIfMinHand(3)),
+                          { label: 'Return a spy → draw + each opp with 4+ cards discards',
+                            handler: sequence(returnOwnSpyChoice(), grant({ draw: 1 }), eachOpponentDiscardsIfMinHand(4)),
                             available: playerHasOwnSpy }),
   // Cost 3 — Mindwitness: assassinate; the killed troop's OWNER discards
-  //   a card if they have 3+. Hand-rolled to capture the killed troop's
-  //   color BEFORE the assassinate clears the slot.
+  //   a card if they have MORE THAN 3 cards (4+). Hand-rolled to capture
+  //   the killed troop's color BEFORE the assassinate clears the slot.
   'mindwitness':        (ctx => {
                           const me = ctx.G.players[ctx.actorId];
                           // Phase 1: pick the assassinate target.
@@ -102,16 +104,16 @@ registerAll({
                           Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
                           // Force the owner of the killed color to discard.
                           if (killedColor !== 'white') {
-                            const forceFn = forcePlayerOfColorToDiscardIfMinHand(killedColor as Color, ctx.actorId, 3);
+                            const forceFn = forcePlayerOfColorToDiscardIfMinHand(killedColor as Color, ctx.actorId, 4);
                             forceFn(ctx);
                           }
                           return true;
                         }),
-  // Cost 3 — Gauth: chooseOne(+2 money OR draw + force opponent-3+ discard)
+  // Cost 3 — Gauth: chooseOne(+2 money OR draw + force opponent with 4+ cards to discard)
   'gauth':              chooseOne(
                           { label: '+2 Influence', handler: grant({ influence: 2 }) },
-                          { label: 'Draw a card, choose opp (3+) to discard',
-                            handler: sequence(grant({ draw: 1 }), chooseOpponentToDiscard(3)) }),
+                          { label: 'Draw a card, choose opp (4+ cards) to discard',
+                            handler: sequence(grant({ draw: 1 }), chooseOpponentToDiscard(4)) }),
   // Cost 3 — Ambassador: eot promote + "if discarded by opponent, may
   //   promote it" — reactive part isn't implemented. Eot promote works.
   'ambassador':         flagEotPromote(),
@@ -193,7 +195,7 @@ registerAll({
   // Cost 7 — Neogi: deploy 4 + eot each-opp-discard (here we just discard
   //   immediately rather than queueing for end of turn; outcome is the
   //   same since no card-play happens between deploy and end-of-turn).
-  'neogi':              sequence(deployChoice({ count: 4 }), eachOpponentDiscardsIfMinHand(3)),
+  'neogi':              sequence(deployChoice({ count: 4 }), eachOpponentDiscardsIfMinHand(4)),
   // Cost 7 — Death Tyrant: assassinate up to 3 troops at a single site +1
   //   money each. Approximate as 3 normal assassinates (the "at single
   //   site" restriction is a strategic narrowing; engine-wise the player
