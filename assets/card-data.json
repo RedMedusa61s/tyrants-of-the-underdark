@@ -236,7 +236,7 @@
     "cost": 4,
     "deckVp": 2,
     "innerCircleVp": 4,
-    "aspect": "Conquest",
+    "aspect": "Ambition",
     "type": "Drow",
     "rarity": 1,
     "benefits": [
@@ -254,7 +254,7 @@
     "cost": 4,
     "deckVp": 2,
     "innerCircleVp": 4,
-    "aspect": "Conquest",
+    "aspect": "Ambition",
     "type": "Drow",
     "rarity": 1,
     "benefits": [
@@ -708,7 +708,7 @@
     "slot": 0,
     "name": "Black Dragon",
     "image": "assets/cards/dragons/00-unnamed.jpg",
-    "cost": 8,
+    "cost": 7,
     "deckVp": 3,
     "innerCircleVp": 7,
     "aspect": "Conquest",
@@ -1102,7 +1102,7 @@
   "dragons::25": {
     "deck": "dragons",
     "slot": 25,
-    "name": "Rather Modar",
+    "name": "Rath Modar",
     "image": "assets/cards/dragons/25-unnamed.jpg",
     "cost": 6,
     "deckVp": 2,
@@ -1114,7 +1114,7 @@
       "draw 2 cards",
       "spy"
     ],
-    "effectKey": "rather-modar",
+    "effectKey": "rath-modar",
     "_matchedSheet": true
   },
   "dragons::26": {
@@ -1684,7 +1684,7 @@
     "cost": 3,
     "deckVp": 1,
     "innerCircleVp": 3,
-    "aspect": "Guile",
+    "aspect": "Ambition",
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
@@ -1703,7 +1703,7 @@
     "cost": 3,
     "deckVp": 1,
     "innerCircleVp": 3,
-    "aspect": "Guile",
+    "aspect": "Ambition",
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
@@ -2213,7 +2213,7 @@
     "deckVp": 1,
     "innerCircleVp": 4,
     "aspect": "Conquest",
-    "type": "Gerro",
+    "type": "Derro",
     "rarity": 1,
     "benefits": [
       "supplant a white troop anywhere",
@@ -2231,7 +2231,7 @@
     "deckVp": 1,
     "innerCircleVp": 4,
     "aspect": "Conquest",
-    "type": "Gerro",
+    "type": "Derro",
     "rarity": 1,
     "benefits": [
       "supplant a white troop anywhere",
@@ -3649,7 +3649,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3666,7 +3666,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3683,7 +3683,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3700,7 +3700,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3717,7 +3717,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3734,7 +3734,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3751,7 +3751,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "attack"
+      "money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3768,7 +3768,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "money"
+      "attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true

@@ -50,7 +50,7 @@ const grantVpPerTotalControlledSite: EffectHandler = ctx => {
 registerAll({
   'red-wyrmling':         grant({ power: 2, influence: 2 }),
   'severin-silrajin':     grant({ power: 5 }),
-  'rather-modar':         sequence(grant({ draw: 2 }), placeSpyAtChosenSite()),
+  'rath-modar':           sequence(grant({ draw: 2 }), placeSpyAtChosenSite()),
   'wyrmspeaker':          sequence(grant({ influence: 1 }), flagEotPromote()),
 
   'enchanter-of-thay':    chooseOne(

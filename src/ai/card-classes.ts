@@ -91,7 +91,7 @@ const TABLE: Record<string, CardCategory> = {
   // ---- Dragons half-deck ----
   'red-wyrmling':       'power',       // +2P +2I, mixed → bias power
   'severin-silrajin':   'power',       // +5P
-  'rather-modar':       'hand',        // draw 2 + 2 spies; draw dominates
+  'rath-modar':         'hand',        // draw 2 + 2 spies; draw dominates
   'wyrmspeaker':        'influence',
   'enchanter-of-thay':  'tactical',
   'green-wyrmling':     'tactical',
