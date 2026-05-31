@@ -700,7 +700,7 @@ export const TyrantsGame: Game<TyrantsState> = {
           const aspectTag = t.aspectFilter ? ` ${t.aspectFilter}` : '';
           G.pendingChoice = {
             kind: 'select-played-card',
-            prompt: `End of turn — promote ${t.optional ? 'an optional' : 'a'}${aspectTag} card played this turn (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
+            prompt: `End of turn — promote ${t.optional ? 'an optional' : 'a'}${aspectTag} card played this turn — ${t.optional ? 'you may decline this one' : `${t.name} requires it, so you must promote one`} (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
             options: eligible,
             // Mandatory by default; only declinable when the trigger
             // explicitly says so (printed "you may promote..." cards).
@@ -930,7 +930,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         const aspectTag = trigger2.aspectFilter ? ` ${trigger2.aspectFilter}` : '';
         G.pendingChoice = {
           kind: 'select-played-card',
-          prompt: `End of turn — promote ${trigger2.optional ? 'an optional' : 'a'}${aspectTag} card played this turn (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
+          prompt: `End of turn — promote ${trigger2.optional ? 'an optional' : 'a'}${aspectTag} card played this turn — ${trigger2.optional ? 'you may decline this one' : `${trigger2.name} requires it, so you must promote one`} (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
           options: eligible2,
           // See companion site at the top of resolveChoice — mandatory by
           // default, declinable only when the trigger flags itself optional.
