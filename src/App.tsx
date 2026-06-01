@@ -891,8 +891,22 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {actionBtn('Return enemy spy (3 Power)', canReturnSpy, baseAction?.kind === 'return-spy',
         () => setBaseAction(baseAction?.kind === 'return-spy' ? null : { kind: 'return-spy' }))}
       {baseAction && actionBtn('Cancel', true, false, () => setBaseAction(null))}
+      {(() => {
+        const canUndo = myTurn && (G.undoStack?.length ?? 0) > 0;
+        return (
+          <button
+            onClick={() => { setBaseAction(null); moves.undo(); }}
+            disabled={!canUndo}
+            title={canUndo
+              ? 'Undo your last action. You can keep undoing back to the start of your turn — but not past anything that revealed a hidden card (a draw or a market buy).'
+              : 'Nothing to undo. Actions that reveal a hidden card (drawing, buying from the market) cannot be undone.'}
+            style={{ padding: '8px 16px', background: canUndo ? '#553a20' : '#2a2a2a', color: canUndo ? 'white' : '#777', border: 'none', borderRadius: 4, cursor: canUndo ? 'pointer' : 'not-allowed', marginLeft: 'auto' }}>
+            ↶ Undo{canUndo ? ` (${G.undoStack.length})` : ''}
+          </button>
+        );
+      })()}
       <button onClick={handleEndTurn} disabled={!myTurn}
-        style={{ padding: '8px 16px', background: '#3a2055', color: 'white', border: 'none', borderRadius: 4, cursor: myTurn ? 'pointer' : 'not-allowed', marginLeft: 'auto' }}>
+        style={{ padding: '8px 16px', background: '#3a2055', color: 'white', border: 'none', borderRadius: 4, cursor: myTurn ? 'pointer' : 'not-allowed' }}>
         End Turn
       </button>
     </div>

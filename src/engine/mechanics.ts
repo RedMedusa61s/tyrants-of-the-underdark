@@ -17,6 +17,14 @@ export const Mechanics = {
     G.log.push(line);
   },
 
+  /** Mark that hidden information just became visible (a card drawn, the
+   *  market refilled, the top of a deck looked at). This is a one-way door
+   *  for the within-turn undo: it wipes the undo stack so the player can't
+   *  rewind back across the reveal and re-draw into different cards. */
+  markInfoRevealed(G: TyrantsState) {
+    if (G.undoStack && G.undoStack.length > 0) G.undoStack = [];
+  },
+
   gainPower(G: TyrantsState, playerId: string, n: number) {
     p(G, playerId).power += n;
     if (n !== 0) Mechanics.log(G, `P${Number(playerId) + 1} +${n} Power`);
@@ -49,6 +57,8 @@ export const Mechanics = {
     for (let i = 0; i < n; i++) {
       if (pl.deck.length === 0) {
         if (pl.discard.length === 0) return;
+        // Reshuffle + draw exposes hidden card order — close the undo door.
+        Mechanics.markInfoRevealed(G);
         // Deterministic reshuffle via the seeded boardgame.io RNG when passed
         // through. Callers in move handlers should pass ctx.random. Fenwick-
         // free Fisher-Yates on a copy so we don't mutate discard mid-loop.
@@ -61,7 +71,11 @@ export const Mechanics = {
         pl.discard = [];
       }
       const c = pl.deck.shift();
-      if (c) pl.hand.push(c);
+      if (c) {
+        // A card moving from the (face-down) deck into hand is new information.
+        Mechanics.markInfoRevealed(G);
+        pl.hand.push(c);
+      }
     }
   },
 
@@ -112,7 +126,11 @@ export const Mechanics = {
     const card = G.market.row[marketIndex];
     if (!card) return false;
     p(G, playerId).discard.push(card);
-    G.market.row[marketIndex] = G.market.deck.shift() ?? null;
+    const refill = G.market.deck.shift() ?? null;
+    // Refilling the row from the face-down market deck reveals a new card to
+    // everyone — recruiting from the market is therefore not undoable.
+    if (refill) Mechanics.markInfoRevealed(G);
+    G.market.row[marketIndex] = refill;
     Mechanics.log(G, `P${Number(playerId) + 1} recruited ${card.name}`);
     return true;
   },

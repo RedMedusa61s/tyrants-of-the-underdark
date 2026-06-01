@@ -1067,6 +1067,8 @@ export function promoteTopOfDeck(opts?: { count?: number }): EffectHandler {
       }
       const card = me.deck.shift();
       if (!card) break;
+      // Promoting the top of the deck reveals a previously-hidden card — bars undo.
+      Mechanics.markInfoRevealed(ctx.G);
       Mechanics.promote(ctx.G, ctx.actorId, card);
     }
     return true;
@@ -1602,7 +1604,9 @@ export function devourMarketChoice(opts?: { optional?: boolean }): EffectHandler
     const card = ctx.G.market.row[idx];
     if (!card) return true;
     Mechanics.devour(ctx.G, card);
-    ctx.G.market.row[idx] = ctx.G.market.deck.shift() ?? null;
+    const refill = ctx.G.market.deck.shift() ?? null;
+    if (refill) Mechanics.markInfoRevealed(ctx.G);
+    ctx.G.market.row[idx] = refill;
     return true;
   };
 }
@@ -2614,7 +2618,9 @@ export function playForeignCard(opts: {
         if (slotIdx >= 0 && ctx.G.market.row[slotIdx]) {
           const removed = ctx.G.market.row[slotIdx]!;
           Mechanics.devour(ctx.G, removed);
-          ctx.G.market.row[slotIdx] = ctx.G.market.deck.shift() ?? null;
+          const refill = ctx.G.market.deck.shift() ?? null;
+          if (refill) Mechanics.markInfoRevealed(ctx.G);
+          ctx.G.market.row[slotIdx] = refill;
         }
       }
       ctx.handlerState = null;

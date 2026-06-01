@@ -209,6 +209,8 @@ registerAll({
                             const me = ctx.G.players[ctx.actorId];
                             if (me.deck.length === 0) return true;
                             const top = me.deck.shift()!;
+                            // Reveals the top of your deck — bars within-turn undo.
+                            Mechanics.markInfoRevealed(ctx.G);
                             me.innerCircle.push(top);
                             ctx.G.log.push(`P${Number(ctx.actorId) + 1} promoted ${top.name} from top of deck`);
                             return true;
