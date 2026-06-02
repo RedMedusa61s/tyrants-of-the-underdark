@@ -282,7 +282,11 @@ export default defineConfig(({ mode }) => {
     base: mode === 'production' ? (env.VITE_BASE_PATH || '/tyrants-of-the-underdark/') : '/',
     plugins: [react(), liveLogPlugin(), onlineApiPlugin()],
     server: { port: 5173, open: false },
-    resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
+    // dedupe react/react-dom so the file-linked framework (built against React 18)
+    // shares THIS app's single React 19 copy. Without this there are two React
+    // instances and framework hooks (useGame) throw "Cannot read properties of
+    // null (reading 'useState')".
+    resolve: { alias: { '@': path.resolve(__dirname, 'src') }, dedupe: ['react', 'react-dom'] },
     publicDir: 'assets',
     // Stamp build-time identity into the bundle. Game logs include this in
     // their `aiVersion` field so we can later correlate strategic behavior
