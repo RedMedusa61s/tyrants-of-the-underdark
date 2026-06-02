@@ -545,6 +545,15 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const me = mySeat;
   const p = G.players[me];
   const myTurn = ctx.currentPlayer === me;
+  // The seat that's actually acting right now: a pending choice's owner takes
+  // precedence over the nominal turn player. Used for the online "whose turn"
+  // banner. Reuses each player's engine-assigned color for the display label.
+  const currentActor = G.pendingChoice?.playerId ?? ctx.currentPlayer;
+  const showOpponentTurnBanner = isOnline && currentActor !== me;
+  const opponentColor = showOpponentTurnBanner ? G.players[currentActor]?.color : undefined;
+  const opponentTurnLabel = opponentColor
+    ? `${opponentColor.charAt(0).toUpperCase()}${opponentColor.slice(1)} is taking their turn`
+    : undefined;
   // The local AI drives every seat that isn't the local human's — but ONLY in
   // hotseat. Online, every other seat is a remote human, so there is no AI turn.
   const isAiTurn = !isOnline && ctx.currentPlayer !== me;
@@ -1437,6 +1446,28 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               </button>
             )}
           </div>
+        )}
+
+        {/* Online-only "whose turn" banner in the empty space above the market.
+            Gated on isOnline && currentActor !== me, so hotseat (isOnline=false)
+            renders nothing here and is visually unchanged. */}
+        {showOpponentTurnBanner && opponentTurnLabel && (
+          <>
+            <style>{`
+              @keyframes tot-opponent-turn-pulse {
+                0%, 100% { opacity: 0.55; transform: scale(1); }
+                50%      { opacity: 1;    transform: scale(1.025); }
+              }
+            `}</style>
+            <div style={{
+              marginTop: 24, marginBottom: 8, padding: '18px 24px',
+              textAlign: 'center', fontSize: 26, fontWeight: 700,
+              letterSpacing: 0.5, color: '#f0e8ff',
+              animation: 'tot-opponent-turn-pulse 2.2s ease-in-out infinite',
+            }}>
+              {opponentTurnLabel}
+            </div>
+          </>
         )}
 
         <h2 style={{ marginTop: 24 }}>
