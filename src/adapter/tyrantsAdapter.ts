@@ -1,0 +1,407 @@
+// GameAdapter for Tyrants of the Underdark — Option A: WRAP boardgame.io's reducer.
+//
+// The framework `State` here is boardgame.io's FULL serializable client state
+// object: `{ G, ctx, plugins, _undo, _redo, _stateID }`. Keeping the whole bgio
+// state (not just G) keeps the `random` plugin's seed+prngstate inside the
+// snapshot, so RNG/shuffles replay deterministically with zero changes to any
+// shuffle call site. This was verified to round-trip cleanly through jsonCodec
+// (ctx + plugins + random seed all survive) in scripts/roundtrip-check.ts.
+//
+// applyAction / tryApplyAction run bgio's OWN reducer (built the same way
+// App.tsx:532-533 builds it for AI lookahead) against a structuredClone of the
+// full state, so the mutate-in-place moves + turn machine + random plugin all
+// run exactly as in live play. We never hand-roll the turn advance — bgio does.
+//
+// This file is ADDITIVE. It does not modify the engine, game.ts moves, the UI,
+// or the hotseat client.
+
+import type { GameAdapter, GameResult } from 'digital-boardgame-framework';
+import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
+import { TyrantsGame, type TyrantsState, type Color, type CardRef } from '../game';
+import { SITES } from '../data/sites';
+import { TROOP_SPACES, sitesSpaces } from '../data/troop-spaces';
+import { lookupCard } from '../card-data';
+import { hasPresence } from '../engine/map-state';
+import { scoreAll } from '../engine/scoring';
+import { BASE_ACTION_POWER_COST } from '../game';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** The seat-index string '0'..'3'. Matches Object.keys(G.players). */
+export type PlayerId = string;
+
+/** The action vocabulary = the bgio moves we expose online. `undo` and
+ *  `loadState` are deliberately excluded (local-only / dev rewind). */
+export type TyrantsAction =
+  | { kind: 'deployStartingTroop'; siteId: string }
+  | { kind: 'playCard'; handIndex: number }
+  | { kind: 'recruitFromMarket'; marketIndex: number }
+  | { kind: 'recruitFromAuxStack'; stack: 'houseGuards' | 'priestesses' }
+  | { kind: 'deployTroop'; spaceId: string }
+  | { kind: 'assassinateTroop'; spaceId: string }
+  | { kind: 'returnEnemySpy'; siteId: string; targetColor: Color }
+  | { kind: 'resolveChoice'; response: unknown }
+  | { kind: 'endTurn' };
+
+/** boardgame.io's full client/transport state. We treat it as opaque-ish: the
+ *  adapter only reaches into `.G` and `.ctx`; `plugins` etc. ride along. */
+export interface BgioState {
+  G: TyrantsState;
+  ctx: {
+    currentPlayer: string;
+    numPlayers: number;
+    turn: number;
+    playOrderPos: number;
+    gameover?: unknown;
+    [k: string]: unknown;
+  };
+  plugins?: unknown;
+  _undo?: unknown;
+  _redo?: unknown;
+  _stateID?: number;
+  [k: string]: unknown;
+}
+
+// ---------------------------------------------------------------------------
+// bgio reducer (built once, like App.tsx:532-533)
+// ---------------------------------------------------------------------------
+//
+// The reducer is pure given (state, action): it clones internally and applies
+// the move + turn machine + random plugin. We build it from the same Game def
+// the live client uses. halfDecks/activeSections live in G already once setup
+// has run, so the reducer doesn't need setupData — it never re-runs setup.
+
+type AnyReducer = (s: BgioState, action: unknown) => BgioState;
+
+let _reducer: AnyReducer | null = null;
+function reducer(): AnyReducer {
+  if (!_reducer) {
+    _reducer = CreateGameReducer({ game: TyrantsGame }) as unknown as AnyReducer;
+  }
+  return _reducer;
+}
+
+/** Build a fresh bgio initial full-state for a new game. Exposed for harnesses
+ *  and the eventual server createGame. */
+export function initialBgioState(
+  numPlayers: number,
+  setupData?: { halfDecks?: string[]; activeSections?: Array<'left' | 'center' | 'right'> },
+): BgioState {
+  const wrapped = setupData
+    ? {
+        ...TyrantsGame,
+        setup: (sa: Parameters<NonNullable<typeof TyrantsGame.setup>>[0]) =>
+          TyrantsGame.setup!(sa, setupData),
+      }
+    : TyrantsGame;
+  return InitializeGame({ game: wrapped, numPlayers }) as unknown as BgioState;
+}
+
+/** Translate a TyrantsAction into the bgio MAKE_MOVE dispatch shape. */
+function toBgioAction(action: TyrantsAction, actor: PlayerId): unknown {
+  const mk = (type: string, args: unknown[]) => ({
+    type: 'MAKE_MOVE',
+    payload: { type, args, playerID: actor },
+  });
+  switch (action.kind) {
+    case 'deployStartingTroop': return mk('deployStartingTroop', [action.siteId]);
+    case 'playCard':            return mk('playCard', [action.handIndex]);
+    case 'recruitFromMarket':   return mk('recruitFromMarket', [action.marketIndex]);
+    case 'recruitFromAuxStack': return mk('recruitFromAuxStack', [action.stack]);
+    case 'deployTroop':         return mk('deployTroop', [action.spaceId]);
+    case 'assassinateTroop':    return mk('assassinateTroop', [action.spaceId]);
+    case 'returnEnemySpy':      return mk('returnEnemySpy', [action.siteId, action.targetColor]);
+    case 'resolveChoice':       return mk('resolveChoice', [action.response]);
+    case 'endTurn':             return mk('endTurn', []);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Legal-action enumeration (display-grade)
+// ---------------------------------------------------------------------------
+//
+// Mirrors the random AI's enumeration (src/ai/random-ai.ts) but returns the
+// FULL set of legal options rather than one pick. The non-active-player case
+// (forced cross-player pendingChoice) is handled by currentActor; legalActions
+// returns [] when it's not `actor`'s turn or the game is over.
+
+function enumerateLegal(state: BgioState, actor: PlayerId): TyrantsAction[] {
+  const G = state.G;
+  if (state.ctx.gameover) return [];
+
+  const acting = currentActorOf(state);
+  if (acting !== actor) return [];
+
+  // 1. Pending choice owned by this actor → enumerate resolveChoice responses.
+  if (G.pendingChoice && G.pendingChoice.playerId === actor) {
+    return enumerateChoiceResponses(G);
+  }
+  // A pending choice owned by someone else blocks this actor entirely.
+  if (G.pendingChoice) return [];
+
+  // 2. Setup phase: open starting sites.
+  if (G.setupPhase) {
+    const out: TyrantsAction[] = [];
+    for (const s of SITES) {
+      if (!s.isStartingSite) continue;
+      if (!(s.id in G.siteControl)) continue;
+      const spaces = sitesSpaces(s.id);
+      const hasOpen = spaces.some(sp => !G.troops[sp.id]);
+      const rivalHeld = spaces.some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white');
+      if (hasOpen && !rivalHeld) out.push({ kind: 'deployStartingTroop', siteId: s.id });
+    }
+    return out;
+  }
+
+  // 3. Regular turn.
+  const out: TyrantsAction[] = [];
+  const me = G.players[actor];
+  const color = me.color;
+
+  // 3a. Play any hand card.
+  for (let i = 0; i < me.hand.length; i++) out.push({ kind: 'playCard', handIndex: i });
+
+  // 3b. Power-based board actions.
+  const hasAnyMapPresence = SITES.some(s => hasPresence(G, color, { site: s.id }));
+  if (me.power >= 1) {
+    for (const t of TROOP_SPACES) {
+      if (G.troops[t.id]) continue;
+      let ok: boolean;
+      if (!hasAnyMapPresence) ok = true;
+      else if (t.parentSite) ok = hasPresence(G, color, { site: t.parentSite });
+      else ok = hasPresence(G, color, { space: t.id });
+      if (ok) out.push({ kind: 'deployTroop', spaceId: t.id });
+    }
+  }
+  if (me.power >= BASE_ACTION_POWER_COST) {
+    // Assassinate enemy troops where we have presence.
+    for (const t of TROOP_SPACES) {
+      const occ = G.troops[t.id];
+      if (!occ || occ === color) continue;
+      const presence = t.parentSite
+        ? hasPresence(G, color, { site: t.parentSite })
+        : hasPresence(G, color, { space: t.id });
+      if (presence) out.push({ kind: 'assassinateTroop', spaceId: t.id });
+    }
+    // Return enemy spies where we have presence.
+    for (const s of SITES) {
+      if (!(s.id in G.siteControl)) continue;
+      if (!hasPresence(G, color, { site: s.id })) continue;
+      for (const c of G.spies[s.id] ?? []) {
+        if (c !== color) out.push({ kind: 'returnEnemySpy', siteId: s.id, targetColor: c as Color });
+      }
+    }
+  }
+
+  // 3c. Recruit affordable cards from the market row and aux stacks.
+  for (let i = 0; i < G.market.row.length; i++) {
+    const c = G.market.row[i];
+    if (!c) continue;
+    const data = lookupCard(c.deck, c.slot);
+    if (data && data.cost <= me.influence) out.push({ kind: 'recruitFromMarket', marketIndex: i });
+  }
+  for (const [stack, ref] of [
+    ['priestesses', lookupCard('priestesses', 43)] as const,
+    ['houseGuards', lookupCard('house-guards', 40)] as const,
+  ]) {
+    if (!ref) continue;
+    if ((G.auxStacks[stack] ?? 0) <= 0) continue;
+    if (ref.cost > me.influence) continue;
+    out.push({ kind: 'recruitFromAuxStack', stack });
+  }
+
+  // 3d. End turn is always legal during a regular (non-setup) turn.
+  out.push({ kind: 'endTurn' });
+  return out;
+}
+
+/** Enumerate the legal `resolveChoice` responses for the live pendingChoice.
+ *  The engine already publishes the legal `options` on the choice, so this is
+ *  faithful (the AI does the same — random-ai.ts:40-77). */
+function enumerateChoiceResponses(G: TyrantsState): TyrantsAction[] {
+  const pc = G.pendingChoice!;
+  const out: TyrantsAction[] = [];
+  // A declinable prompt may be answered with null.
+  if (pc.optional) out.push({ kind: 'resolveChoice', response: null });
+
+  switch (pc.kind) {
+    case 'choose-one': {
+      // response is an index into options.
+      const opts = (pc.options as unknown[] | undefined) ?? [];
+      for (let i = 0; i < opts.length; i++) out.push({ kind: 'resolveChoice', response: i });
+      break;
+    }
+    case 'select-card-in-hand':
+    case 'select-card-in-discard':
+    case 'select-card-in-inner-circle':
+    case 'select-played-card':
+    case 'select-market-card':
+    case 'select-site':
+    case 'select-troop-space':
+    case 'select-enemy-troop':
+    case 'select-enemy-spy':
+    case 'select-player': {
+      // response is the option value itself.
+      const opts = (pc.options as unknown[] | undefined) ?? [];
+      for (const o of opts) out.push({ kind: 'resolveChoice', response: o });
+      // Some self-targeted hand prompts expose no options array; fall back to
+      // null (decline / no-op) so the actor is never stuck with zero actions.
+      if (out.length === 0) out.push({ kind: 'resolveChoice', response: null });
+      break;
+    }
+    default: {
+      const opts = (pc.options as unknown[] | undefined) ?? [];
+      if (opts.length > 0) out.push({ kind: 'resolveChoice', response: opts[0] });
+      else out.push({ kind: 'resolveChoice', response: null });
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// currentActor
+// ---------------------------------------------------------------------------
+
+function currentActorOf(state: BgioState): PlayerId | null {
+  if (state.ctx.gameover) return null;
+  // Forced cross-player prompt: the prompted player must answer, even though
+  // it's not their seat's turn (Phase 0 §7).
+  const pc = state.G.pendingChoice;
+  if (pc && pc.playerId) return pc.playerId;
+  return state.ctx.currentPlayer;
+}
+
+// ---------------------------------------------------------------------------
+// viewFor — per-player redaction (Phase 0 §6)
+// ---------------------------------------------------------------------------
+//
+// Hidden (symmetric): every player's draw `deck` ORDER+contents (count public),
+// opponents' `hand`, `market.deck` ORDER+contents (count public), `undoStack`,
+// and peek-style `pendingChoice.options` / `pausedHandlerState` for non-owners.
+// Public: discard, innerCircle, map, scores, log. Face-down cards become
+// same-shape sentinel CardRefs so the UI can still render backs.
+
+const HIDDEN_CARD: CardRef = { deck: '__hidden__', slot: -1, name: '', image: '' };
+
+function hideCards(cards: CardRef[]): CardRef[] {
+  return cards.map(() => ({ ...HIDDEN_CARD }));
+}
+
+function redactState(state: BgioState, viewer: PlayerId | null): BgioState {
+  // structuredClone keeps the full bgio state shape (ctx/plugins ride along).
+  const next = structuredClone(state);
+  const G = next.G;
+
+  for (const [pid, p] of Object.entries(G.players)) {
+    // Draw deck order is secret to everyone, including its owner.
+    p.deck = hideCards(p.deck);
+    // Opponent hands are secret; the viewer keeps their own.
+    if (pid !== viewer) {
+      p.hand = hideCards(p.hand);
+    }
+  }
+
+  // Market draw pile is face-down.
+  G.market.deck = hideCards(G.market.deck);
+
+  // Undo stack holds full pre-action snapshots that could leak hidden info.
+  G.undoStack = [];
+
+  // Per-turn snapshots are codec strings of full state (same leak risk); strip.
+  G.snapshots = [];
+
+  // A pending choice the viewer does NOT own may carry peek-style options
+  // (e.g. "look at the top card of a deck") and paused handler state that
+  // would leak hidden info. Redact those for non-owners; keep the prompt shell
+  // so the UI can show "opponent is choosing…".
+  if (G.pendingChoice && G.pendingChoice.playerId !== viewer) {
+    G.pendingChoice = { ...G.pendingChoice, options: undefined };
+    G.pausedHandlerState = null;
+  } else if (!G.pendingChoice) {
+    // Nothing pending — paused handler state should already be null, but if a
+    // non-owner is somehow looking, clear opaque carry-over defensively.
+    if (viewer === null) G.pausedHandlerState = null;
+  }
+
+  return next;
+}
+
+// ---------------------------------------------------------------------------
+// result — map ctx.gameover (Phase 0 §7, game.ts endIf)
+// ---------------------------------------------------------------------------
+//
+// game.ts endIf returns `{ ended: true }`; the running `p.vp` is ONLY the VP
+// tokens collected during play — it does NOT include end-game scoring (site
+// control, total-control, trophies, deck/inner-circle VP, card riders). The
+// scoring module's scoreAll(...).total is the true final score, so we rank on
+// that. Ties on the top score → multiple winners (a valid draw).
+
+function resultOf(state: BgioState): GameResult<PlayerId> | null {
+  if (!state.ctx.gameover) return null;
+  const scores = scoreAll(state.G);
+  let best = -Infinity;
+  for (const sb of Object.values(scores)) {
+    if (sb.total > best) best = sb.total;
+  }
+  const winners: PlayerId[] = [];
+  for (const [pid, sb] of Object.entries(scores)) {
+    if (sb.total === best) winners.push(pid);
+  }
+  return { winners, reason: winners.length > 1 ? 'tie on final score' : 'highest final score' };
+}
+
+// ---------------------------------------------------------------------------
+// The adapter
+// ---------------------------------------------------------------------------
+
+export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
+  schemaVersion: 1,
+
+  applyAction(state, action, actor) {
+    // bgio's reducer is pure given (state, action) and clones internally, but
+    // we structuredClone defensively so callers never observe shared mutation.
+    const input = structuredClone(state);
+    const next = reducer()(input, toBgioAction(action, actor));
+    if (next === input || next.G === input.G) {
+      // bgio returns the same top-level reference on INVALID_MOVE.
+      throw new Error(`applyAction: illegal ${action.kind} for ${actor}`);
+    }
+    return next;
+  },
+
+  tryApplyAction(state, action, actor) {
+    const input = structuredClone(state);
+    let next: BgioState;
+    try {
+      next = reducer()(input, toBgioAction(action, actor));
+    } catch (e) {
+      return { state, ok: false, reason: String((e as Error)?.message ?? e) };
+    }
+    if (next === input || next.G === input.G) {
+      return { state, ok: false, reason: 'INVALID_MOVE (engine rejected)' };
+    }
+    return { state: next, ok: true };
+  },
+
+  legalActions(state, actor) {
+    return enumerateLegal(state, actor);
+  },
+
+  currentActor(state) {
+    return currentActorOf(state);
+  },
+
+  viewFor(state, viewer) {
+    return redactState(state, viewer);
+  },
+
+  result(state) {
+    return resultOf(state);
+  },
+
+  migrate() {
+    throw new Error('tyrantsAdapter.migrate: no migrations yet (schemaVersion 1)');
+  },
+};
