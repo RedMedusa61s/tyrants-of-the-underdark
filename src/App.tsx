@@ -35,6 +35,39 @@ import { lookupCard } from './card-data';
 import { scoreAll } from './engine/scoring';
 
 const HUMAN_SEAT = '0';
+
+// ---------------------------------------------------------------------------
+// Board mode seam (hotseat vs online)
+// ---------------------------------------------------------------------------
+//
+// The Board component below is shared between hotseat (the bgio Client) and
+// online play (OnlinePlay.tsx feeds it a BoardProps-shaped object backed by the
+// framework's useGame/submit). Everything mode-specific is funneled through
+// this context so the component body stays a single implementation:
+//
+//   - `mySeat`   — which seat the local human controls. Hotseat is always '0'
+//                  (HUMAN_SEAT); online it's the seat the server assigned
+//                  (useGame's `you`). Every former `HUMAN_SEAT` reference inside
+//                  Board now reads this instead, so the same JSX renders the
+//                  active player's controls regardless of which seat they hold.
+//   - `isOnline` — gates off every hotseat-only side effect: the local AI driver
+//                  loop, localStorage save/load, archive, publish, dev-log, and
+//                  beforeunload. Online, the server is authoritative and the
+//                  opponents are remote humans; a client must only drive its own
+//                  seat (integration-guide "Porting an existing hotseat game").
+//   - `onlineError` — useGame's `error`, surfaced inside the board chrome so a
+//                  rejected submit is visible even under a full-screen prompt.
+//
+// The DEFAULT is hotseat (`isOnline:false, mySeat:'0'`), so the existing bgio
+// Client path that renders <Board/> WITHOUT a provider is byte-for-byte
+// unchanged in behavior.
+interface BoardMode {
+  isOnline: boolean;
+  mySeat: string;
+  onlineError?: Error | null;
+}
+export const BoardModeContext = createContext<BoardMode>({ isOnline: false, mySeat: HUMAN_SEAT });
+
 const AI_THINK_MS = 400;
 const SAVE_KEY = 'totu.savegame';
 const CONFIG_KEY = 'totu.gameconfig';
@@ -290,7 +323,7 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
 
 type BaseAction = null | { kind: 'deploy' | 'assassinate' } | { kind: 'return-spy'; siteId?: string };
 
-function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
+export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const session = useContext(SessionContext);
   const [tab, setTab] = useState<'play' | 'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>('game');
   // Split-view as React state so toggling doesn't need a page reload (which
@@ -349,6 +382,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // Saved games are cleared by the "New game" button and when the game ends.
   const loadedRef = useRef(false);
   useEffect(() => {
+    if (isOnline) return; // server is the source of truth; never restore a local save
     if (loadedRef.current) return;
     loadedRef.current = true;
     const saved = localStorage.getItem(SAVE_KEY);
@@ -367,6 +401,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // first real write happens once loadState lands and snapshots grows.
   const firstSaveRef = useRef(true);
   useEffect(() => {
+    if (isOnline) return; // online games persist server-side; don't touch localStorage
     if (firstSaveRef.current) { firstSaveRef.current = false; return; }
     if (ctx.gameover) { localStorage.removeItem(SAVE_KEY); return; }
     if (G.snapshots.length === 0) return;
@@ -389,6 +424,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // to capture) or has reached gameover (already archived in the gameover
   // effect below).
   useEffect(() => {
+    if (isOnline) return; // archiving is a hotseat affordance; online state lives server-side
     function onUnload() {
       if (!session) return;
       if (G.setupPhase) return;
@@ -413,6 +449,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // retries.
   const publishedRef = useRef(false);
   useEffect(() => {
+    if (isOnline) return; // online games are archived/published by the server pipeline, not the client
     if (!ctx.gameover) return;
     if (publishedRef.current) return;
     publishedRef.current = true;
@@ -492,12 +529,17 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       }).catch(() => { /* ignore — endpoint only exists in dev */ });
     }
   }, [G.log.length, ctx.turn, ctx.currentPlayer, ctx.gameover, G, G.log, G.turnLogs, G.snapshots, G.pendingChoice, G.players]);
-  // P1 is the human; P2/P3/P4 are AI. The UI is always rendered from P1's perspective.
-  const me = HUMAN_SEAT;
+  // Hotseat: P1 ('0') is the human and the UI renders from their perspective;
+  // P2..PN are AI. Online: `mySeat` is the seat the server assigned this client,
+  // and `isOnline` turns off the local AI driver + persistence side effects.
+  const { isOnline, mySeat, onlineError } = useContext(BoardModeContext);
+  const me = mySeat;
   const p = G.players[me];
-  const myTurn = ctx.currentPlayer === HUMAN_SEAT;
-  const isAiTurn = ctx.currentPlayer !== HUMAN_SEAT;
-  const aiHasPendingChoice = !!G.pendingChoice && G.pendingChoice.playerId !== HUMAN_SEAT;
+  const myTurn = ctx.currentPlayer === me;
+  // The local AI drives every seat that isn't the local human's — but ONLY in
+  // hotseat. Online, every other seat is a remote human, so there is no AI turn.
+  const isAiTurn = !isOnline && ctx.currentPlayer !== me;
+  const aiHasPendingChoice = !isOnline && !!G.pendingChoice && G.pendingChoice.playerId !== me;
 
   // Per-AI-turn summary modal. The user clicks through each AI's completed turn to
   // see what they did before play continues to the next seat.
@@ -506,8 +548,11 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // OK can jump the counter past it (skipping any interleaved human turns), instead
   // of just incrementing by 1 and forcing the user to click through the gap.
   const pendingAiSummaryIdx = (() => {
+    // Per-AI-turn summary is a hotseat-only affordance (clicking through what
+    // each local AI did). Online there are no AI turns, so never surface it.
+    if (isOnline) return -1;
     for (let i = shownTurnLogCount; i < G.turnLogs.length; i++) {
-      if (G.turnLogs[i].playerId !== HUMAN_SEAT) return i;
+      if (G.turnLogs[i].playerId !== me) return i;
     }
     return -1;
   })();
@@ -605,15 +650,15 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // Human-facing pending choices that drive map UI.
   const humanSitePick = G.pendingChoice
     && G.pendingChoice.kind === 'select-site'
-    && G.pendingChoice.playerId === HUMAN_SEAT
+    && G.pendingChoice.playerId === me
     ? G.pendingChoice : null;
   const humanSpacePick = G.pendingChoice
     && G.pendingChoice.kind === 'select-troop-space'
-    && G.pendingChoice.playerId === HUMAN_SEAT
+    && G.pendingChoice.playerId === me
     ? G.pendingChoice : null;
   const humanMarketPick = G.pendingChoice
     && G.pendingChoice.kind === 'select-market-card'
-    && G.pendingChoice.playerId === HUMAN_SEAT
+    && G.pendingChoice.playerId === me
     ? G.pendingChoice : null;
   const humanMapPick = humanSitePick || humanSpacePick;
   const clickableMarketSlots = humanMarketPick
@@ -848,7 +893,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const interactivePromptBar = (() => {
     const pc = G.pendingChoice;
     if (!pc) return null;
-    if (pc.playerId !== HUMAN_SEAT) return null;
+    if (pc.playerId !== me) return null;
     if (pc.kind !== 'choose-one' && pc.kind !== 'select-player') return null;
     return (
       <div style={{ marginBottom: 8, padding: 10, background: '#3a2055', borderRadius: 4 }}>
@@ -1184,6 +1229,25 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           onClose={() => { setReportOpen(false); setReportScreenshot(null); }}
         />
       )}
+      {/* Online seam: surface a rejected-submit / fetch error INSIDE the board
+          chrome (integration-guide: "surface errors inside whatever view has
+          focus"). Hotseat never sets onlineError, so this never renders there. */}
+      {isOnline && onlineError && (
+        <div style={{
+          marginTop: 8, padding: '8px 12px', borderRadius: 4,
+          background: '#5a1f1f', color: '#fdd', border: '1px solid #802626',
+          fontSize: 13,
+        }}>
+          ⚠ {onlineError.message}
+        </div>
+      )}
+      {isOnline && (
+        <div style={{ marginTop: 8, fontSize: 12 }}>
+          <a href="/lobby" style={{ color: '#6cf' }}>← Lobby</a>
+          <span style={{ opacity: 0.6 }}> · You are seat P{Number(me) + 1} ({p.color})
+            {myTurn ? ' — your move' : ctx.gameover ? ' — game over' : ' — waiting for the active player…'}</span>
+        </div>
+      )}
       <div style={{ marginTop: 8, opacity: 0.7 }}>
         Player P{Number(me) + 1} ({p.color}) — Turn: P{Number(ctx.currentPlayer) + 1} {myTurn ? '(your turn)' : ''}
         {' · '}Power: {p.power} · Influence: {p.influence} · Deck: {p.deck.length} · Discard: {p.discard.length} · Inner Circle: {p.innerCircle.length} · Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
@@ -1238,7 +1302,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           }}
             style={{ padding: '4px 12px', background: tab === t ? '#3a2055' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer' }}>
             {t}
-            {t === 'play' && G.pendingChoice && G.pendingChoice.playerId === HUMAN_SEAT && (
+            {t === 'play' && G.pendingChoice && G.pendingChoice.playerId === me && (
               <span style={{ marginLeft: 6, display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#e04050', verticalAlign: 'middle' }} />
             )}
           </button>
@@ -1291,6 +1355,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           humanMapPick={humanMapPick}
           actionBar={actionBar}
           interactivePromptBar={interactivePromptBar}
+          mySeat={me}
         />
       )}
       {tab === 'calibrate' && <div style={{ marginTop: 16 }}><MapView calibrate /></div>}
@@ -1320,7 +1385,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               {G.pendingChoice.kind === 'select-site' && ' Click a glowing site on the map.'}
               {G.pendingChoice.kind === 'select-troop-space' && ' Click a glowing troop space on the map.'}
             </div>
-            {G.pendingChoice.kind === 'choose-one' && G.pendingChoice.playerId === HUMAN_SEAT && (
+            {G.pendingChoice.kind === 'choose-one' && G.pendingChoice.playerId === me && (
               <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {((G.pendingChoice.options as string[] | undefined) ?? []).map((label, i) => (
                   <button key={i} onClick={() => moves.resolveChoice(i)} style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
@@ -1329,7 +1394,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                 ))}
               </div>
             )}
-            {G.pendingChoice.kind === 'select-player' && G.pendingChoice.playerId === HUMAN_SEAT && (
+            {G.pendingChoice.kind === 'select-player' && G.pendingChoice.playerId === me && (
               <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {((G.pendingChoice.options as string[] | undefined) ?? []).map(pid => (
                   <button key={pid} onClick={() => moves.resolveChoice(pid)}
@@ -1402,7 +1467,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           })}
         </div>
 
-        {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === HUMAN_SEAT && (
+        {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
           <>
             <h2 style={{ marginTop: 24 }}>Discard — pick one</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1413,7 +1478,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
-        {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === HUMAN_SEAT && (
+        {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === me && (
           <>
             <h2 style={{ marginTop: 24 }}>Inner Circle — pick one to devour</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1424,7 +1489,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
-        {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === HUMAN_SEAT && (
+        {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === me && (
           <>
             <h2 style={{ marginTop: 24 }}>Played this turn — pick one to promote</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -1455,7 +1520,7 @@ function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // discards (Mindwitness, Chuul, Neogi, …) the prompt may target
             // the human while it's an AI's turn. Gate on HUMAN_SEAT, not
             // currentPlayer.
-            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === HUMAN_SEAT;
+            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
@@ -1732,10 +1797,14 @@ function SplitPlayView(props: {
   humanMapPick: { prompt: string; optional?: boolean } | null;
   actionBar: React.ReactNode;
   interactivePromptBar: React.ReactNode;
+  /** Seat the local human controls — '0' in hotseat, the server-assigned seat
+   *  online. Used to gate which side's pendingChoice prompts render. */
+  mySeat: string;
 }) {
   const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
-          clickableMarketSlots, humanMapPick, actionBar, interactivePromptBar } = props;
+          clickableMarketSlots, humanMapPick, actionBar, interactivePromptBar,
+          mySeat: me } = props;
   const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
 
   // Hover expansion: on hover-capable devices, mouse enter/leave drive
@@ -1778,7 +1847,7 @@ function SplitPlayView(props: {
           text here. Without this, prompts like "Devour a card from your hand"
           (Wight, Vampire Spawn, etc.) were silently waiting for a hand click
           with no instruction — reported as #37. */}
-      {G.pendingChoice && G.pendingChoice.playerId === HUMAN_SEAT
+      {G.pendingChoice && G.pendingChoice.playerId === me
         && G.pendingChoice.kind !== 'choose-one' && G.pendingChoice.kind !== 'select-player'
         && G.pendingChoice.kind !== 'select-site' && G.pendingChoice.kind !== 'select-troop-space'
         && !humanMapPick && (
@@ -1796,7 +1865,7 @@ function SplitPlayView(props: {
           end-of-turn promote, devour-from-discard, devour-from-inner-circle.
           Without these in split view the user has no way to resolve those
           prompts and the game stalls (reported as issue #34). */}
-      {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === HUMAN_SEAT && (
+      {G.pendingChoice?.kind === 'select-played-card' && G.pendingChoice.playerId === me && (
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Played this turn — pick one to promote</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1812,7 +1881,7 @@ function SplitPlayView(props: {
           </div>
         </div>
       )}
-      {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === HUMAN_SEAT && (
+      {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Discard — pick one</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1822,7 +1891,7 @@ function SplitPlayView(props: {
           </div>
         </div>
       )}
-      {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === HUMAN_SEAT && (
+      {G.pendingChoice?.kind === 'select-card-in-inner-circle' && G.pendingChoice.playerId === me && (
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Inner Circle — pick one to devour</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -1846,7 +1915,7 @@ function SplitPlayView(props: {
                 // See same-named check in the play tab above — the
                 // prompted player owns this choice (HUMAN_SEAT for forced
                 // discards triggered on the human's hand during an AI turn).
-                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === HUMAN_SEAT;
+                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
                 const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
                 const onClick = isChoosing

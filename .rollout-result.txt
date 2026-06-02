@@ -1,0 +1,27 @@
+  game 29 (4p): 704 steps, winners=[2] (highest final score)
+OK: 30 games, 19634 total steps, none threw / deadlocked, all resolved.
+
+Replay determinism: same seeds twice -> identical final snapshots...
+  replay 0: steps 330/330, final snapshot identical: true
+  replay 1: steps 735/735, final snapshot identical: true
+  replay 2: steps 862/862, final snapshot identical: true
+  replay 3: steps 383/383, final snapshot identical: true
+  replay 4: steps 604/604, final snapshot identical: true
+
+viewFor redaction spot-checks...
+  OK  viewer 0 sees own hand
+  OK  viewer 0 cannot see P1 hand
+  OK  P1 hand count preserved
+  OK  own deck order hidden
+  OK  deck count preserved
+  OK  market deck hidden
+  OK  market deck count preserved
+  OK  market row visible
+  OK  spectator sees no hands
+  OK  undoStack stripped
+  OK  snapshots stripped
+  OK  view keeps ctx
+  OK  view keeps plugins
+  OK  viewFor did not mutate original
+
+==== RESULT: ALL CHECKS PASSED ====

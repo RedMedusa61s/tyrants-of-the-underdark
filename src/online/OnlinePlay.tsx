@@ -1,121 +1,117 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import type { BoardProps } from 'boardgame.io/react';
 import { useGame } from 'digital-boardgame-framework/client';
 import { makeClient } from './client';
 import { rememberOpenedGame } from './myGames';
+import { Board, BoardModeContext } from '../App';
+import type { TyrantsState } from '../game';
 import type { BgioState, TyrantsAction, PlayerId } from '../adapter/tyrantsAdapter';
 
-// Deliberately MINIMAL ("ugly buttons") UI: a JSON dump of the redacted view
-// plus one button per legal action. This is the end-to-end multiplayer proof;
-// the pretty board is the hotseat App's job and is untouched.
+// ONLINE play renders the REAL Tyrants board — the exact same <Board/> component
+// hotseat uses — fed by a BoardProps-shaped object backed by the framework's
+// useGame/submit instead of a boardgame.io Client.
+//
+// The seam (see App.tsx BoardModeContext):
+//   - G / ctx     come straight from the redacted server view.
+//   - playerID    is the server-assigned seat (`you`); Board reads it via
+//                 BoardModeContext.mySeat and renders that seat's controls.
+//   - isActive    is `yourTurn`.
+//   - moves       is a PROXY: each bgio move name maps 1:1 onto a framework
+//                 Action and is dispatched through submit(...). The 9 move names
+//                 match the 9 TyrantsAction kinds exactly (see tyrantsAdapter).
+//   - undo / redo / reset / loadState are no-ops online (hotseat-only rewind).
+//   - isOnline=true gates off the local AI driver + all localStorage / archive /
+//     publish side effects inside Board.
+//
+// A submit is fire-and-forget from the board's perspective (bgio moves return
+// void); useGame re-fetches the authoritative view, which re-renders the board.
 
-function actionLabel(a: TyrantsAction): string {
-  switch (a.kind) {
-    case 'deployStartingTroop': return `Deploy starting troop @ ${a.siteId}`;
-    case 'playCard': return `Play hand card #${a.handIndex}`;
-    case 'recruitFromMarket': return `Recruit market slot ${a.marketIndex}`;
-    case 'recruitFromAuxStack': return `Recruit ${a.stack}`;
-    case 'deployTroop': return `Deploy troop @ ${a.spaceId}`;
-    case 'assassinateTroop': return `Assassinate @ ${a.spaceId}`;
-    case 'returnEnemySpy': return `Return ${a.targetColor} spy @ ${a.siteId}`;
-    case 'resolveChoice': return `Resolve: ${JSON.stringify(a.response)}`;
-    case 'endTurn': return 'End turn';
-  }
+/** Build the moves proxy: bgio-move-name(...args) -> submit(Action). The arg
+ *  shapes mirror toBgioAction in tyrantsAdapter.ts (the inverse mapping). */
+function makeMovesProxy(
+  submit: (a: TyrantsAction) => void,
+): BoardProps<TyrantsState>['moves'] {
+  const moves: Record<string, (...args: any[]) => void> = {
+    deployStartingTroop: (siteId: string) => submit({ kind: 'deployStartingTroop', siteId }),
+    playCard: (handIndex: number) => submit({ kind: 'playCard', handIndex }),
+    recruitFromMarket: (marketIndex: number) => submit({ kind: 'recruitFromMarket', marketIndex }),
+    recruitFromAuxStack: (stack: 'houseGuards' | 'priestesses') =>
+      submit({ kind: 'recruitFromAuxStack', stack }),
+    deployTroop: (spaceId: string) => submit({ kind: 'deployTroop', spaceId }),
+    assassinateTroop: (spaceId: string) => submit({ kind: 'assassinateTroop', spaceId }),
+    returnEnemySpy: (siteId: string, targetColor: string) =>
+      submit({ kind: 'returnEnemySpy', siteId, targetColor: targetColor as any }),
+    resolveChoice: (response: unknown) => submit({ kind: 'resolveChoice', response }),
+    endTurn: () => submit({ kind: 'endTurn' }),
+    // Hotseat-only rewind controls — no-ops online. Board disables/hides their
+    // entry points when isOnline (undo button is gated on G.undoStack, which is
+    // stripped by viewFor, so it's always disabled online anyway).
+    undo: () => { /* online: server is authoritative; no client-side undo */ },
+    redo: () => { /* online: no-op */ },
+    loadState: () => { /* online: server is authoritative; no local snapshot load */ },
+  };
+  return moves as unknown as BoardProps<TyrantsState>['moves'];
 }
 
 export function OnlinePlay({ gameId, token }: { gameId: string; token: string }) {
   const client = useMemo(() => makeClient(gameId, token), [gameId, token]);
-  const { view, yourTurn, gameOver, you, turn, legalActions, submit, reportBug, loading, error } =
+  const { view, yourTurn, you, submit, loading, error } =
     useGame<BgioState, TyrantsAction>(client, { pollMs: 2000 });
 
   useEffect(() => {
     if (you != null) rememberOpenedGame(gameId, you as PlayerId, token);
   }, [you, gameId, token]);
 
-  const [reportMsg, setReportMsg] = useState('');
-  const [reported, setReported] = useState<string | null>(null);
+  // submit() returns a Promise; the board calls moves.x(...) synchronously and
+  // ignores the result, so we fire-and-forget and let useGame re-fetch. Wrapped
+  // in a ref-stable callback so the moves proxy identity is stable per render.
+  const submitFn = useRef((a: TyrantsAction) => { void submit(a); });
+  submitFn.current = (a: TyrantsAction) => { void submit(a); };
+  const moves = useMemo(() => makeMovesProxy((a) => submitFn.current(a)), []);
 
-  if (loading && !view) return <p>Loading…</p>;
-  if (!view) return <p style={{ color: '#f66' }}>Error: {error?.message ?? 'no view'}</p>;
+  if (loading && !view) return <p style={{ padding: 24 }}>Loading…</p>;
+  if (!view) {
+    return (
+      <p style={{ padding: 24, color: '#f66' }}>
+        Error: {error?.message ?? 'no view'} · <a href="/lobby" style={{ color: '#6cf' }}>← Lobby</a>
+      </p>
+    );
+  }
 
-  const status = gameOver
-    ? 'Game over.'
-    : yourTurn
-      ? 'Your move.'
-      : `Waiting for the active player…`;
+  // Construct the BoardProps the real Board expects. Only the props Board
+  // actually consumes need to be faithful: G, ctx, moves, plus the bgio-required
+  // shape. The rest (events, log, matchData, etc.) are filled with safe stubs.
+  const boardProps = {
+    G: view.G,
+    ctx: view.ctx as unknown as BoardProps<TyrantsState>['ctx'],
+    moves,
+    playerID: you ?? null,
+    isActive: yourTurn,
+    isMultiplayer: true,
+    isConnected: true,
+    events: {
+      endTurn: () => {},
+      endPhase: () => {},
+      endStage: () => {},
+      setPhase: () => {},
+      setStage: () => {},
+      endGame: () => {},
+      setActivePlayers: () => {},
+    } as unknown as BoardProps<TyrantsState>['events'],
+    reset: () => {},
+    undo: () => {},
+    redo: () => {},
+    log: [],
+    matchID: gameId,
+    matchData: undefined,
+    sendChatMessage: () => {},
+    chatMessages: [],
+    plugins: (view as any).plugins ?? {},
+  } as unknown as BoardProps<TyrantsState>;
 
   return (
-    <div style={{ maxWidth: 900 }}>
-      <h1>Tyrants — Online (minimal)</h1>
-      <p>
-        You are <strong style={{ color: '#bf9cff' }}>seat {you ?? '…'}</strong>.{' '}
-        <span style={{ color: '#aab' }}>{status}</span>{' '}
-        <span style={{ color: '#667' }}>(turn {turn})</span>
-      </p>
-
-      {error && <p style={{ color: '#f66' }}>⚠ {error.message}</p>}
-
-      <h2 style={{ fontSize: 16 }}>Legal actions</h2>
-      {yourTurn && !gameOver ? (
-        legalActions.length === 0
-          ? <p style={{ color: '#aab' }}>No legal actions.</p>
-          : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {legalActions.map((a, i) => (
-                <button key={i} onClick={() => submit(a)} style={actBtn}>
-                  {actionLabel(a)}
-                </button>
-              ))}
-            </div>
-          )
-      ) : (
-        <p style={{ color: '#aab' }}>Not your turn — controls hidden.</p>
-      )}
-
-      <h2 style={{ fontSize: 16, marginTop: 24 }}>Redacted state (your view)</h2>
-      <pre style={{
-        background: '#100a18', border: '1px solid #332', borderRadius: 6, padding: 12,
-        maxHeight: 480, overflow: 'auto', fontSize: 11, color: '#cbd',
-      }}>
-        {JSON.stringify(view, null, 2)}
-      </pre>
-
-      <p style={{ marginTop: 16 }}>
-        <a href="/lobby" style={{ color: '#6cf' }}>← Lobby</a>
-      </p>
-
-      <details style={{ marginTop: 12, color: '#aab' }}>
-        <summary style={{ cursor: 'pointer' }}>Report a problem</summary>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-          <input
-            value={reportMsg}
-            onChange={(e) => setReportMsg(e.target.value)}
-            placeholder="What went wrong?"
-            style={{ flex: 1, padding: 6, borderRadius: 4, border: '1px solid #445', background: '#0f0a18', color: 'white' }}
-          />
-          <button
-            disabled={!reportMsg.trim()}
-            onClick={async () => {
-              const id = await reportBug(reportMsg.trim(), 'bug');
-              setReported(id);
-              setReportMsg('');
-            }}
-            style={{ ...actBtn, opacity: reportMsg.trim() ? 1 : 0.5 }}
-          >
-            Send
-          </button>
-        </div>
-        {reported && <p style={{ fontSize: 13 }}>Thanks — filed as <code>{reported}</code>.</p>}
-      </details>
-    </div>
+    <BoardModeContext.Provider value={{ isOnline: true, mySeat: (you ?? '0') as string, onlineError: error }}>
+      <Board {...boardProps} />
+    </BoardModeContext.Provider>
   );
 }
-
-const actBtn: React.CSSProperties = {
-  background: '#2d6cdf',
-  color: 'white',
-  border: 'none',
-  borderRadius: 6,
-  padding: '6px 12px',
-  fontSize: 13,
-  cursor: 'pointer',
-};
