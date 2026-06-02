@@ -9,9 +9,9 @@
 // digital-boardgame-framework/server/node and is NEVER imported here.
 
 import { GameServer, SupabaseStore, ResendNotifier, NoopNotifier } from 'digital-boardgame-framework/server';
-import { jsonCodec } from 'digital-boardgame-framework';
 import { createClient } from '@supabase/supabase-js';
 import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from '../../src/adapter/tyrantsAdapter';
+import { snapshotCodec } from '../../src/online/snapshotCodec';
 import { handleApi } from '../../server/handlers';
 
 interface Env {
@@ -40,7 +40,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   const site = env.SITE_URL ?? url.origin;
   const server = new GameServer<BgioState, TyrantsAction, PlayerId>({
     adapter: tyrantsAdapter,
-    codec: jsonCodec<BgioState>(),
+    codec: snapshotCodec(),
     store: new SupabaseStore(_supabase),
     notifier,
     gameUrl: (gameId, token) => `${site}/play/${gameId}?as=${token}`,

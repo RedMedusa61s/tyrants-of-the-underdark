@@ -16,7 +16,10 @@
     "tournament": "vite-node scripts/tournament.ts --",
     "tune": "vite-node scripts/tune.ts --",
     "replay-divergence": "vite-node scripts/replay-divergence.ts --",
-    "recruit-divergence": "vite-node scripts/recruit-divergence.ts --"
+    "recruit-divergence": "vite-node scripts/recruit-divergence.ts --",
+    "roundtrip-check": "vite-node scripts/roundtrip-check.ts",
+    "adapter-rollout": "vite-node scripts/adapter-rollout.ts",
+    "snapshot-size": "vite-node scripts/snapshot-size.ts"
   },
   "keywords": [],
   "author": "",

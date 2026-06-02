@@ -5,9 +5,9 @@ import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { GameServer, NoopNotifier } from 'digital-boardgame-framework/server';
 import { FsStore } from 'digital-boardgame-framework/server/node';
-import { jsonCodec } from 'digital-boardgame-framework';
 import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from './src/adapter/tyrantsAdapter';
 import { handleApi } from './server/handlers';
+import { snapshotCodec } from './src/online/snapshotCodec';
 
 // Dev API for online multiplayer: the same handleApi router the Cloudflare
 // Function uses, backed by FsStore + NoopNotifier so local dev needs no cloud
@@ -19,7 +19,7 @@ function onlineApiPlugin(): Plugin {
   function makeServer(origin: string) {
     return new GameServer<BgioState, TyrantsAction, PlayerId>({
       adapter: tyrantsAdapter,
-      codec: jsonCodec<BgioState>(),
+      codec: snapshotCodec(),
       store,
       notifier: new NoopNotifier(),
       gameUrl: (id, token) => `${origin}/play/${id}?as=${token}`,
