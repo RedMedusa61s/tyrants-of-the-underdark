@@ -17,6 +17,15 @@ interface Props {
    *  game state behind the modal, not the modal itself. May be null when
    *  capture failed (CORS taint, etc.); dialog renders fine without it. */
   screenshotBase64?: string | null;
+  /** ONLINE only: when provided (set by OnlinePlay via BoardModeContext), the
+   *  report is submitted directly to the framework report store (Supabase
+   *  dbf_reports, version-tagged via clientBuild) and this dialog shows a
+   *  "filed as <id>" confirmation. When undefined (hotseat), submit() runs the
+   *  existing GitHub/relay flow unchanged. Returns the framework report id. */
+  onlineSubmit?: (
+    message: string,
+    severity?: 'bug' | 'rules-question' | 'feedback',
+  ) => Promise<string>;
   onClose: () => void;
 }
 
@@ -78,7 +87,7 @@ function githubIssueUrl(args: {
   return `https://github.com/${FALLBACK_REPO}/issues/new?${params.toString()}`;
 }
 
-export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onClose }: Props) {
+export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onlineSubmit, onClose }: Props) {
   const [description, setDescription] = useState('');
   const [expected, setExpected] = useState('');
   const [includeState, setIncludeState] = useState(true);
@@ -94,6 +103,29 @@ export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onCl
     if (!description.trim() || submitting) return;
     setSubmitting(true);
     setResult(null);
+
+    // ONLINE path: submit straight to the framework report store. The server
+    // auto-attaches the authoritative game snapshot and version-tags the report
+    // via clientBuild (set in OnlinePlay). No GitHub token, no relay, no
+    // screenshot/state payload — the snapshot lives server-side. Hotseat
+    // (onlineSubmit undefined) skips this and runs the GitHub flow below.
+    if (onlineSubmit) {
+      try {
+        const expectedSuffix = expected.trim()
+          ? `\n\nExpected: ${expected.trim()}`
+          : '';
+        const reportId = await onlineSubmit(description.trim() + expectedSuffix);
+        setResult({
+          ok: true,
+          note: `Thanks — filed as ${reportId}. The dev can replay this exact game state.`,
+        });
+      } catch (err) {
+        setResult({ ok: false, error: String(err) });
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
 
     // The state we attach is a slim view (full G is huge). The base64 codec of
     // the most recent turn-start snapshot is the most useful single artifact:

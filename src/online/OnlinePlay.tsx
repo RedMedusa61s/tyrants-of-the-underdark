@@ -4,6 +4,7 @@ import { useGame } from 'digital-boardgame-framework/client';
 import { makeClient } from './client';
 import { rememberOpenedGame } from './myGames';
 import { Board, BoardModeContext } from '../App';
+import { AI_VERSION } from '../ai-version';
 import type { TyrantsState } from '../game';
 import type { BgioState, TyrantsAction, PlayerId } from '../adapter/tyrantsAdapter';
 
@@ -69,6 +70,30 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
   submitFn.current = (a: TyrantsAction) => { void submit(a); };
   const moves = useMemo(() => makeMovesProxy((a) => submitFn.current(a)), []);
 
+  // Online problem reports go straight to the framework report store
+  // (POST /api/games/:id/report -> server.report -> Supabase dbf_reports),
+  // which auto-attaches the authoritative snapshot. We route through the
+  // client's report() (not useGame.reportBug, which doesn't forward
+  // clientBuild) so we can version-tag the report. The clientBuild lets triage
+  // tell which game+build a report came from; AI_VERSION is Tyrants' existing
+  // git-SHA build stamp (see ai-version.ts / vite define __AI_VERSION__).
+  const reportProblem = useMemo(
+    () =>
+      async (
+        message: string,
+        severity?: 'bug' | 'rules-question' | 'feedback',
+      ): Promise<string> => {
+        const r = await client.report({
+          message,
+          severity,
+          clientBuild: `tyrants-online@${AI_VERSION}`,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        });
+        return r.reportId;
+      },
+    [client],
+  );
+
   if (loading && !view) return <p style={{ padding: 24 }}>Loading…</p>;
   if (!view) {
     return (
@@ -110,7 +135,7 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
   } as unknown as BoardProps<TyrantsState>;
 
   return (
-    <BoardModeContext.Provider value={{ isOnline: true, mySeat: (you ?? '0') as string, onlineError: error }}>
+    <BoardModeContext.Provider value={{ isOnline: true, mySeat: (you ?? '0') as string, onlineError: error, reportProblem }}>
       <Board {...boardProps} />
     </BoardModeContext.Provider>
   );

@@ -65,6 +65,15 @@ interface BoardMode {
   isOnline: boolean;
   mySeat: string;
   onlineError?: Error | null;
+  // ONLINE only: submit a problem report directly to the framework report
+  // store (Supabase `dbf_reports`, version-tagged via clientBuild) instead of
+  // the GitHub flow. Hotseat leaves this undefined, so ProblemReportDialog
+  // falls back to its existing GitHub/relay path byte-for-byte unchanged.
+  // Returns the framework-assigned report id.
+  reportProblem?: (
+    message: string,
+    severity?: 'bug' | 'rules-question' | 'feedback',
+  ) => Promise<string>;
 }
 export const BoardModeContext = createContext<BoardMode>({ isOnline: false, mySeat: HUMAN_SEAT });
 
@@ -532,7 +541,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // Hotseat: P1 ('0') is the human and the UI renders from their perspective;
   // P2..PN are AI. Online: `mySeat` is the seat the server assigned this client,
   // and `isOnline` turns off the local AI driver + persistence side effects.
-  const { isOnline, mySeat, onlineError } = useContext(BoardModeContext);
+  const { isOnline, mySeat, onlineError, reportProblem } = useContext(BoardModeContext);
   const me = mySeat;
   const p = G.players[me];
   const myTurn = ctx.currentPlayer === me;
@@ -1226,6 +1235,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             aiStyles: session.config.aiStyles,
           } : undefined}
           screenshotBase64={reportScreenshot}
+          onlineSubmit={isOnline ? reportProblem : undefined}
           onClose={() => { setReportOpen(false); setReportScreenshot(null); }}
         />
       )}
