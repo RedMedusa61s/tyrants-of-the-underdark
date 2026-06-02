@@ -2,6 +2,8 @@
 # Separate from worker/wrangler.toml (the bug-report relay Worker).
 name = "tyrants-online"
 compatibility_date = "2024-09-01"
+# Required for Pages to honor this file (else wrangler ignores it entirely).
+pages_build_output_dir = "dist"
 
 # @supabase/supabase-js pulls transitive deps that reference node: built-ins.
 # nodejs_compat lets the Workers runtime resolve them at runtime.
