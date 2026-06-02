@@ -557,9 +557,16 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // OK can jump the counter past it (skipping any interleaved human turns), instead
   // of just incrementing by 1 and forcing the user to click through the gap.
   const pendingAiSummaryIdx = (() => {
-    // Per-AI-turn summary is a hotseat-only affordance (clicking through what
-    // each local AI did). Online there are no AI turns, so never surface it.
-    if (isOnline) return -1;
+    // Hotseat: this clicks through what each local AI (or other hotseat seat) did.
+    // Online: there are no AI turns, but you also can't watch your remote opponent
+    // play — so the SAME modal is exactly what's needed to show the opponent's
+    // completed turn(s) once control returns to you. In both modes the rule is
+    // identical: surface the next turnLog that isn't mine and that I haven't
+    // already seen. `shownTurnLogCount` (advanced past on OK) makes this
+    // poll-safe: re-renders while it's still the opponent's turn just re-find the
+    // same index until a new completed-turn log appears; clicking OK jumps the
+    // counter past it so it never re-shows. (Phase 3 disabled this online when it
+    // was wrongly assumed to be AI-only; the opponent-turn-summary need is real.)
     for (let i = shownTurnLogCount; i < G.turnLogs.length; i++) {
       if (G.turnLogs[i].playerId !== me) return i;
     }
@@ -1386,7 +1393,17 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       )}
 
       {tab === 'game' && <>
-        {G.pendingChoice && (
+        {/* Online: a pending choice that is NOT the local seat's belongs to the
+            opponent. Its options/prompt were redacted by viewFor, so render only
+            a quiet "opponent is choosing…" indicator — never the dialog/controls.
+            Hotseat (isOnline=false) is unchanged: the human sees every pending
+            choice, including an AI's, exactly as before. */}
+        {isOnline && G.pendingChoice && G.pendingChoice.playerId !== me && (
+          <div style={{ marginTop: 16, padding: 12, background: '#2a1840', borderRadius: 4, opacity: 0.8, fontStyle: 'italic' }}>
+            Opponent is choosing…
+          </div>
+        )}
+        {G.pendingChoice && (!isOnline || G.pendingChoice.playerId === me) && (
           <div style={{ marginTop: 16, padding: 12, background: '#3a2055', borderRadius: 4 }}>
             <div style={{ fontWeight: 'bold' }}>{G.pendingChoice.prompt}</div>
             <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>

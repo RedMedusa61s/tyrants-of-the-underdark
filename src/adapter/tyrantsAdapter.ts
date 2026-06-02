@@ -313,11 +313,21 @@ function redactState(state: BgioState, viewer: PlayerId | null): BgioState {
   G.snapshots = [];
 
   // A pending choice the viewer does NOT own may carry peek-style options
-  // (e.g. "look at the top card of a deck") and paused handler state that
-  // would leak hidden info. Redact those for non-owners; keep the prompt shell
-  // so the UI can show "opponent is choosing…".
+  // (e.g. "look at the top card of a deck"), a hidden-info-revealing prompt
+  // string (e.g. "Discard the Drow Soldier you just drew"), a partially-filled
+  // response, a cardKey identifying a face-down card, and paused handler state —
+  // ALL of which can leak hidden info. Strip the entire payload for non-owners,
+  // keeping ONLY { playerId, kind } so the UI can show a non-leaky
+  // "opponent is choosing…" indicator without exposing what or why.
   if (G.pendingChoice && G.pendingChoice.playerId !== viewer) {
-    G.pendingChoice = { ...G.pendingChoice, options: undefined };
+    G.pendingChoice = {
+      kind: G.pendingChoice.kind,
+      prompt: '',
+      playerId: G.pendingChoice.playerId,
+      // cardKey is required by the State type but identifies a (possibly
+      // face-down) card, so blank it for non-owners rather than leak it.
+      cardKey: '',
+    };
     G.pausedHandlerState = null;
   } else if (!G.pendingChoice) {
     // Nothing pending — paused handler state should already be null, but if a

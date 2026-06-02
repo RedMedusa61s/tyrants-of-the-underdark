@@ -134,5 +134,44 @@ console.log('\nviewFor redaction spot-checks...');
   }
 }
 
+// --- 3b. pendingChoice redaction: owner sees it, non-owner does NOT (Bug 1) ---
+console.log('\npendingChoice redaction (hidden-info-leak class)...');
+{
+  const s = initialState('pc-seed', 4);
+  // Inject a peek-style pending choice OWNED by player '0' carrying options +
+  // a leaky prompt. viewFor must keep it whole for '0', strip payload for '1'.
+  s.G.pendingChoice = {
+    kind: 'select-card-in-hand',
+    prompt: 'Discard the Drow Soldier you just drew',
+    options: [0, 1, 2],
+    response: undefined,
+    playerId: '0',
+    cardKey: 'drow::5',
+  } as unknown as typeof s.G.pendingChoice;
+
+  const owner = adapter.viewFor(s, '0');
+  const other = adapter.viewFor(s, '1');
+
+  const pcChecks: Array<[string, boolean]> = [];
+  // Owner keeps the full choice (kind, prompt, options).
+  pcChecks.push(['owner keeps options', JSON.stringify(owner.G.pendingChoice?.options) === JSON.stringify([0, 1, 2])]);
+  pcChecks.push(['owner keeps prompt', owner.G.pendingChoice?.prompt === 'Discard the Drow Soldier you just drew']);
+  // Non-owner: options/payload/prompt fully stripped, only { kind, playerId } survive.
+  pcChecks.push(['non-owner has NO options', other.G.pendingChoice?.options === undefined]);
+  pcChecks.push(['non-owner prompt redacted', !other.G.pendingChoice?.prompt]);
+  pcChecks.push(['non-owner cardKey blanked', !(other.G.pendingChoice as { cardKey?: string } | null)?.cardKey]);
+  pcChecks.push(['non-owner has no response', (other.G.pendingChoice as { response?: unknown } | null)?.response === undefined]);
+  // Indicator-grade fields survive so UI can show "opponent is choosing…".
+  pcChecks.push(['non-owner keeps playerId', other.G.pendingChoice?.playerId === '0']);
+  pcChecks.push(['non-owner keeps kind', other.G.pendingChoice?.kind === 'select-card-in-hand']);
+  // Original state untouched.
+  pcChecks.push(['viewFor did not mutate pendingChoice', JSON.stringify(s.G.pendingChoice?.options) === JSON.stringify([0, 1, 2])]);
+
+  for (const [label, pass] of pcChecks) {
+    console.log(`  ${pass ? 'OK ' : 'FAIL'} ${label}`);
+    if (!pass) allDet = false;
+  }
+}
+
 console.log('\n==== RESULT:', allDet ? 'ALL CHECKS PASSED' : 'SOME CHECKS FAILED', '====');
 process.exit(allDet ? 0 : 1);
