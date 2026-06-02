@@ -13,6 +13,9 @@ build/
 training-logs/
 *.log
 
+# --- Online dev FsStore scratch (local snapshots) ---
+.dev-store/
+
 # --- OS / editor / agent local config ---
 .DS_Store
 Thumbs.db

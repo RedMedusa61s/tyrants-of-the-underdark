@@ -1,8 +1,61 @@
-import { defineConfig, loadEnv, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin, type Connect } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { GameServer, NoopNotifier } from 'digital-boardgame-framework/server';
+import { FsStore } from 'digital-boardgame-framework/server/node';
+import { jsonCodec } from 'digital-boardgame-framework';
+import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from './src/adapter/tyrantsAdapter';
+import { handleApi } from './server/handlers';
+
+// Dev API for online multiplayer: the same handleApi router the Cloudflare
+// Function uses, backed by FsStore + NoopNotifier so local dev needs no cloud
+// accounts. Snapshots land in .dev-store/. This is ADDITIVE — it coexists with
+// the existing liveLogPlugin and only intercepts /api/* requests. FsStore
+// (node:fs) is fine here: this code only ever runs in the Vite dev server.
+function onlineApiPlugin(): Plugin {
+  const store = new FsStore('./.dev-store');
+  function makeServer(origin: string) {
+    return new GameServer<BgioState, TyrantsAction, PlayerId>({
+      adapter: tyrantsAdapter,
+      codec: jsonCodec<BgioState>(),
+      store,
+      notifier: new NoopNotifier(),
+      gameUrl: (id, token) => `${origin}/play/${id}?as=${token}`,
+    });
+  }
+  return {
+    name: 'totu-online-api',
+    configureServer(server: { middlewares: Connect.Server }) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url || !req.url.startsWith('/api/')) return next();
+
+        const origin = `http://${req.headers.host ?? 'localhost:5173'}`;
+        const url = new URL(req.url, origin);
+
+        let body: unknown = undefined;
+        if (req.method === 'POST') {
+          const chunks: Buffer[] = [];
+          for await (const c of req) chunks.push(c as Buffer);
+          const raw = Buffer.concat(chunks).toString('utf8');
+          try { body = raw ? JSON.parse(raw) : {}; } catch { body = {}; }
+        }
+
+        const result = await handleApi(
+          makeServer(origin),
+          req.method ?? 'GET',
+          url.pathname,
+          url.searchParams,
+          body,
+        );
+        res.statusCode = result.status;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(result.body));
+      });
+    },
+  };
+}
 
 /** Best-effort git short SHA injected as __AI_VERSION__ at build time so
  *  every game log published from this build is stamped with the exact code
@@ -227,7 +280,7 @@ export default defineConfig(({ mode }) => {
     // the default '/'. Override with VITE_BASE_PATH if you ever deploy to
     // a different sub-path (custom domain, root deploy, etc.).
     base: mode === 'production' ? (env.VITE_BASE_PATH || '/tyrants-of-the-underdark/') : '/',
-    plugins: [react(), liveLogPlugin()],
+    plugins: [react(), liveLogPlugin(), onlineApiPlugin()],
     server: { port: 5173, open: false },
     resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
     publicDir: 'assets',
