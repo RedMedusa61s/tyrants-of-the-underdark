@@ -404,6 +404,12 @@ export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
   },
 
   viewFor(state, viewer) {
+    // At game over, reveal everything. The final scoreboard scores every
+    // player's deck + inner circle; computed from a REDACTED view, a client
+    // zeroes out the opponent's hidden cards, so the two players see DIFFERENT
+    // totals. Once the game is decided there is nothing left to hide, so both
+    // players get the full state and compute the identical, correct scoreboard.
+    if (state.ctx.gameover) return state;
     return redactState(state, viewer);
   },
 
