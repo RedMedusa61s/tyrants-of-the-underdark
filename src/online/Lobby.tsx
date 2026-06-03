@@ -63,6 +63,71 @@ export function Lobby() {
       )}
 
       <GamesInProgress reloadKey={reloadKey} />
+      <MoreGames />
+    </div>
+  );
+}
+
+/** The cross-game hub's canonical URL. Its games.json is the single source of
+ *  truth (served CORS-open), so adding a game there makes it appear here with
+ *  no change to this file. */
+const HUB_URL = 'https://games-hub-5vo.pages.dev';
+
+interface HubGame {
+  id: string;
+  name: string;
+  blurb?: string;
+  url: string | null;
+  status: string;
+  accent?: string;
+}
+
+/** "More board games" — the other games from the hub, fetched live. Filters out
+ *  Tyrants itself; hides entirely if the hub is unreachable (never breaks the
+ *  lobby). */
+function MoreGames() {
+  const [games, setGames] = useState<HubGame[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`${HUB_URL}/games.json`, { cache: 'no-cache' })
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive) setGames(((d?.games ?? []) as HubGame[]).filter((g) => g.id !== 'tyrants'));
+      })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, []);
+
+  if (failed || (games && games.length === 0)) return null;
+
+  return (
+    <div style={{ marginTop: 36 }}>
+      <h2 style={{ fontSize: 18 }}>More board games</h2>
+      <p style={{ color: '#778', fontSize: 12, marginTop: -4 }}>
+        Other games by the same author — <a href={HUB_URL} style={{ color: '#6cf' }}>see all →</a>
+      </p>
+      {!games && <p style={{ color: '#778' }}>Loading…</p>}
+      {games?.map((g) => {
+        const playable = g.status !== 'soon' && !!g.url;
+        const inner = (
+          <>
+            <strong style={{ color: playable ? '#cbd' : '#889' }}>{g.name}</strong>
+            {g.status === 'soon' && <span style={{ color: '#778', fontSize: 12 }}> (coming soon)</span>}
+            {g.blurb && <div style={{ color: '#889', fontSize: 12 }}>{g.blurb}</div>}
+          </>
+        );
+        const frame: React.CSSProperties = {
+          display: 'block', margin: '10px 0', paddingLeft: 10,
+          borderLeft: `3px solid ${g.accent ?? '#5a3380'}`,
+        };
+        return playable ? (
+          <a key={g.id} href={g.url!} style={{ ...frame, textDecoration: 'none' }}>{inner}</a>
+        ) : (
+          <div key={g.id} style={{ ...frame, opacity: 0.6 }}>{inner}</div>
+        );
+      })}
     </div>
   );
 }
