@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
 import { useGame } from 'digital-boardgame-framework/client';
 import { makeClient } from './client';
@@ -64,11 +64,56 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
   }, [you, gameId, token]);
 
   // submit() returns a Promise; the board calls moves.x(...) synchronously and
-  // ignores the result, so we fire-and-forget and let useGame re-fetch. Wrapped
-  // in a ref-stable callback so the moves proxy identity is stable per render.
-  const submitFn = useRef((a: TyrantsAction) => { void submit(a); });
-  submitFn.current = (a: TyrantsAction) => { void submit(a); };
-  const moves = useMemo(() => makeMovesProxy((a) => submitFn.current(a)), []);
+  // ignores the result, so we fire-and-forget and let useGame re-fetch.
+  //
+  // PHANTOM "engine rejected" FIX: the same logical move could fire twice (rapid
+  // click, a React re-invoke, or a submit racing useGame's poll). The first
+  // applies server-side; the duplicate then hits a server that already advanced
+  // and tryApplyAction rejects it — surfacing an "Illegal action" banner even
+  // though the game moved on correctly. We guard two ways:
+  //   1. SERIALIZE: only one submit is in flight at a time; the rest queue and
+  //      apply in order. This keeps useGame's view/error consistent (no two
+  //      submits interleaving their setState) and matches turn-based intent.
+  //   2. DEDUPE identical actions: if an action with the *same* JSON payload is
+  //      already in flight or sitting in the queue, drop the new one. Distinct
+  //      moves a player makes in quick succession are NOT dropped (different
+  //      payloads → different keys), so legitimate rapid play still works.
+  // The keep-latest semantics aren't needed: every queued action is preserved
+  // and applied in order; only exact duplicates are coalesced.
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  const queueRef = useRef<{ items: { key: string; action: TyrantsAction }[]; draining: boolean }>(
+    { items: [], draining: false },
+  );
+
+  const enqueueSubmit = useCallback((a: TyrantsAction) => {
+    const key = JSON.stringify(a);
+    const q = queueRef.current;
+    // Drop an exact-duplicate of something already pending/in-flight.
+    if (q.items.some((it) => it.key === key)) return;
+    q.items.push({ key, action: a });
+    if (q.draining) return;
+    q.draining = true;
+    (async () => {
+      while (q.items.length > 0) {
+        const next = q.items[0]; // keep it in the queue so a duplicate is still detected
+        try {
+          // useGame.submit clears `error` on success and re-fetches the
+          // authoritative view; a transient/stale error never lingers past the
+          // next successful submit. On failure it re-syncs and rethrows — we
+          // swallow the throw here (board ignores it) so the queue keeps draining.
+          await submitRef.current(next.action);
+        } catch {
+          /* error surfaced via useGame.error; refresh already re-synced the view */
+        } finally {
+          q.items.shift();
+        }
+      }
+      q.draining = false;
+    })();
+  }, []);
+
+  const moves = useMemo(() => makeMovesProxy(enqueueSubmit), [enqueueSubmit]);
 
   // Online problem reports go straight to the framework report store
   // (POST /api/games/:id/report -> server.report -> Supabase dbf_reports),

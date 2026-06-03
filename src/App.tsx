@@ -1145,6 +1145,12 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           style={{ padding: '6px 14px', background: splitView ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
           {splitView ? '📐 split view on' : '📐 split view off'}
         </button>
+        {/* Log upload targets the worker /game-log relay, which does not exist on
+            the online (Cloudflare Pages) deploy — so it always fails online. Online
+            games are already captured server-side (framework Supabase snapshots),
+            making this feature redundant online. Gate the button + its
+            failed/ok indicator off when isOnline; hotseat is unchanged. */}
+        {!isOnline && (
         <button onClick={async () => {
           // Click 1: count records and open the disclosure dialog. Actual
           // upload only fires after the user confirms in the dialog (see
@@ -1172,6 +1178,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                   : `${bulkUpload.uploaded} new · ${bulkUpload.deduped} deduped`)
               : 'Upload logs'}
         </button>
+        )}
         <button onClick={async () => {
           // Capture the page BEFORE the modal mounts, so the screenshot
           // reflects the game state the user was looking at, not the
@@ -1304,7 +1311,14 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             {isAiTurn ? ' (AI thinking…)' : ''}
           </div>
           <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
-            {myTurn ? 'Click any glowing starting site on the map.' : 'Waiting on AI.'}
+            {myTurn
+              ? 'Click any glowing starting site on the map.'
+              // Online, the other seat is a remote human (no local AI runs when
+              // isOnline — the AI driver effect is gated on isAiTurn=!isOnline).
+              // Name the waiting target by the active seat's color rather than "AI".
+              : isOnline
+                ? `Waiting for ${G.players[ctx.currentPlayer].color} (the other player).`
+                : 'Waiting on AI.'}
           </div>
         </div>
       )}
