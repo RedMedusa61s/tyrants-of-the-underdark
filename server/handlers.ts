@@ -113,7 +113,14 @@ export async function handleApi(
 
     return { status: 404, body: { error: 'no route', pathname, method } };
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    // Surface a legible message. Supabase/PostgREST throw a PLAIN OBJECT
+    // ({ message, details, hint, code }), not an Error — String(e) on that is
+    // the useless "[object Object]". Pull .message when present, else stringify.
+    const message =
+      e instanceof Error ? e.message
+      : (e && typeof e === 'object')
+        ? ((e as { message?: string }).message ?? JSON.stringify(e))
+        : String(e);
     return { status: errToStatus(message), body: { error: message } };
   }
 }
