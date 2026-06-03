@@ -18,6 +18,11 @@ interface Env {
   ALLOWED_ORIGIN?: string;
 }
 
+// Game logs and report screenshots are committed to this branch — NOT the
+// default (main) — so they never pollute the code history or trigger the
+// GitHub Pages deploy. Named to avoid colliding with the logs/ directory.
+const LOG_BRANCH = 'game-logs';
+
 interface ProblemReportPayload {
   description: string;
   expected?: string;
@@ -92,7 +97,7 @@ async function handleProblemReport(req: Request, env: Env): Promise<Response> {
     const path = `screenshots/${hash}.png`;
     const ghUrl = `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${path}`;
     // HEAD-style check: GET returns 200 if the file already exists.
-    const head = await fetch(ghUrl, { headers: githubHeaders(env) });
+    const head = await fetch(`${ghUrl}?ref=${LOG_BRANCH}`, { headers: githubHeaders(env) });
     if (head.status !== 200) {
       const put = await fetch(ghUrl, {
         method: 'PUT',
@@ -100,6 +105,7 @@ async function handleProblemReport(req: Request, env: Env): Promise<Response> {
         body: JSON.stringify({
           message: `Screenshot ${hash.slice(0, 12)} (problem report)`,
           content: body.screenshot,
+          branch: LOG_BRANCH,
         }),
       });
       if (!put.ok) {
@@ -112,7 +118,7 @@ async function handleProblemReport(req: Request, env: Env): Promise<Response> {
         }
       }
     }
-    const rawUrl = `https://raw.githubusercontent.com/${env.GITHUB_REPO}/main/${path}`;
+    const rawUrl = `https://raw.githubusercontent.com/${env.GITHUB_REPO}/${LOG_BRANCH}/${path}`;
     sections.push(`**Screenshot**\n\n![screenshot](${rawUrl})`);
   }
 
@@ -254,7 +260,7 @@ async function handleGameLog(req: Request, env: Env): Promise<Response> {
 
   // Existing file with this name → same game already published, no-op.
   const existing = await fetch(
-    `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${repoPath}`,
+    `https://api.github.com/repos/${env.GITHUB_REPO}/contents/${repoPath}?ref=${LOG_BRANCH}`,
     { headers: githubHeaders(env) }
   );
   if (existing.status === 200) {
@@ -282,6 +288,7 @@ async function handleGameLog(req: Request, env: Env): Promise<Response> {
       body: JSON.stringify({
         message: `log: publish game (${body.source ?? 'unknown'}) ${hash.slice(0, 8)}`,
         content: btoaUtf8(wrapperJson),
+        branch: LOG_BRANCH,
       }),
     }
   );
