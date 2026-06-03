@@ -10,6 +10,7 @@
 import type { TyrantsState } from './game';
 import { scoreAll } from './engine/scoring';
 import { AI_VERSION, BUILD_TIME } from './ai-version';
+import { relayBaseUrl } from './relay-url';
 
 export interface PublishContext {
   numPlayers: number;
@@ -100,9 +101,9 @@ export async function publishGameLog(
     endedAtTurn: G.endGameTriggeredAtTurn,
   };
 
-  const relayUrl = import.meta.env.VITE_TOTU_RELAY_URL as string | undefined;
+  const relayUrl = relayBaseUrl();
   const submitUrl = relayUrl
-    ? `${relayUrl.replace(/\/$/, '')}/game-log`
+    ? `${relayUrl}/game-log`
     : '/__publish-game-log';
 
   try {

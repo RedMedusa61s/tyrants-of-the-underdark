@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import type { TyrantsState } from '../game';
 import { recordFiledReport } from '../bug-report-tracker';
+import { relayBaseUrl } from '../relay-url';
 
 interface Props {
   G: TyrantsState;
@@ -48,7 +49,10 @@ const FALLBACK_REPO = 'johnchampaign/tyrants-of-the-underdark';
  *  configured, the fetch will hit a 404 / index.html and the JSON parse will
  *  fail — better to surface the GitHub-fallback path immediately. */
 function relayAvailable(): boolean {
-  if (import.meta.env.VITE_TOTU_RELAY_URL) return true;
+  // relayBaseUrl() is defined in production (defaults to the public relay) and
+  // in dev only when explicitly overridden; otherwise dev relies on the local
+  // Vite middleware at /__report-problem.
+  if (relayBaseUrl()) return true;
   const host = typeof location !== 'undefined' ? location.hostname : '';
   return host === 'localhost' || host === '127.0.0.1';
 }
@@ -196,8 +200,8 @@ export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onli
 
     // Relay path: POST to either the configured Cloudflare Worker
     // (production) or the Vite middleware at /__report-problem (dev).
-    const relayUrl = import.meta.env.VITE_TOTU_RELAY_URL as string | undefined;
-    const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/problem-report` : '/__report-problem';
+    const relayUrl = relayBaseUrl();
+    const submitUrl = relayUrl ? `${relayUrl}/problem-report` : '/__report-problem';
 
     try {
       const resp = await fetch(submitUrl, {

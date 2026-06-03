@@ -17,6 +17,8 @@
 // The client compares each update's commentCreatedAt against the locally-
 // stored seenFixCommentAt; if it's newer (or unset), we surface a modal.
 
+import { relayBaseUrl } from './relay-url';
+
 export interface TrackedReport {
   number: number;
   createdAt: string;
@@ -92,10 +94,10 @@ export function markFixNoteSeen(issueNumber: number, commentCreatedAt: string): 
 export async function fetchUnseenFixNotes(): Promise<FixNoteUpdate[]> {
   const reports = loadTrackedReports();
   if (reports.length === 0) return [];
-  const relayUrl = import.meta.env.VITE_TOTU_RELAY_URL as string | undefined;
+  const relayUrl = relayBaseUrl();
   if (!relayUrl) return [];
   try {
-    const resp = await fetch(`${relayUrl.replace(/\/$/, '')}/report-status`, {
+    const resp = await fetch(`${relayUrl}/report-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ issueNumbers: reports.map(r => r.number) }),
