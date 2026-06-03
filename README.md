@@ -30,15 +30,13 @@ The project is **not** git-connected, so deploys are manual:
 
 ```sh
 npm run build
-npx wrangler pages deploy dist --project-name tyrants-online --branch <production-branch>
+npx wrangler pages deploy dist --project-name tyrants-online --branch main
 ```
 
-`<production-branch>` must match the branch set as **Production** in the
-Cloudflare dashboard (Workers & Pages → tyrants-online → Settings → Builds &
-deployments). Deploying any other branch produces a throwaway *preview* that
-never reaches `tyrants-online.pages.dev`. The Production branch is currently
-**`framework-port`** (a historical leftover); if you change it to `main` in the
-dashboard, deploy with `--branch main` instead.
+`--branch` must match the branch set as **Production** in the Cloudflare
+dashboard (Workers & Pages → tyrants-online → Settings → Builds & deployments),
+which is **`main`**. Deploying any other branch produces a throwaway *preview*
+that never reaches `tyrants-online.pages.dev`.
 
 Pushes to `main` no longer deploy the app to GitHub Pages — that workflow
 (`.github/workflows/deploy.yml`) now only publishes a redirect to the Cloudflare

@@ -10,8 +10,8 @@
 #
 # To deploy the real app, see README / the wrangler command:
 #   npm run build && npx wrangler pages deploy dist \
-#     --project-name tyrants-online --branch framework-port
-# (--branch must match the Cloudflare project's Production branch.)
+#     --project-name tyrants-online --branch main
+# (--branch must match the Cloudflare project's Production branch, which is main.)
 
 name: Redirect GitHub Pages to Cloudflare
 
