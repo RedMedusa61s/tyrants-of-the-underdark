@@ -1680,7 +1680,14 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
         )}
         <h3>New game</h3>
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'block', marginBottom: 4, opacity: 0.85 }}>Number of players</label>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
+            <label style={{ opacity: 0.85 }}>Number of players</label>
+            <a href="/lobby"
+              title="Set up an online game you can play with a friend over separate devices"
+              style={{ fontSize: 13, color: '#b69cff', textDecoration: 'none' }}>
+              Multiplayer →
+            </a>
+          </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {[2, 3, 4].map(n => (
               <button key={n} onClick={() => setNumPlayers(n)}
