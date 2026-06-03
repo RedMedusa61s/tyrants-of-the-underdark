@@ -1571,21 +1571,22 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           <>
             <h2 style={{ marginTop: 24 }}>Played this turn — pick one to promote</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {G.cardsPlayedThisTurn.map((c, i) => {
-                // Gate clickability by the engine's eligible-indices list
-                // (Ambassador / Cultist of Myrkul / Myrmidons exclude the
-                // trigger card itself, and aspect-filtered triggers exclude
-                // mismatched aspects). Showing un-clickable cards alongside
-                // clickable ones gives the player context for "wait, why
-                // can't I promote that one?"
-                const eligibleIdxs = G.pendingChoice!.options as number[] | undefined;
-                const isEligible = !eligibleIdxs || eligibleIdxs.includes(i);
-                return (
-                  <Card key={i} card={c}
-                    label={isEligible ? 'promote' : '—'}
-                    onClick={isEligible ? () => moves.resolveChoice(i) : undefined} />
-                );
-              })}
+              {/* Only show cards that are actually promotable. The engine's
+                  options list excludes the trigger card itself and (for
+                  aspect-filtered triggers like the Myrmidons) mismatched
+                  aspects. Ineligible cards are hidden entirely rather than
+                  shown greyed-out. The original index is preserved for
+                  resolveChoice. */}
+              {G.cardsPlayedThisTurn
+                .map((c, i) => ({ c, i }))
+                .filter(({ i }) => {
+                  const eligibleIdxs = G.pendingChoice!.options as number[] | undefined;
+                  return !eligibleIdxs || eligibleIdxs.includes(i);
+                })
+                .map(({ c, i }) => (
+                  <Card key={i} card={c} label="promote"
+                    onClick={() => moves.resolveChoice(i)} />
+                ))}
             </div>
           </>
         )}
@@ -1947,15 +1948,18 @@ function SplitPlayView(props: {
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Played this turn — pick one to promote</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-            {G.cardsPlayedThisTurn.map((c, i) => {
-              const eligibleIdxs = (G.pendingChoice!.options as number[] | undefined);
-              const isEligible = !eligibleIdxs || eligibleIdxs.includes(i);
-              return (
-                <Card key={i} card={c}
-                  label={isEligible ? 'promote' : '—'}
-                  onClick={isEligible ? () => moves.resolveChoice(i) : undefined} />
-              );
-            })}
+            {/* Hide ineligible cards entirely (trigger card itself,
+                aspect-filtered mismatches); keep original index for resolveChoice. */}
+            {G.cardsPlayedThisTurn
+              .map((c, i) => ({ c, i }))
+              .filter(({ i }) => {
+                const eligibleIdxs = (G.pendingChoice!.options as number[] | undefined);
+                return !eligibleIdxs || eligibleIdxs.includes(i);
+              })
+              .map(({ c, i }) => (
+                <Card key={i} card={c} label="promote"
+                  onClick={() => moves.resolveChoice(i)} />
+              ))}
           </div>
         </div>
       )}
