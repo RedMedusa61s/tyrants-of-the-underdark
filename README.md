@@ -42,6 +42,33 @@ Pushes to `main` no longer deploy the app to GitHub Pages — that workflow
 (`.github/workflows/deploy.yml`) now only publishes a redirect to the Cloudflare
 site.
 
+### Backends (don't lose track of these)
+
+- **Supabase** (online game state + bug reports): `tyrants-online`'s
+  `SUPABASE_URL` points at the **`boardgame framework`** project,
+  ref **`nuvhxfrqutbfcvozfwrn`** — SQL editor:
+  `https://supabase.com/dashboard/project/nuvhxfrqutbfcvozfwrn/sql/new`.
+  (Rebellion is a *separate* Supabase project, `oyjhintjodzpipfwupxj` — not
+  used by Tyrants.) `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are stored as
+  Pages **secrets**, so their values can't be read back from the dashboard or
+  API — only overwritten.
+- **Relay worker** (`tyrants-relay`, separate Cloudflare project): files GitHub
+  issues (holds `GITHUB_TOKEN`), uploads game logs + report screenshots to the
+  `game-logs` branch, and serves `/report-status`. Online bug reports are
+  forwarded to it server-side by the framework's `ReportForwarder`
+  (`src/online/githubIssueForwarder.ts`). Deploy separately: `cd worker &&
+  npx wrangler deploy`.
+
+### Bumping the framework (`digital-boardgame-framework`)
+
+When upgrading the framework dep, **apply any schema changes to the Supabase
+project as part of the same rollout** — the `GameServer` writes against the
+new schema immediately on deploy, so a lagging DB silently 500s online play.
+Diff the framework's `supabase/schema.sql` and apply the new statements (they're
+written `… if not exists`, safe to re-run) to `nuvhxfrqutbfcvozfwrn` before/with
+the Pages deploy. (Concretely: `0.4.0` added `dbf_reports.category` — missing it
+made every online report 500 with "Could not find the 'category' column".)
+
 ### First-run image download (one time, ~25 MB)
 
 The first time you load the page you'll be asked whether to import card and board
