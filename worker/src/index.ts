@@ -36,6 +36,10 @@ interface ProblemReportPayload {
    *  the repo via the Contents API and embeds the raw URL in the issue
    *  body as a markdown image. */
   screenshot?: string;
+  /** Optional extra issue labels merged with the base ['bug','from-game'].
+   *  Online play sends 'area:multiplayer' for connecting/turn/loading reports
+   *  so framework-class bugs are filterable (and routable upstream) at triage. */
+  labels?: string[];
 }
 
 interface GameLogPayload {
@@ -138,13 +142,20 @@ async function handleProblemReport(req: Request, env: Env): Promise<Response> {
   }
   const issueBody = sections.join('\n\n---\n\n');
 
+  // Base labels + any caller-supplied extras (e.g. 'area:multiplayer' from
+  // online play). Sanitize: strings only, deduped, length-capped.
+  const extraLabels = Array.isArray(body.labels)
+    ? body.labels.filter((l): l is string => typeof l === 'string' && l.length > 0 && l.length <= 50)
+    : [];
+  const labels = Array.from(new Set(['bug', 'from-game', ...extraLabels]));
+
   const resp = await fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/issues`, {
     method: 'POST',
     headers: githubHeaders(env),
     body: JSON.stringify({
       title,
       body: issueBody,
-      labels: ['bug', 'from-game'],
+      labels,
     }),
   });
 

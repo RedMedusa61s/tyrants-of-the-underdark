@@ -121,6 +121,7 @@ function liveLogPlugin(): Plugin {
             state?: unknown;
             log?: string[];
             meta?: Record<string, unknown>;
+            labels?: string[];
           };
           try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
           catch { res.statusCode = 400; res.end('bad json'); return; }
@@ -178,7 +179,11 @@ function liveLogPlugin(): Plugin {
               body: JSON.stringify({
                 title,
                 body: issueBody,
-                labels: ['bug', 'from-game'],
+                labels: Array.from(new Set([
+                  'bug', 'from-game',
+                  ...((Array.isArray(body.labels) ? body.labels : [])
+                    .filter((l): l is string => typeof l === 'string' && l.length > 0 && l.length <= 50)),
+                ])),
               }),
             });
             if (!resp.ok) {

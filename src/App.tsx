@@ -65,15 +65,27 @@ interface BoardMode {
   isOnline: boolean;
   mySeat: string;
   onlineError?: Error | null;
-  // ONLINE only: submit a problem report directly to the framework report
-  // store (Supabase `dbf_reports`, version-tagged via clientBuild) instead of
-  // the GitHub flow. Hotseat leaves this undefined, so ProblemReportDialog
-  // falls back to its existing GitHub/relay path byte-for-byte unchanged.
-  // Returns the framework-assigned report id.
+  // ONLINE only: submit a problem report. OnlinePlay implements this to write
+  // BOTH the durable authoritative snapshot to the framework store (Supabase
+  // `dbf_reports`) AND a canonical GitHub issue via the same relay the hotseat
+  // uses — so all triage lives in one place (GitHub Issues). The `category`
+  // is a coarse, player-friendly symptom bucket; 'multiplayer' adds the
+  // `area:multiplayer` label so framework-class bugs are filterable/routable.
+  // Hotseat leaves this undefined, so ProblemReportDialog runs its existing
+  // GitHub/relay path unchanged.
   reportProblem?: (
     message: string,
-    severity?: 'bug' | 'rules-question' | 'feedback',
-  ) => Promise<string>;
+    opts?: { category?: OnlineReportCategory },
+  ) => Promise<OnlineReportResult>;
+}
+/** Coarse symptom bucket chosen by the player in the online report dialog. */
+export type OnlineReportCategory = 'game' | 'multiplayer' | 'other';
+export interface OnlineReportResult {
+  /** Framework store id (durable snapshot), if that write succeeded. */
+  reportId?: string;
+  /** GitHub issue URL/number, if the relay filed one (the canonical channel). */
+  issueUrl?: string;
+  issueNumber?: number;
 }
 export const BoardModeContext = createContext<BoardMode>({ isOnline: false, mySeat: HUMAN_SEAT });
 

@@ -6,8 +6,18 @@
 
 import { useState } from 'react';
 import type { TyrantsState } from '../game';
+import type { OnlineReportCategory, OnlineReportResult } from '../App';
 import { recordFiledReport } from '../bug-report-tracker';
 import { relayBaseUrl } from '../relay-url';
+
+/** Player-friendly symptom buckets shown only in online mode. The label maps
+ *  to a coarse area so triage can route framework-class bugs upstream:
+ *  'multiplayer' adds the `area:multiplayer` issue label. */
+const ONLINE_CATEGORIES: { value: OnlineReportCategory; label: string }[] = [
+  { value: 'game', label: 'Cards, rules, or scoring' },
+  { value: 'multiplayer', label: 'Turns, joining, or loading' },
+  { value: 'other', label: 'Something else' },
+];
 
 interface Props {
   G: TyrantsState;
@@ -25,8 +35,8 @@ interface Props {
    *  existing GitHub/relay flow unchanged. Returns the framework report id. */
   onlineSubmit?: (
     message: string,
-    severity?: 'bug' | 'rules-question' | 'feedback',
-  ) => Promise<string>;
+    opts?: { category?: OnlineReportCategory },
+  ) => Promise<OnlineReportResult>;
   onClose: () => void;
 }
 
@@ -100,6 +110,7 @@ export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onli
   // out (e.g. their screen contains something they don't want public).
   // Disabled entirely when capture failed (screenshotBase64 == null).
   const [includeScreenshot, setIncludeScreenshot] = useState(true);
+  const [category, setCategory] = useState<OnlineReportCategory>('game');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
 
@@ -118,11 +129,27 @@ export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onli
         const expectedSuffix = expected.trim()
           ? `\n\nExpected: ${expected.trim()}`
           : '';
-        const reportId = await onlineSubmit(description.trim() + expectedSuffix);
-        setResult({
-          ok: true,
-          note: `Thanks — filed as ${reportId}. The dev can replay this exact game state.`,
-        });
+        const res = await onlineSubmit(description.trim() + expectedSuffix, { category });
+        if (res.issueUrl) {
+          // Canonical GitHub issue filed (single triage channel). If the
+          // framework store also captured the snapshot, mention it.
+          setResult({
+            ok: true,
+            url: res.issueUrl,
+            number: res.issueNumber,
+            note: res.reportId
+              ? `Thanks — filed, and we saved this exact game state (ref ${res.reportId}) so we can replay it.`
+              : 'Thanks — filed. We can investigate from here.',
+          });
+        } else if (res.reportId) {
+          // Relay was unreachable but the durable snapshot landed — still useful.
+          setResult({
+            ok: true,
+            note: `Thanks — saved as ${res.reportId}. (Couldn't reach the issue tracker just now, but your report and game state are stored.)`,
+          });
+        } else {
+          setResult({ ok: false, error: 'Could not file the report. Please try again.' });
+        }
       } catch (err) {
         setResult({ ok: false, error: String(err) });
       } finally {
@@ -302,24 +329,50 @@ export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onli
           }}
         />
 
-        <div style={{ marginTop: 16, display: 'flex', gap: 16, fontSize: 12, flexWrap: 'wrap' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <input type="checkbox" checked={includeState} onChange={e => setIncludeState(e.target.checked)} />
-            Include game state (codec + player summary)
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <input type="checkbox" checked={includeLog} onChange={e => setIncludeLog(e.target.checked)} />
-            Include log (last 40 lines)
-          </label>
-          {screenshotBase64 && (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-              <input type="checkbox" checked={includeScreenshot} onChange={e => setIncludeScreenshot(e.target.checked)} />
-              Include screenshot
+        {/* ONLINE: a coarse symptom bucket. 'Turns, joining, or loading' maps to
+            the framework area (area:multiplayer label) so those reports can be
+            routed upstream at triage; the rest are game-area by default. */}
+        {onlineSubmit && (
+          <div style={{ marginTop: 16 }}>
+            <label style={{ display: 'block', fontSize: 12, opacity: 0.85, marginBottom: 4 }}>
+              What's it about?
             </label>
-          )}
-        </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {ONLINE_CATEGORIES.map(c => (
+                <button key={c.value} type="button" onClick={() => setCategory(c.value)}
+                  style={{
+                    padding: '6px 12px', cursor: 'pointer', borderRadius: 4, fontSize: 12,
+                    background: category === c.value ? '#5a3380' : '#2a1840',
+                    color: '#e6e1f2', border: '1px solid #3a2055',
+                  }}>{c.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
-        {screenshotBase64 && includeScreenshot && (
+        {/* Attachment toggles only apply to the hotseat GitHub/relay path. Online
+            reports carry the authoritative server snapshot automatically, so
+            these checkboxes would be no-ops there — hide them. */}
+        {!onlineSubmit && (
+          <div style={{ marginTop: 16, display: 'flex', gap: 16, fontSize: 12, flexWrap: 'wrap' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={includeState} onChange={e => setIncludeState(e.target.checked)} />
+              Include game state (codec + player summary)
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={includeLog} onChange={e => setIncludeLog(e.target.checked)} />
+              Include log (last 40 lines)
+            </label>
+            {screenshotBase64 && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={includeScreenshot} onChange={e => setIncludeScreenshot(e.target.checked)} />
+                Include screenshot
+              </label>
+            )}
+          </div>
+        )}
+
+        {!onlineSubmit && screenshotBase64 && includeScreenshot && (
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>Screenshot preview (will be attached):</div>
             <img src={`data:image/png;base64,${screenshotBase64}`} alt="Captured screenshot"
