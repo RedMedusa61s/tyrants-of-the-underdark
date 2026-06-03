@@ -275,11 +275,11 @@ export default defineConfig(({ mode }) => {
     if (process.env[k] === undefined) process.env[k] = env[k];
   }
   return {
-    // GitHub Pages serves the site under /<repo-name>/, so production
-    // builds need every asset URL to be prefixed with that path. Dev keeps
-    // the default '/'. Override with VITE_BASE_PATH if you ever deploy to
-    // a different sub-path (custom domain, root deploy, etc.).
-    base: mode === 'production' ? (env.VITE_BASE_PATH || '/tyrants-of-the-underdark/') : '/',
+    // The canonical deployment is Cloudflare Pages (tyrants-online), which
+    // serves the app at root, so the base is '/'. (GitHub Pages, which served
+    // under /<repo-name>/, is retired — it now only publishes a redirect.)
+    // Override with VITE_BASE_PATH if you ever deploy under a sub-path again.
+    base: mode === 'production' ? (env.VITE_BASE_PATH || '/') : '/',
     plugins: [react(), liveLogPlugin(), onlineApiPlugin()],
     server: { port: 5173, open: false },
     // dedupe react/react-dom so the file-linked framework (built against React 18)
