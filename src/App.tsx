@@ -1075,7 +1075,13 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </tbody>
         </table>
         <div style={{ marginTop: 16, opacity: 0.6, fontSize: 12 }}>
-          Reload the page to start a fresh game.
+          {isOnline ? (
+            <span>
+              Game over. <a href="/lobby" style={{ color: '#6cf', opacity: 1 }}>← Back to the lobby</a> to start a new game.
+            </span>
+          ) : (
+            'Reload the page to start a fresh game.'
+          )}
         </div>
       </div>
     );
