@@ -1,74 +1,81 @@
-# Auto-deploy the client to GitHub Pages on every push to main.
+# GitHub Pages is RETIRED as a real deployment.
 #
-# One-time setup before this works:
-#   Repo → Settings → Pages → Source: "GitHub Actions" (NOT "Deploy from a
-#   branch"). After the first workflow run the site will be available at
-#     https://<user>.github.io/<repo>/
-#   which for this repo is
-#     https://johnchampaign.github.io/tyrants-of-the-underdark/
+# The canonical site is now the Cloudflare Pages project tyrants-online
+# (https://tyrants-online.pages.dev/), which serves both the hotseat game AND
+# online multiplayer (the /api/* lobby backend runs as Cloudflare Pages
+# Functions; GitHub Pages is static-only and could never host that). To avoid
+# two divergent deployments, this workflow no longer builds the app — it
+# publishes a tiny redirect so any old bookmark (including deep links like
+# /lobby) bounces to the canonical site.
 #
-# That's it — no API tokens or secrets to add. Every push to main builds and
-# deploys automatically; you can also run it on demand via the Actions tab.
+# To deploy the real app, see README / the wrangler command:
+#   npm run build && npx wrangler pages deploy dist \
+#     --project-name tyrants-online --branch framework-port
+# (--branch must match the Cloudflare project's Production branch.)
 
-name: Deploy to GitHub Pages
+name: Redirect GitHub Pages to Cloudflare
 
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
-# GitHub Pages requires these specific permissions to publish from Actions.
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow only one concurrent deploy; queue new runs but cancel in-progress
-# ones so the most recent push wins.
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repo
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-        env:
-          # The in-app problem-report and game-log uploaders look for a
-          # Cloudflare-Worker relay URL here. Leave it unset and those
-          # uploaders just no-op in production (which is fine — they're
-          # nice-to-have telemetry, not core gameplay).
-          VITE_TOTU_RELAY_URL: ${{ vars.VITE_TOTU_RELAY_URL }}
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload built artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
   deploy:
     runs-on: ubuntu-latest
-    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Build redirect page
+        run: |
+          mkdir -p _site
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <title>Tyrants of the Underdark — moved</title>
+            <meta http-equiv="refresh" content="0; url=https://tyrants-online.pages.dev/" />
+            <link rel="canonical" href="https://tyrants-online.pages.dev/" />
+            <meta name="robots" content="noindex" />
+          </head>
+          <body style="font-family: system-ui, sans-serif; max-width: 36rem; margin: 4rem auto; padding: 0 1rem;">
+            <h1>This game has moved</h1>
+            <p>Tyrants of the Underdark now lives at
+              <a id="go" href="https://tyrants-online.pages.dev/">tyrants-online.pages.dev</a>,
+              where both the solo/hotseat game and online multiplayer run.</p>
+            <p>Redirecting you now&hellip;</p>
+            <script>
+              // Preserve any hash so deep links still land where intended.
+              var dest = "https://tyrants-online.pages.dev/" + location.hash;
+              document.getElementById("go").href = dest;
+              location.replace(dest);
+            </script>
+          </body>
+          </html>
+          HTML
+          # 404.html makes GitHub Pages serve the same redirect for unknown
+          # deep links (e.g. /tyrants-of-the-underdark/lobby).
+          cp _site/index.html _site/404.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload redirect artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
