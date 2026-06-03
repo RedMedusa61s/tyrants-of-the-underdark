@@ -12,6 +12,7 @@ import { GameServer, SupabaseStore, ResendNotifier, NoopNotifier } from 'digital
 import { createClient } from '@supabase/supabase-js';
 import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from '../../src/adapter/tyrantsAdapter';
 import { snapshotCodec } from '../../src/online/snapshotCodec';
+import { GitHubIssueForwarder } from '../../src/online/githubIssueForwarder';
 import { handleApi } from '../../server/handlers';
 
 interface Env {
@@ -20,7 +21,12 @@ interface Env {
   RESEND_KEY?: string;
   RESEND_FROM?: string;
   SITE_URL?: string;
+  /** Relay worker base URL (holds GITHUB_TOKEN); its /problem-report files the
+   *  issue. Defaults to the public relay so no Pages secret is required. */
+  RELAY_URL?: string;
 }
+
+const DEFAULT_RELAY = 'https://tyrants-relay.johnchampaign.workers.dev';
 
 // Module-scoped cache — persists across requests within a warm isolate.
 let _supabase: ReturnType<typeof createClient> | null = null;
@@ -38,11 +44,15 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     : new NoopNotifier();
 
   const site = env.SITE_URL ?? url.origin;
+  const relay = (env.RELAY_URL ?? DEFAULT_RELAY).replace(/\/$/, '');
   const server = new GameServer<BgioState, TyrantsAction, PlayerId>({
     adapter: tyrantsAdapter,
     codec: snapshotCodec(),
     store: new SupabaseStore(_supabase),
     notifier,
+    // Server-side report forward: stored report -> relay /problem-report ->
+    // GitHub issue. The relay holds the GitHub token; this Function does not.
+    forwarder: new GitHubIssueForwarder({ endpoint: `${relay}/problem-report` }),
     gameUrl: (gameId, token) => `${site}/play/${gameId}?as=${token}`,
   });
 

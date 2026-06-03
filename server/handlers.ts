@@ -8,7 +8,7 @@
 // adapter's initialBgioState (boardgame.io's InitializeGame under the hood).
 // The seats are the bgio seat-index strings '0'..'3'.
 
-import type { GameServer } from 'digital-boardgame-framework/server';
+import type { GameServer, ReportSubmission } from 'digital-boardgame-framework/server';
 import type { BgioState, TyrantsAction, PlayerId } from '../src/adapter/tyrantsAdapter';
 import { initialBgioState } from '../src/adapter/tyrantsAdapter';
 
@@ -92,7 +92,7 @@ export async function handleApi(
       }
       // POST /api/games/:id/report
       if (segs[3] === 'report' && method === 'POST') {
-        return { status: 200, body: await server.report(gameId, token, body as { message: string }) };
+        return { status: 200, body: await server.report(gameId, token, body as ReportSubmission) };
       }
     }
 

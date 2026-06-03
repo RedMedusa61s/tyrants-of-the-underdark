@@ -8,6 +8,7 @@ import { FsStore } from 'digital-boardgame-framework/server/node';
 import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from './src/adapter/tyrantsAdapter';
 import { handleApi } from './server/handlers';
 import { snapshotCodec } from './src/online/snapshotCodec';
+import { GitHubIssueForwarder } from './src/online/githubIssueForwarder';
 
 // Dev API for online multiplayer: the same handleApi router the Cloudflare
 // Function uses, backed by FsStore + NoopNotifier so local dev needs no cloud
@@ -22,6 +23,10 @@ function onlineApiPlugin(): Plugin {
       codec: snapshotCodec(),
       store,
       notifier: new NoopNotifier(),
+      // Dev parity: forward to the LOCAL /__report-problem middleware (files a
+      // GitHub issue if TOTU_BUGREPORT_TOKEN/REPO are set, else writes to disk).
+      // No GitHub token needed on the Pages project.
+      forwarder: new GitHubIssueForwarder({ endpoint: `${origin}/__report-problem` }),
       gameUrl: (id, token) => `${origin}/play/${id}?as=${token}`,
     });
   }

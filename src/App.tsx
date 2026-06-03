@@ -65,28 +65,22 @@ interface BoardMode {
   isOnline: boolean;
   mySeat: string;
   onlineError?: Error | null;
-  // ONLINE only: submit a problem report. OnlinePlay implements this to write
-  // BOTH the durable authoritative snapshot to the framework store (Supabase
-  // `dbf_reports`) AND a canonical GitHub issue via the same relay the hotseat
-  // uses — so all triage lives in one place (GitHub Issues). The `category`
-  // is a coarse, player-friendly symptom bucket; 'multiplayer' adds the
-  // `area:multiplayer` label so framework-class bugs are filterable/routable.
-  // Hotseat leaves this undefined, so ProblemReportDialog runs its existing
-  // GitHub/relay path unchanged.
+  // ONLINE only: submit a problem report as a SINGLE write to the framework
+  // store (Supabase `dbf_reports`, dbf@0.4.0). The server-side ReportForwarder
+  // (GitHubIssueForwarder) then files the canonical GitHub issue — so triage
+  // still lives in one place (GitHub Issues), but the GitHub call is no longer
+  // a separate client request. The `category` is a coarse, player-friendly
+  // symptom bucket; the forwarder maps 'multiplayer' -> the `area:multiplayer`
+  // label so framework-class bugs are filterable/routable. Returns the
+  // framework report id. Hotseat leaves this undefined, so ProblemReportDialog
+  // runs its existing GitHub/relay path unchanged.
   reportProblem?: (
     message: string,
     opts?: { category?: OnlineReportCategory },
-  ) => Promise<OnlineReportResult>;
+  ) => Promise<string>;
 }
 /** Coarse symptom bucket chosen by the player in the online report dialog. */
 export type OnlineReportCategory = 'game' | 'multiplayer' | 'other';
-export interface OnlineReportResult {
-  /** Framework store id (durable snapshot), if that write succeeded. */
-  reportId?: string;
-  /** GitHub issue URL/number, if the relay filed one (the canonical channel). */
-  issueUrl?: string;
-  issueNumber?: number;
-}
 export const BoardModeContext = createContext<BoardMode>({ isOnline: false, mySeat: HUMAN_SEAT });
 
 const AI_THINK_MS = 400;

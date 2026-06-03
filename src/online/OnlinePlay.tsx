@@ -3,9 +3,8 @@ import type { BoardProps } from 'boardgame.io/react';
 import { useGame } from 'digital-boardgame-framework/client';
 import { makeClient } from './client';
 import { rememberOpenedGame } from './myGames';
-import { Board, BoardModeContext, type OnlineReportCategory, type OnlineReportResult } from '../App';
+import { Board, BoardModeContext, type OnlineReportCategory } from '../App';
 import { AI_VERSION } from '../ai-version';
-import { relayBaseUrl } from '../relay-url';
 import type { TyrantsState } from '../game';
 import type { BgioState, TyrantsAction, PlayerId } from '../adapter/tyrantsAdapter';
 
@@ -116,70 +115,28 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
 
   const moves = useMemo(() => makeMovesProxy(enqueueSubmit), [enqueueSubmit]);
 
-  // Online problem reports go to ONE canonical triage channel: GitHub Issues,
-  // via the same relay the hotseat uses. We ALSO write the framework report
-  // store (Supabase dbf_reports) so the authoritative server snapshot is kept
-  // for replay, and reference its id from the issue. Two writes, one inbox:
-  //   1. client.report() -> server.report -> dbf_reports (durable snapshot).
-  //   2. relay /problem-report -> GitHub issue, labelled by symptom category.
-  // The clientBuild/build stamp (AI_VERSION git SHA) lets triage tell which
-  // build a report came from. A 'multiplayer' category adds area:multiplayer
-  // so framework-class bugs are filterable and routable upstream.
+  // Online problem reports are a SINGLE write: client.report() -> server.report
+  // -> framework store (durable snapshot). The server then forwards the stored
+  // report to GitHub via the GitHubIssueForwarder (see functions/api +
+  // vite.config), so the canonical triage channel is still GitHub Issues — but
+  // the GitHub call now happens server-side, not here. We pass the game-defined
+  // `category` (the server persists it and the forwarder maps 'multiplayer' ->
+  // area:multiplayer) and the AI_VERSION build stamp for triage.
   const reportProblem = useMemo(
     () =>
       async (
         message: string,
         opts?: { category?: OnlineReportCategory },
-      ): Promise<OnlineReportResult> => {
-        const category = opts?.category ?? 'game';
-        const ua = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
-
-        // 1. Durable authoritative snapshot in the framework store (best-effort:
-        //    the GitHub issue is the canonical channel, so a store failure here
-        //    must not block filing the issue).
-        let reportId: string | undefined;
-        try {
-          const r = await client.report({
-            message,
-            clientBuild: `tyrants-online@${AI_VERSION}`,
-            userAgent: ua,
-          });
-          reportId = r.reportId;
-        } catch { /* non-fatal — fall through to the issue */ }
-
-        // 2. Canonical GitHub issue via the relay (dev: local /__report-problem).
-        const relay = relayBaseUrl();
-        const submitUrl = relay ? `${relay}/problem-report` : '/__report-problem';
-        const labels = category === 'multiplayer' ? ['area:multiplayer'] : [];
-        let issueUrl: string | undefined;
-        let issueNumber: number | undefined;
-        try {
-          const resp = await fetch(submitUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              description: message,
-              labels,
-              meta: {
-                mode: 'online',
-                gameId,
-                seat: you ?? null,
-                build: `tyrants-online@${AI_VERSION}`,
-                category,
-                frameworkReportId: reportId ?? null,
-                userAgent: ua,
-              },
-            }),
-          });
-          const data = (await resp.json().catch(() => null)) as
-            | { ok?: boolean; url?: string; number?: number }
-            | null;
-          if (data?.ok) { issueUrl = data.url; issueNumber = data.number; }
-        } catch { /* relay unreachable — reportId (if any) is still returned */ }
-
-        return { reportId, issueUrl, issueNumber };
+      ): Promise<string> => {
+        const r = await client.report({
+          message,
+          category: opts?.category ?? 'game',
+          clientBuild: `tyrants-online@${AI_VERSION}`,
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+        });
+        return r.reportId;
       },
-    [client, gameId, you],
+    [client],
   );
 
   if (loading && !view) return <p style={{ padding: 24 }}>Loading…</p>;

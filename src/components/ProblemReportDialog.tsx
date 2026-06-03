@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import type { TyrantsState } from '../game';
-import type { OnlineReportCategory, OnlineReportResult } from '../App';
+import type { OnlineReportCategory } from '../App';
 import { recordFiledReport } from '../bug-report-tracker';
 import { relayBaseUrl } from '../relay-url';
 
@@ -36,7 +36,7 @@ interface Props {
   onlineSubmit?: (
     message: string,
     opts?: { category?: OnlineReportCategory },
-  ) => Promise<OnlineReportResult>;
+  ) => Promise<string>;
   onClose: () => void;
 }
 
@@ -129,27 +129,13 @@ export function ProblemReportDialog({ G, ctxInfo, config, screenshotBase64, onli
         const expectedSuffix = expected.trim()
           ? `\n\nExpected: ${expected.trim()}`
           : '';
-        const res = await onlineSubmit(description.trim() + expectedSuffix, { category });
-        if (res.issueUrl) {
-          // Canonical GitHub issue filed (single triage channel). If the
-          // framework store also captured the snapshot, mention it.
-          setResult({
-            ok: true,
-            url: res.issueUrl,
-            number: res.issueNumber,
-            note: res.reportId
-              ? `Thanks — filed, and we saved this exact game state (ref ${res.reportId}) so we can replay it.`
-              : 'Thanks — filed. We can investigate from here.',
-          });
-        } else if (res.reportId) {
-          // Relay was unreachable but the durable snapshot landed — still useful.
-          setResult({
-            ok: true,
-            note: `Thanks — saved as ${res.reportId}. (Couldn't reach the issue tracker just now, but your report and game state are stored.)`,
-          });
-        } else {
-          setResult({ ok: false, error: 'Could not file the report. Please try again.' });
-        }
+        const reportId = await onlineSubmit(description.trim() + expectedSuffix, { category });
+        // Single write: the server stored the report (with this exact game
+        // state) and forwards it to the issue tracker server-side.
+        setResult({
+          ok: true,
+          note: `Thanks — filed as ${reportId}. We saved this exact game state so we can replay it.`,
+        });
       } catch (err) {
         setResult({ ok: false, error: String(err) });
       } finally {
