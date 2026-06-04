@@ -41,6 +41,7 @@ assets/models/
 assets/site-crops/
 assets/site-crops-round/
 docs/rulebook.pdf
+scripts/.rb.txt
 
 # --- Cloudflare Worker build output ---
 worker/.wrangler/
