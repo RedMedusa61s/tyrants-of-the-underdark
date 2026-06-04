@@ -115,30 +115,21 @@ export function scorePlayer(G: TyrantsState, playerId: string): ScoreBreakdown {
   };
 }
 
-/** Per-card end-of-game VP riders, keyed by card name. */
-const SCORING_RIDERS: Record<string, (G: TyrantsState, playerId: string) => number> = {
-  'Black Dragon': (G, pid) => Math.floor(G.players[pid].trophyHall.white / 3),
-  'Blue Dragon':  (G, pid) => Math.floor(G.players[pid].innerCircle.length / 3),
-  'Green Dragon': (G, pid) => {
-    // +1 VP per site control marker held (only "control" side counts; total-control side
-    // is the same physical marker, just flipped).
-    let n = 0;
-    for (const m of Object.values(G.controlMarkers)) if (m.holder === G.players[pid].color) n++;
-    return n;
-  },
-  'Red Dragon': (G, pid) => {
-    const color = G.players[pid].color;
-    let n = 0;
-    for (const siteId of Object.keys(G.siteControl)) if (hasTotalControl(G, color, siteId)) n++;
-    return n;
-  },
-  'White Dragon': (G, pid) => {
-    const color = G.players[pid].color;
-    let controlled = 0;
-    for (const c of Object.values(G.siteControl)) if (c === color) controlled++;
-    return Math.floor(controlled / 2);
-  },
-};
+/** Per-card END-OF-GAME VP riders, keyed by card name.
+ *
+ *  EMPTY by design. No card in the game has an end-of-game scoring rider — the
+ *  rulebook's Final Scoring lists only the standard categories (site control,
+ *  total control, trophies, deck VP, inner-circle VP, VP tokens gained). The
+ *  five big Dragons say "Gain X VP …", which the rulebook defines as taking VP
+ *  TOKENS IMMEDIATELY when the card resolves (Blue: at end of turn). Those are
+ *  granted in the Dragon handlers (engine/handlers/dragons.ts) and counted under
+ *  "VP tokens gained during the game" — they are NOT end-of-game riders.
+ *
+ *  This used to list all five Dragons, which double-counted Red/Green (already
+ *  granted in-play) and mistimed Black/White/Blue. The map is kept (rather than
+ *  deleted) as a dormant extension point should a future card ever print a true
+ *  "at the end of the game, score …" rider. */
+const SCORING_RIDERS: Record<string, (G: TyrantsState, playerId: string) => number> = {};
 
 export function scoreAll(G: TyrantsState): Record<string, ScoreBreakdown> {
   const out: Record<string, ScoreBreakdown> = {};

@@ -12,7 +12,7 @@ import { SITES } from '../data/sites';
 import { ROUTES } from '../data/routes';
 import { TROOP_SPACES } from '../data/troop-spaces';
 import { lookupCard, cardsInDeck } from '../card-data';
-import type { CardRef, Color } from '../game';
+import type { CardRef, Color, TyrantsState } from '../game';
 
 // ---------- Pure grants ----------
 
@@ -1267,6 +1267,38 @@ export function promoteFromDiscardChoice(opts?: { optional?: boolean }): EffectH
     Mechanics.promote(ctx.G, ctx.actorId, card);
     return true;
   };
+}
+
+// ---------- End-of-turn inner-circle VP (Blue Dragon) ----------
+
+/** Queue an end-of-turn "gain 1 VP per `perN` cards in your inner circle" grant.
+ *  Blue Dragon: "At end of turn, promote up to 2 …, THEN gain 1 VP for every 3
+ *  cards in your inner circle." The grant is deferred to turn.onEnd
+ *  (applyEotInnerCircleVp) so it counts the cards promoted this turn. Per the
+ *  rulebook this is an immediate "gain VP" (VP tokens), NOT an end-of-game
+ *  rider — its only special timing is "end of turn." */
+export function flagEotInnerCircleVp(perN: number): EffectHandler {
+  return ctx => {
+    if (!ctx.G.pendingEotInnerCircleVp) ctx.G.pendingEotInnerCircleVp = [];
+    ctx.G.pendingEotInnerCircleVp.push({ playerId: ctx.actorId, perN, source: ctx.card.name });
+    return true;
+  };
+}
+
+/** Drain G.pendingEotInnerCircleVp, awarding each queued inner-circle VP bonus.
+ *  Called from turn.onEnd, once this turn's promotes have resolved so the
+ *  inner-circle count is final. */
+export function applyEotInnerCircleVp(G: TyrantsState): void {
+  const queue = G.pendingEotInnerCircleVp;
+  if (!queue || queue.length === 0) return;
+  for (const g of queue) {
+    const pl = G.players[g.playerId];
+    if (!pl) continue;
+    const vp = Math.floor(pl.innerCircle.length / g.perN);
+    if (vp > 0) Mechanics.gainVpTokens(G, g.playerId, vp);
+    else Mechanics.log(G, `(${g.source}: inner circle has fewer than ${g.perN} cards — +0 VP)`);
+  }
+  G.pendingEotInnerCircleVp = [];
 }
 
 // ---------- Devour-from-inner-circle optional cost (Zuggtmoy) ----------

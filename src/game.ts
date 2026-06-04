@@ -9,7 +9,7 @@ import { SITES } from './data/sites';
 import { TROOP_SPACES, sitesSpaces } from './data/troop-spaces';
 import { ROUTES } from './data/routes';
 import { deployTroop, assassinateTroop, hasPresence, returnSpy, payHeldMarkerEffectsAtTurnStart } from './engine/map-state';
-import { ensureSpiesLeftInitialized } from './engine/handler-helpers';
+import { ensureSpiesLeftInitialized, applyEotInnerCircleVp } from './engine/handler-helpers';
 
 export type Color = 'black' | 'red' | 'orange' | 'blue';
 
@@ -578,6 +578,9 @@ export const TyrantsGame: Game<TyrantsState> = {
         G._endingSetupTurn = false;
         return;
       }
+      // Award any end-of-turn inner-circle VP (Blue Dragon) now that this turn's
+      // promotes have resolved, so the inner-circle count is final.
+      applyEotInnerCircleVp(G);
       const p = G.players[ctx.currentPlayer];
       // Site-control markers no longer need an end-of-turn claim or scoring
       // step: per the revised rulebook the chit transfers immediately on

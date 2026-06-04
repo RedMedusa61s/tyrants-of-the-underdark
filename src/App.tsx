@@ -1091,16 +1091,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               <th>Deck VP</th>
               <th>Inner VP</th>
               <th>VP tokens</th>
-              <th>Riders</th>
               <th style={{ textAlign: 'right' }}>Total</th>
             </tr>
           </thead>
           <tbody>
             {ranked.map(([pid, s]) => {
-              const riderText = s.riderBonuses.map(r => `${r.source} +${r.vp}`).join(', ');
-              const riderTip = s.riderBonuses.length === 0
-                ? 'No end-of-game scoring riders.'
-                : s.riderBonuses.map(r => `${r.source}: +${r.vp}`).join('\n');
               const sitesTip = s.sitesDetail.length === 0
                 ? 'You control no sites.'
                 : s.sitesDetail.map(d => `${d.site}: +${d.vp}`).join('\n') + `\n— total: +${s.sites}`;
@@ -1155,7 +1150,6 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                   {cell(s.deckVp, deckTip)}
                   {cell(s.innerCircleVp, innerTip)}
                   {cell(s.vpTokens, tokensTip)}
-                  <td title={riderTip} style={{ maxWidth: 200, fontSize: 11, opacity: 0.8, cursor: 'help' }}>{riderText || '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{s.total}</td>
                 </tr>
               );

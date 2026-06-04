@@ -5,7 +5,8 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
          returnOwnSpyChoice, returnEnemySpyChoice, moveEnemyTroopChoice, conditionalGrant,
          ifAnotherPlayerTroopAtLastPlacedSpySite, devourMarketChoice,
          supplantAtLastPlacedSpySite, supplantAtLastReturnedSpySite,
-         returnEnemyTroopOrSpyChoice, playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
+         returnEnemyTroopOrSpyChoice, playerHasOwnSpy, playerCanAssassinate,
+         flagEotInnerCircleVp } from '../handler-helpers';
 import { totalTrophies } from '../../game';
 import type { EffectHandler } from '../types';
 import { Mechanics } from '../mechanics';
@@ -47,6 +48,37 @@ const grantVpPerTotalControlledSite: EffectHandler = ctx => {
   return true;
 };
 
+/** Black Dragon in-play: +1 VP per 3 white troops in your trophy hall. The card
+ *  says "Gain 1 VP…", which the rulebook defines as taking VP tokens
+ *  immediately — NOT an end-of-game rider. */
+export const grantVpPerThreeWhiteTrophies: EffectHandler = ctx => {
+  const me = ctx.G.players[ctx.actorId];
+  const vp = Math.floor((me.trophyHall.white ?? 0) / 3);
+  if (vp > 0) {
+    me.vp += vp;
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +${vp} VP from Black Dragon (white trophies)`);
+  } else {
+    Mechanics.log(ctx.G, `(Black Dragon: fewer than 3 white trophies — +0 VP)`);
+  }
+  return true;
+};
+
+/** White Dragon in-play: +1 VP per 2 sites you control (immediate, per rulebook
+ *  "gain VP"). */
+export const grantVpPerTwoSitesControlled: EffectHandler = ctx => {
+  const me = ctx.G.players[ctx.actorId];
+  let controlled = 0;
+  for (const c of Object.values(ctx.G.siteControl)) if (c === me.color) controlled++;
+  const vp = Math.floor(controlled / 2);
+  if (vp > 0) {
+    me.vp += vp;
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +${vp} VP from White Dragon (sites controlled)`);
+  } else {
+    Mechanics.log(ctx.G, `(White Dragon: fewer than 2 sites controlled — +0 VP)`);
+  }
+  return true;
+};
+
 registerAll({
   'red-wyrmling':         grant({ power: 2, influence: 2 }),
   'severin-silrajin':     grant({ power: 5 }),
@@ -82,11 +114,18 @@ registerAll({
                               grant({ power: 2 }),
                               '5+ trophies in trophy hall')),
 
-  // Big dragons — in-play effect resolved here; final-scoring riders run automatically
-  // from engine/scoring.ts (Black/Blue/Green/Red/White Dragon lookups).
-  'black-dragon':         supplantChoice({ whiteOnly: true, anywhere: true }),
-  // "promote up to 2 other cards played this turn" — "up to" = optional.
-  'blue-dragon':          flagEotPromote({ count: 2, optional: true }),
+  // Big dragons. Each card says "Gain X VP …", which the rulebook defines as
+  // taking VP tokens IMMEDIATELY when the card resolves (Final Scoring lists no
+  // per-card end-of-game bonus). So the VP is granted here, in-play — NOT via an
+  // engine/scoring.ts rider (those were removed; they double-counted Red/Green
+  // and mistimed Black/White/Blue). Blue is the one exception the card spells
+  // out: its VP is gained "at end of turn", after its promotes resolve.
+  'black-dragon':         sequence(supplantChoice({ whiteOnly: true, anywhere: true }),
+                                   grantVpPerThreeWhiteTrophies),
+  // "promote up to 2 other cards played this turn" ("up to" = optional), THEN at
+  // end of turn gain 1 VP per 3 inner-circle cards (counts the cards just promoted).
+  'blue-dragon':          sequence(flagEotPromote({ count: 2, optional: true }),
+                                   flagEotInnerCircleVp(3)),
   'green-dragon':         chooseOne(
                             { label: 'Place a spy + supplant a troop at that site', handler: sequence(placeSpyAtChosenSite(), supplantAtLastPlacedSpySite()) },
                             { label: 'Return a spy + supplant a troop at that site + 1 VP per control marker held', handler: sequence(returnOwnSpyChoice(), supplantAtLastReturnedSpySite(), grantVpPerControlMarkerHeld), available: playerHasOwnSpy }),
@@ -97,5 +136,5 @@ registerAll({
   'red-dragon':           sequence(supplantChoice(),
                                    returnEnemySpyChoice(),
                                    grantVpPerTotalControlledSite),
-  'white-dragon':         deployChoice({ count: 3 }),
+  'white-dragon':         sequence(deployChoice({ count: 3 }), grantVpPerTwoSitesControlled),
 });
