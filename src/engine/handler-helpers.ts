@@ -1228,11 +1228,29 @@ export function promoteFromDiscardChoice(opts?: { optional?: boolean }): EffectH
   return ctx => {
     if (!ctx.pendingChoice) {
       const me = ctx.G.players[ctx.actorId];
-      if (me.discard.length === 0) return true;
+      // Cards played this turn sit in the player's PLAY AREA per the rules, but
+      // the engine also pushes them into `discard` during the turn. Effects that
+      // promote "from your discard pile" (Matron Mother, Necromancer) must NOT
+      // offer those play-area cards (#65). Exclude one discard entry per
+      // card-played-this-turn (by deck::slot, multiset — handles duplicates).
+      const playedLeft = new Map<string, number>();
+      for (const c of ctx.G.cardsPlayedThisTurn) {
+        const k = `${c.deck}::${c.slot}`;
+        playedLeft.set(k, (playedLeft.get(k) ?? 0) + 1);
+      }
+      const options: number[] = [];
+      for (let i = 0; i < me.discard.length; i++) {
+        const c = me.discard[i];
+        const k = `${c.deck}::${c.slot}`;
+        const n = playedLeft.get(k) ?? 0;
+        if (n > 0) { playedLeft.set(k, n - 1); continue; } // play-area card — skip
+        options.push(i);
+      }
+      if (options.length === 0) return true;
       ctx.pendingChoice = {
         kind: 'select-card-in-discard',
         prompt: 'Promote a card from your discard.',
-        options: me.discard.map((_, i) => i),
+        options,
         optional: opts?.optional,
       } as PendingChoice;
       ctx.paused = true;

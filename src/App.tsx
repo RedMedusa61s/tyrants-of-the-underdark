@@ -1555,9 +1555,18 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           <>
             <h2 style={{ marginTop: 24 }}>Discard — pick one</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {p.discard.map((c, i) => (
-                <Card key={i} card={c} label="pick" onClick={() => moves.resolveChoice(i)} />
-              ))}
+              {/* Only the engine-supplied option indices are valid — e.g. Matron
+                  Mother excludes cards played this turn (those are in your play
+                  area, not your discard pile). Show only those. */}
+              {(() => {
+                const opts = G.pendingChoice!.options as number[] | undefined;
+                const idxs = opts ?? p.discard.map((_, i) => i);
+                return idxs
+                  .filter(i => p.discard[i])
+                  .map(i => (
+                    <Card key={i} card={p.discard[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
+                  ));
+              })()}
             </div>
           </>
         )}
@@ -1980,9 +1989,17 @@ function SplitPlayView(props: {
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Discard — pick one</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-            {p.discard.map((c, i) => (
-              <Card key={i} card={c} label="pick" onClick={() => moves.resolveChoice(i)} />
-            ))}
+            {/* Honor the engine's option list (Matron Mother excludes cards
+                played this turn — they're in the play area, not the discard). */}
+            {(() => {
+              const opts = G.pendingChoice!.options as number[] | undefined;
+              const idxs = opts ?? p.discard.map((_, i) => i);
+              return idxs
+                .filter(i => p.discard[i])
+                .map(i => (
+                  <Card key={i} card={p.discard[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
+                ));
+            })()}
           </div>
         </div>
       )}
