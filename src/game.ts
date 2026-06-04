@@ -191,6 +191,12 @@ export interface TyrantsState {
    *  the actual designers (Peter Lee / Rodney Thompson / Andrew Veen)
    *  haven't ruled on it publicly. */
   pendingEotPromotions: Array<EotPromoteTrigger>;
+  /** End-of-turn "gain 1 VP per N cards in your inner circle" grants, queued by
+   *  cards whose VP is awarded at end of turn AFTER their promotes resolve
+   *  (Blue Dragon: "At end of turn, promote up to 2…, then gain 1 VP for every 3
+   *  cards in your inner circle"). Drained in turn.onEnd, once the inner-circle
+   *  count is final. Reset each turn. */
+  pendingEotInnerCircleVp: Array<{ playerId: string; perN: number; source: string }>;
   /** Persistent pile of every card that Mechanics.devour has consumed
    *  this game. Aberrations/Undead expansion mechanics reference it
    *  (Ghost's "top of devoured" recovery). Older saves don't have it;
@@ -479,6 +485,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       turnAspectsPlayed: {},
       cardsPlayedThisTurn: [],
       pendingEotPromotions: [],
+      pendingEotInnerCircleVp: [],
       devouredPile: [],
       markerInfluenceGrantedThisTurn: [],
       markerTcGrantedThisTurn: [],
@@ -511,6 +518,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       G.log.push(`Turn: P${Number(ctx.currentPlayer) + 1} (${G.players[ctx.currentPlayer].color})`);
       G.cardsPlayedThisTurn = [];
       G.pendingEotPromotions = [];
+      G.pendingEotInnerCircleVp = [];
       // Undo history is per-turn — you can't undo back into a prior player's turn.
       G.undoStack = [];
       G.activeTurnColor = G.players[ctx.currentPlayer].color;
