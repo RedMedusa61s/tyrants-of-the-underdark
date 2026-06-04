@@ -1,0 +1,4 @@
+# Cloudflare Pages headers. version.json must never be cached (browser or edge)
+# so the in-app UpdateBanner always sees the freshly-deployed build id.
+/version.json
+  Cache-Control: no-store

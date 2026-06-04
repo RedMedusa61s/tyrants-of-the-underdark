@@ -1,8 +1,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { UpdateBanner } from 'digital-boardgame-framework/client';
 import { App } from './App';
 import { Lobby } from './online/Lobby';
 import { OnlinePlay } from './online/OnlinePlay';
+import { AI_VERSION } from './ai-version';
 
 // Additive root router. ONLINE routes (/lobby, /play/:id?as=token) render the
 // minimal online multiplayer UI; EVERY other path renders the existing hotseat
@@ -26,5 +28,8 @@ function Root() {
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <Root />
+    {/* Shows a "new version — Reload" bar (only) when a newer build is deployed,
+        so long-open tabs don't keep running stale code. Covers all routes. */}
+    <UpdateBanner currentBuild={AI_VERSION} />
   </React.StrictMode>
 );

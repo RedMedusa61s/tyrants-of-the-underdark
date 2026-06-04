@@ -4,6 +4,7 @@ import path from 'node:path';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { GameServer, NoopNotifier } from 'digital-boardgame-framework/server';
+import { versionStamp } from 'digital-boardgame-framework/vite';
 import { FsStore } from 'digital-boardgame-framework/server/node';
 import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from './src/adapter/tyrantsAdapter';
 import { handleApi } from './server/handlers';
@@ -290,7 +291,9 @@ export default defineConfig(({ mode }) => {
     // under /<repo-name>/, is retired — it now only publishes a redirect.)
     // Override with VITE_BASE_PATH if you ever deploy under a sub-path again.
     base: mode === 'production' ? (env.VITE_BASE_PATH || '/') : '/',
-    plugins: [react(), liveLogPlugin(), onlineApiPlugin()],
+    // versionStamp: emit dist/version.json stamped with the same git SHA as
+    // __AI_VERSION__, so the in-app <UpdateBanner> can detect new deploys.
+    plugins: [react(), liveLogPlugin(), onlineApiPlugin(), versionStamp({ buildId: readGitSha() })],
     server: { port: 5173, open: false },
     // dedupe react/react-dom so the file-linked framework (built against React 18)
     // shares THIS app's single React 19 copy. Without this there are two React
