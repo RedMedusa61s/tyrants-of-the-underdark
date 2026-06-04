@@ -81,6 +81,24 @@ interface BoardMode {
 }
 /** Coarse symptom bucket chosen by the player in the online report dialog. */
 export type OnlineReportCategory = 'game' | 'multiplayer' | 'other';
+
+/** Small colored chip so players can identify/pick opponents by colour at a
+ *  glance instead of memorising which colour is P2/P3/P4 (#66). */
+function ColorSwatch({ color, size = 11 }: { color: string; size?: number }) {
+  return (
+    <span style={{
+      display: 'inline-block', width: size, height: size, borderRadius: 2,
+      background: color, border: '1px solid rgba(255,255,255,0.6)',
+      marginRight: 6, verticalAlign: 'middle', flexShrink: 0,
+    }} />
+  );
+}
+/** "Red (P2)" with a leading colour swatch — colour first, since that's how
+ *  players think about opponents. */
+function playerColorLabel(color: string, pid: string) {
+  const name = color.charAt(0).toUpperCase() + color.slice(1);
+  return <><ColorSwatch color={color} />{name} (P{Number(pid) + 1})</>;
+}
 export const BoardModeContext = createContext<BoardMode>({ isOnline: false, mySeat: HUMAN_SEAT });
 
 const AI_THINK_MS = 400;
@@ -89,6 +107,21 @@ const CONFIG_KEY = 'totu.gameconfig';
 const DEV_KEY = 'totu.dev-mode';
 const NO_IMAGES_KEY = 'totu.no-images';
 const SPLIT_VIEW_KEY = 'totu.split-view';
+
+// Bulk "Upload logs": archived games already uploaded successfully are recorded
+// here (by their IndexedDB id) so later uploads skip them instead of re-sending
+// every record every time (#62). The relay also de-dupes server-side by content
+// hash; this just avoids the redundant client-side round-trips.
+const UPLOADED_LOGS_KEY = 'totu.uploaded-logs';
+function loadUploadedLogIds(): Set<number> {
+  try { return new Set(JSON.parse(localStorage.getItem(UPLOADED_LOGS_KEY) ?? '[]') as number[]); }
+  catch { return new Set(); }
+}
+function markLogUploaded(id: number): void {
+  const s = loadUploadedLogIds();
+  s.add(id);
+  try { localStorage.setItem(UPLOADED_LOGS_KEY, JSON.stringify([...s])); } catch { /* quota — ignore */ }
+}
 
 function readUrlBoolFlag(param: string, storageKey: string): boolean {
   try {
@@ -348,6 +381,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const [splitView, setSplitView] = useState<boolean>(isSplitViewMode);
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  // "Play all basic": when true, the driver effect auto-plays non-interactive
+  // hand cards one at a time until none remain (#66).
+  const [playingAll, setPlayingAll] = useState(false);
   // Auto-captured screenshot for the bug report. Grabbed BEFORE the dialog
   // mounts so it shows the actual game state, not the modal overlay.
   const [reportScreenshot, setReportScreenshot] = useState<string | null>(null);
@@ -356,7 +392,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const [bulkUpload, setBulkUpload] = useState<
     | { kind: 'idle' }
     | { kind: 'uploading'; progress: string }
-    | { kind: 'done'; uploaded: number; deduped: number; failed: number }
+    | { kind: 'done'; uploaded: number; deduped: number; failed: number; skipped: number }
   >({ kind: 'idle' });
   // Pending consent: when the user clicks Upload logs we count the records
   // first, open the disclosure dialog, and only kick off the actual POST
@@ -678,6 +714,39 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     return () => clearTimeout(handle);
   }, [G, ctx, isAiTurn, aiHasPendingChoice, moves, showingModal, session, aiLookahead]);
 
+  // "Play all basic" — index of the first hand card whose effect is
+  // NON-interactive (playing it opens no prompt). We can't know that statically,
+  // so we dry-run the play through the same bgio reducer the AI uses and check
+  // whether it leaves a pendingChoice. Hotseat only (online has no local
+  // reducer/session). null = nothing basic to play right now.
+  const basicPlayIdx = useMemo<number | null>(() => {
+    if (isOnline || !aiLookahead || !myTurn || G.pendingChoice || G.setupPhase || ctx.gameover) return null;
+    const { reducer, template } = aiLookahead;
+    const action = (type: string, args: unknown[], pid: string) =>
+      ({ type: 'MAKE_MOVE', payload: { type, args, playerID: pid } });
+    const hand = G.players[me]?.hand ?? [];
+    for (let i = 0; i < hand.length; i++) {
+      const wrapped = { ...template, G, ctx } as { G: TyrantsState; ctx: typeof ctx };
+      const next = reducer(wrapped, action('playCard', [i], me)) as { G: TyrantsState };
+      if (next === wrapped) continue;        // invalid (shouldn't happen on your turn)
+      if (!next.G.pendingChoice) return i;   // non-interactive → "basic"
+    }
+    return null;
+  }, [isOnline, aiLookahead, myTurn, G, ctx, me]);
+
+  // Driver: while Play-all is armed and it's a clean human turn, play one basic
+  // card per tick (small delay so the user sees them go). Stops when none remain
+  // or the turn state changes.
+  useEffect(() => {
+    if (!playingAll) return;
+    if (isOnline || isAiTurn || G.pendingChoice || G.setupPhase || ctx.gameover || basicPlayIdx == null) {
+      setPlayingAll(false);
+      return;
+    }
+    const h = setTimeout(() => moves.playCard(basicPlayIdx), 140);
+    return () => clearTimeout(h);
+  }, [playingAll, basicPlayIdx, isOnline, isAiTurn, G, ctx, moves]);
+
   // Human-facing pending choices that drive map UI.
   const humanSitePick = G.pendingChoice
     && G.pendingChoice.kind === 'select-site'
@@ -943,8 +1012,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {((pc.options as string[] | undefined) ?? []).map(pid => (
               <button key={pid} onClick={() => moves.resolveChoice(pid)}
-                style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                P{Number(pid) + 1} ({G.players[pid].color})
+                style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                {playerColorLabel(G.players[pid].color, pid)}
               </button>
             ))}
           </div>
@@ -967,6 +1036,19 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {actionBtn('Return enemy spy (3 Power)', canReturnSpy, baseAction?.kind === 'return-spy',
         () => setBaseAction(baseAction?.kind === 'return-spy' ? null : { kind: 'return-spy' }))}
       {baseAction && actionBtn('Cancel', true, false, () => setBaseAction(null))}
+      {!isOnline && (() => {
+        const canPlayAll = myTurn && !G.pendingChoice && !G.setupPhase && basicPlayIdx != null;
+        const active = canPlayAll && !playingAll;
+        return (
+          <button
+            onClick={() => setPlayingAll(true)}
+            disabled={!active}
+            title="Play every hand card whose effect needs no decision (e.g. resource cards), one after another. Stops when only cards that require a choice remain."
+            style={{ padding: '8px 16px', background: active ? '#2a4a30' : '#2a2a2a', color: active ? 'white' : '#777', border: 'none', borderRadius: 4, cursor: active ? 'pointer' : 'not-allowed', marginLeft: 'auto' }}>
+            {playingAll ? 'Playing…' : '▶▶ Play all basic'}
+          </button>
+        );
+      })()}
       {(() => {
         const canUndo = myTurn && (G.undoStack?.length ?? 0) > 0;
         return (
@@ -1164,7 +1246,10 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           // re-click later without producing duplicate commits server-side.
           if (bulkUpload.kind === 'uploading') return;
           const archived = await getAllArchivedGames().catch(() => []);
-          setPendingConsent({ recordCount: archived.length + 1 });
+          // Count only records not already uploaded (+1 for the live game).
+          const up = loadUploadedLogIds();
+          const pending = archived.filter(a => a.id == null || !up.has(a.id)).length;
+          setPendingConsent({ recordCount: pending + 1 });
         }}
           disabled={bulkUpload.kind === 'uploading'}
           title="Upload every completed game stored locally plus the current in-progress game to the public log relay. Already-uploaded records dedup server-side."
@@ -1181,7 +1266,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             : bulkUpload.kind === 'done'
               ? (bulkUpload.failed > 0
                   ? `${bulkUpload.failed} failed · ${bulkUpload.uploaded + bulkUpload.deduped} ok`
-                  : `${bulkUpload.uploaded} new · ${bulkUpload.deduped} deduped`)
+                  : `${bulkUpload.uploaded} new · ${bulkUpload.deduped} deduped${bulkUpload.skipped > 0 ? ` · ${bulkUpload.skipped} skipped` : ''}`)
               : 'Upload logs'}
         </button>
         )}
@@ -1234,18 +1319,26 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           setPendingConsent(null);
           if (bulkUpload.kind === 'uploading') return;
           const archived = await getAllArchivedGames().catch(() => []);
-          const total = archived.length + 1;
+          // Skip archived records already uploaded in a prior run (#62).
+          const uploadedIds = loadUploadedLogIds();
+          const toUpload = archived.filter(a => a.id == null || !uploadedIds.has(a.id));
+          const skipped = archived.length - toUpload.length;
+          const total = toUpload.length + 1; // + the live game (always re-published)
           let done = 0, uploaded = 0, deduped = 0, failed = 0;
           setBulkUpload({ kind: 'uploading', progress: `0 / ${total}` });
           const relayUrl = (import.meta.env.VITE_TOTU_RELAY_URL as string | undefined);
           const submitUrl = relayUrl ? `${relayUrl.replace(/\/$/, '')}/game-log` : '/__publish-game-log';
-          for (const a of archived) {
+          for (const a of toUpload) {
             const body = payloadForArchivedGame(a);
             const resp = await fetch(submitUrl, {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(body),
             }).then(r => r.json().catch(() => ({ ok: false }))).catch(() => ({ ok: false }));
-            if (resp.ok) { (resp.deduped ? deduped++ : uploaded++); } else { failed++; }
+            if (resp.ok) {
+              (resp.deduped ? deduped++ : uploaded++);
+              // Mark uploaded so future runs skip it (server already had it or now does).
+              if (a.id != null) markLogUploaded(a.id);
+            } else { failed++; }
             done++;
             setBulkUpload({ kind: 'uploading', progress: `${done} / ${total}` });
           }
@@ -1256,7 +1349,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             source: 'browser-bulk-upload',
           });
           if (r.ok) { (r.deduped ? deduped++ : uploaded++); } else { failed++; }
-          setBulkUpload({ kind: 'done', uploaded, deduped, failed });
+          setBulkUpload({ kind: 'done', uploaded, deduped, failed, skipped });
           setTimeout(() => setBulkUpload({ kind: 'idle' }), 6000);
         }}
       />
@@ -1460,8 +1553,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {((G.pendingChoice.options as string[] | undefined) ?? []).map(pid => (
                   <button key={pid} onClick={() => moves.resolveChoice(pid)}
-                    style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
-                    P{Number(pid) + 1} ({G.players[pid].color})
+                    style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                    {playerColorLabel(G.players[pid].color, pid)}
                   </button>
                 ))}
               </div>
