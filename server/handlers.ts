@@ -94,6 +94,20 @@ export async function handleApi(
       if (segs[3] === 'report' && method === 'POST') {
         return { status: 200, body: await server.report(gameId, token, body as ReportSubmission) };
       }
+      // In-game chat (framework messaging). Both are auth-gated by the token and
+      // stamp the sender seat server-side; both return the refreshed message list.
+      // GET  /api/games/:id/chat  → list
+      if (segs[3] === 'chat' && method === 'GET') {
+        return { status: 200, body: await server.listMessages(gameId, token) };
+      }
+      // POST /api/games/:id/chat  → post { body }, returns refreshed list
+      if (segs[3] === 'chat' && method === 'POST') {
+        const text = (body as { body?: unknown }).body;
+        if (typeof text !== 'string' || text.trim() === '') {
+          return { status: 422, body: { error: 'message body required' } };
+        }
+        return { status: 200, body: await server.postMessage(gameId, token, text) };
+      }
     }
 
     // ---- reports (public triage) ----

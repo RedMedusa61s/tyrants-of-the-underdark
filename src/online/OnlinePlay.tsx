@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
-import { useGame } from 'digital-boardgame-framework/client';
-import { makeClient } from './client';
+import { useGame, ChatPanel } from 'digital-boardgame-framework/client';
+import { makeClient, makeMessagingClient } from './client';
 import { rememberOpenedGame } from './myGames';
 import { Board, BoardModeContext, type OnlineReportCategory } from '../App';
 import { AI_VERSION } from '../ai-version';
@@ -56,6 +56,7 @@ function makeMovesProxy(
 
 export function OnlinePlay({ gameId, token }: { gameId: string; token: string }) {
   const client = useMemo(() => makeClient(gameId, token), [gameId, token]);
+  const messagingClient = useMemo(() => makeMessagingClient(gameId, token), [gameId, token]);
   const { view, yourTurn, you, submit, loading, error } =
     useGame<BgioState, TyrantsAction>(client, { pollMs: 2000 });
 
@@ -179,9 +180,23 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
     plugins: (view as any).plugins ?? {},
   } as unknown as BoardProps<TyrantsState>;
 
+  // Online games are seat-per-human (each seat joins via its own invite token;
+  // there are no AI seats online), so the human-seat count is just the number
+  // of seats. Chat only shows for 2+ humans — never in a solo/all-AI (hotseat)
+  // game, which doesn't render OnlinePlay at all.
+  const humanSeatCount = Object.keys(view.G.players).length;
+  const labelForSeat = (seat: string) => {
+    const color = view.G.players[seat]?.color;
+    const name = color ? color.charAt(0).toUpperCase() + color.slice(1) : '';
+    return color ? `${name} (P${Number(seat) + 1})` : `P${Number(seat) + 1}`;
+  };
+
   return (
     <BoardModeContext.Provider value={{ isOnline: true, mySeat: (you ?? '0') as string, onlineError: error, reportProblem }}>
       <Board {...boardProps} />
+      {humanSeatCount >= 2 && (
+        <ChatPanel client={messagingClient} you={(you ?? '0') as string} seatLabel={labelForSeat} />
+      )}
     </BoardModeContext.Provider>
   );
 }

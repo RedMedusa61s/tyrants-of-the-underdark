@@ -2,7 +2,7 @@
 // framework's /client and the adapter types — never /server. The browser
 // bundle must not pull in the server barrel (node:fs).
 
-import type { GameClientApi } from 'digital-boardgame-framework/client';
+import type { GameClientApi, MessagingClientApi } from 'digital-boardgame-framework/client';
 import type { BgioState, TyrantsAction, PlayerId } from '../adapter/tyrantsAdapter';
 
 export interface Invites {
@@ -69,6 +69,28 @@ export function makeClient(gameId: string, token: string): GameClientApi<BgioSta
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+      }).then(json),
+  };
+}
+
+// In-game chat transport for the framework's ChatPanel/useMessages. Both calls
+// hit /api/games/:id/chat (auth-gated by the token; the server stamps the seat)
+// and return the refreshed ChatMessage[].
+export function makeMessagingClient(gameId: string, token: string): MessagingClientApi {
+  const base = `/api/games/${gameId}/chat`;
+  const q = `?as=${encodeURIComponent(token)}`;
+  const json = async (r: Response): Promise<any> => {
+    const data: any = await r.json();
+    if (!r.ok) throw new Error((data && data.error) || `HTTP ${r.status}`);
+    return data;
+  };
+  return {
+    listMessages: () => fetch(`${base}${q}`).then(json),
+    postMessage: (body) =>
+      fetch(`${base}${q}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body }),
       }).then(json),
   };
 }
