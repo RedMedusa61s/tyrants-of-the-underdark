@@ -240,6 +240,9 @@ registerAll({
   //   Restricted to THE qualifying opponent(s). If multiple opponents
   //   have troops at the site, the player picks which one's hall; both
   //   trophies then come from that chosen player.
+  //   Unlike Orcus (which prints "deploy them anywhere on the board"),
+  //   Lich's deploy uses the plain deploy keyword — so placement is
+  //   presence-restricted (restrictToPresence), per rulebook p.12.
   'lich':                sequence(
                            placeSpyAtChosenSite(),
                            (ctx => {
@@ -301,7 +304,7 @@ registerAll({
                                  pendingChoice: ctx.pendingChoice,
                                  paused: ctx.paused,
                                };
-                               const done = takeTrophyAndPlace({ count: 2, ownerPid: state.victimPid })(childCtx);
+                               const done = takeTrophyAndPlace({ count: 2, ownerPid: state.victimPid, restrictToPresence: true })(childCtx);
                                if (!done) {
                                  ctx.pendingChoice = childCtx.pendingChoice;
                                  ctx.paused = childCtx.paused;

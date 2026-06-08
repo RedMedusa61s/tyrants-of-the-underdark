@@ -1943,7 +1943,7 @@ interface OrcusIterState {
  *  used by Lich ("take 2 trophies from THEIR hall" where "they" is the
  *  opponent with a troop at the spy site). When omitted, any player's
  *  hall is eligible (Orcus's behavior). */
-export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whiteOnly?: boolean }): EffectHandler {
+export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whiteOnly?: boolean; restrictToPresence?: boolean }): EffectHandler {
   return ctx => {
     let state = (ctx.handlerState as OrcusIterState | null) ?? { remaining: opts.count };
 
@@ -1977,11 +1977,26 @@ export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whi
       const choices = enumerateTrophies(ctx.G, opts.ownerPid, opts.whiteOnly);
       const sel = choices[idx];
       if (!sel) { ctx.handlerState = null; return true; }
+      // Placement spaces. The deploy keyword is presence-restricted (rulebook
+      // p.12) UNLESS the card says "anywhere on the board". Orcus prints that
+      // phrase, so it places on any empty space; Lich does NOT, so its deploy
+      // is limited to empty spaces where the active player has presence
+      // (restrictToPresence). With no eligible space, the trophy can't be
+      // placed — skip the rest of the effect (the trophy was not yet removed).
+      const me = ctx.G.players[ctx.actorId];
+      const eligible = opts.restrictToPresence
+        ? legalDeployTargets(ctx.G, me.color, false)
+        : TROOP_SPACES.filter(t => t.id in ctx.G.troops && ctx.G.troops[t.id] === null).map(t => t.id);
+      if (eligible.length === 0) {
+        Mechanics.log(ctx.G, `(deploy: no empty space ${opts.restrictToPresence ? 'where you have presence' : 'on the board'} — skipped)`);
+        ctx.handlerState = null;
+        return true;
+      }
       state = { remaining: state.remaining, picked: sel };
       ctx.pendingChoice = {
         kind: 'select-troop-space',
-        prompt: `Place the ${sel.color} trophy on any empty space (or decline to skip).`,
-        options: TROOP_SPACES.filter(t => t.id in ctx.G.troops && ctx.G.troops[t.id] === null).map(t => t.id),
+        prompt: `Place the ${sel.color} trophy on an empty space${opts.restrictToPresence ? ' where you have presence' : ''} (or decline to skip).`,
+        options: eligible,
         optional: true,
       } as PendingChoice;
       ctx.paused = true;
