@@ -626,25 +626,33 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const pendingAiSummary = pendingAiSummaryIdx >= 0 ? G.turnLogs[pendingAiSummaryIdx] : null;
   const showingModal = !!pendingAiSummary;
 
-  // Reducer + template state for the heuristic AI's 1-ply / turn-end lookahead.
-  // Constructed once per game session (when halfDecks / numPlayers are known)
-  // since both are inputs to TyrantsGame.setup. The reducer is reused across
-  // every AI move decision; closures `simulate` and `rollout` below splice
-  // the LIVE G + ctx into the template state for each counterfactual reducer
-  // call so lookahead reflects current play.
+  // Reducer + template state for the heuristic AI's 1-ply / turn-end lookahead,
+  // ALSO used by the "Play all basic" dry-run (basicPlayIdx below).
+  // The reducer is reused across every counterfactual call; closures `simulate`
+  // and `rollout` below (and basicPlayIdx) splice the LIVE G + ctx into the
+  // template state for each reducer call, so lookahead reflects current play.
+  //
+  // Available online too: previously this returned null without a session
+  // (online has no SessionContext), which silently disabled Play-all in
+  // multiplayer (#70). The session only ever supplied setup inputs (halfDecks /
+  // numPlayers), and setup is invoked solely to build the throwaway `template`
+  // — whose G/ctx are DISCARDED at every use site in favour of the live state.
+  // So we can build it from the live ctx.numPlayers; halfDecks only seeds the
+  // discarded template market, so a default is harmless when no session exists.
   const aiLookahead = useMemo(() => {
-    if (!session) return null;
     type AnyState = { G: TyrantsState; ctx: typeof ctx & { gameover?: unknown } };
     type AnyReducer = (s: AnyState, action: unknown) => AnyState;
+    const numPlayers = session?.config.numPlayers ?? ctx.numPlayers ?? 2;
+    const halfDecks = session?.config.halfDecks ?? ['drow', 'dragons'];
     const wrappedGame = {
       ...TyrantsGame,
       setup: (sa: Parameters<NonNullable<typeof TyrantsGame.setup>>[0]) =>
-        TyrantsGame.setup!(sa, { halfDecks: session.config.halfDecks }),
+        TyrantsGame.setup!(sa, { halfDecks }),
     };
     const reducer = CreateGameReducer({ game: wrappedGame }) as unknown as AnyReducer;
-    const template = InitializeGame({ game: wrappedGame, numPlayers: session.config.numPlayers }) as unknown as AnyState;
+    const template = InitializeGame({ game: wrappedGame, numPlayers }) as unknown as AnyState;
     return { reducer, template };
-  }, [session]);
+  }, [session, ctx.numPlayers]);
 
   // AI driver: dispatch one move per state tick whenever it's an AI seat's turn
   // (or an AI has a pending choice). State updates re-run this effect, so the AI keeps
@@ -717,10 +725,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // "Play all basic" — index of the first hand card whose effect is
   // NON-interactive (playing it opens no prompt). We can't know that statically,
   // so we dry-run the play through the same bgio reducer the AI uses and check
-  // whether it leaves a pendingChoice. Hotseat only (online has no local
-  // reducer/session). null = nothing basic to play right now.
+  // whether it leaves a pendingChoice. Works online too (#70): the dry-run is a
+  // pure reducer call on the live G; online, moves.playCard routes through the
+  // server like any other move. null = nothing basic to play right now.
   const basicPlayIdx = useMemo<number | null>(() => {
-    if (isOnline || !aiLookahead || !myTurn || G.pendingChoice || G.setupPhase || ctx.gameover) return null;
+    if (!aiLookahead || !myTurn || G.pendingChoice || G.setupPhase || ctx.gameover) return null;
     const { reducer, template } = aiLookahead;
     const action = (type: string, args: unknown[], pid: string) =>
       ({ type: 'MAKE_MOVE', payload: { type, args, playerID: pid } });
@@ -736,16 +745,18 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
   // Driver: while Play-all is armed and it's a clean human turn, play one basic
   // card per tick (small delay so the user sees them go). Stops when none remain
-  // or the turn state changes.
+  // or the turn state changes. Online, each playCard is fire-and-forget: G only
+  // updates after the server round-trip + useGame refetch, which re-runs this
+  // effect (deps include G) and plays the next basic card — one per round-trip.
   useEffect(() => {
     if (!playingAll) return;
-    if (isOnline || isAiTurn || G.pendingChoice || G.setupPhase || ctx.gameover || basicPlayIdx == null) {
+    if (isAiTurn || G.pendingChoice || G.setupPhase || ctx.gameover || basicPlayIdx == null) {
       setPlayingAll(false);
       return;
     }
     const h = setTimeout(() => moves.playCard(basicPlayIdx), 140);
     return () => clearTimeout(h);
-  }, [playingAll, basicPlayIdx, isOnline, isAiTurn, G, ctx, moves]);
+  }, [playingAll, basicPlayIdx, isAiTurn, G, ctx, moves]);
 
   // Human-facing pending choices that drive map UI.
   const humanSitePick = G.pendingChoice
@@ -1036,7 +1047,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {actionBtn('Return enemy spy (3 Power)', canReturnSpy, baseAction?.kind === 'return-spy',
         () => setBaseAction(baseAction?.kind === 'return-spy' ? null : { kind: 'return-spy' }))}
       {baseAction && actionBtn('Cancel', true, false, () => setBaseAction(null))}
-      {!isOnline && (() => {
+      {(() => {
         const canPlayAll = myTurn && !G.pendingChoice && !G.setupPhase && basicPlayIdx != null;
         const active = canPlayAll && !playingAll;
         return (
