@@ -381,6 +381,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const [splitView, setSplitView] = useState<boolean>(isSplitViewMode);
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  // Which of the player's own card piles is open in the inspector overlay,
+  // if any. Lets a player review what's in their deck / discard / inner
+  // circle for planning (#68). The deck is shown UNORDERED (sorted by
+  // deck+slot) so it isn't a peek at draw order.
+  const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | null>(null);
   // "Play all basic": when true, the driver effect auto-plays non-interactive
   // hand cards one at a time until none remain (#66).
   const [playingAll, setPlayingAll] = useState(false);
@@ -801,6 +806,31 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     }
   }, [G.setupPhase, myTurn, humanMapPick, baseAction, tab, splitView]);
 
+  // Auto-focus the card view whenever a prompt fires that can only be
+  // resolved from the card piles / hand (end-of-turn promote, devour-from-
+  // discard / inner-circle, forced hand discard). Those render on the game
+  // tab (or the play tab in split view), NOT the map tab — so a player who
+  // clicks End Turn while looking at the map would otherwise have to flip
+  // back manually to promote. Pull them there automatically. Reported as
+  // suggestion #68: "auto-go to the promote screen on End Turn." The map-
+  // click prompts (select-site/-troop-space) are handled by the map-focus
+  // effect above; choose-one / select-player resolve inline via the prompt
+  // bar, so neither needs a switch here.
+  useEffect(() => {
+    const pc = G.pendingChoice;
+    if (!pc || pc.playerId !== me) return;
+    const cardPileKinds = [
+      'select-played-card', 'select-card-in-discard',
+      'select-card-in-inner-circle', 'select-card-in-hand',
+    ];
+    if (!cardPileKinds.includes(pc.kind)) return;
+    if (splitView) {
+      if (tab !== 'play') setTab('play');
+    } else if (tab === 'map' || tab === 'log') {
+      setTab('game');
+    }
+  }, [G.pendingChoice, me, tab, splitView]);
+
   // Clear pending base action whenever it's no longer the human's turn or a card prompt fires.
   useEffect(() => {
     if (!myTurn || humanMapPick) setBaseAction(null);
@@ -1081,6 +1111,78 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     </div>
   );
 
+  // A "Deck: 12"-style count that's clickable to open the pile inspector
+  // (#68). Rendered as an inline button styled to read like the surrounding
+  // status text, so the stat line still looks like a stat line.
+  const pileButton = (label: string, count: number, onClick: () => void) => (
+    <button onClick={onClick}
+      title={`View the cards in your ${label.toLowerCase()}`}
+      style={{
+        background: 'none', border: 'none', padding: 0, font: 'inherit',
+        color: '#a9c6ff', cursor: 'pointer', textDecoration: 'underline',
+        textUnderlineOffset: 2,
+      }}>
+      {label}: {count}
+    </button>
+  );
+
+  // Pile inspector overlay (#68). Lists the cards in one of the player's own
+  // piles. The deck is shown UNORDERED — sorted by deck+slot — so a player
+  // can plan around what's left without learning their draw order; discard
+  // and inner circle are shown the same way (their order carries no hidden
+  // information). Rendered once at the top level so it overlays from any tab.
+  const pileViewOverlay = (() => {
+    if (!pileView) return null;
+    const cards = pileView === 'deck' ? p.deck
+      : pileView === 'discard' ? p.discard
+      : p.innerCircle;
+    const title = pileView === 'deck' ? 'Your Deck'
+      : pileView === 'discard' ? 'Your Discard Pile'
+      : 'Your Inner Circle';
+    const sorted = [...cards].sort(
+      (a, b) => a.deck.localeCompare(b.deck) || a.slot - b.slot || a.name.localeCompare(b.name)
+    );
+    return (
+      <div
+        onClick={() => setPileView(null)}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: 20,
+        }}>
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: '#1a1030', border: '1px solid #3a2055', borderRadius: 8,
+            padding: 20, maxWidth: '90vw', maxHeight: '85vh', overflow: 'auto',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+          }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, marginBottom: 8 }}>
+            <h2 style={{ margin: 0 }}>
+              {title} <span style={{ opacity: 0.6, fontWeight: 'normal', fontSize: 15 }}>· {cards.length} card{cards.length === 1 ? '' : 's'}</span>
+            </h2>
+            <button onClick={() => setPileView(null)}
+              style={{ padding: '4px 12px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
+              Close
+            </button>
+          </div>
+          {pileView === 'deck' && (
+            <div style={{ marginBottom: 8, fontSize: 12, opacity: 0.6 }}>
+              Shown in sorted order, not draw order — so this isn't a peek at what you'll draw next.
+            </div>
+          )}
+          {cards.length === 0 ? (
+            <div style={{ opacity: 0.6, padding: '24px 8px' }}>This pile is empty.</div>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {sorted.map((c, i) => <Card key={i} card={c} />)}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  })();
+
   // End-of-game scoreboard.
   if (ctx.gameover) {
     const scores = scoreAll(G);
@@ -1310,6 +1412,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           New game
         </button>
       </div>
+      {pileViewOverlay}
       {fixNoteQueue.length > 0 && (
         <BugFixResponseDialog
           update={fixNoteQueue[0]}
@@ -1393,7 +1496,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       )}
       <div style={{ marginTop: 8, opacity: 0.7 }}>
         Player P{Number(me) + 1} ({p.color}) — Turn: P{Number(ctx.currentPlayer) + 1} {myTurn ? '(your turn)' : ''}
-        {' · '}Power: {p.power} · Influence: {p.influence} · Deck: {p.deck.length} · Discard: {p.discard.length} · Inner Circle: {p.innerCircle.length} · Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
+        {' · '}Power: {p.power} · Influence: {p.influence}
+        {' · '}{pileButton('Deck', p.deck.length, () => setPileView('deck'))}
+        {' · '}{pileButton('Discard', p.discard.length, () => setPileView('discard'))}
+        {' · '}{pileButton('Inner Circle', p.innerCircle.length, () => setPileView('inner'))}
+        {' · '}Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
         {' · '}<b style={{ color: '#ffcc44' }}>VP: {p.vp}</b>
         {G.endGameTriggeredAtTurn !== null && <span style={{ color: '#ffcc44', marginLeft: 8 }}>· Final round!</span>}
       </div>
@@ -1506,6 +1613,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           actionBar={actionBar}
           interactivePromptBar={interactivePromptBar}
           mySeat={me}
+          onViewPile={setPileView}
         />
       )}
       {tab === 'calibrate' && <div style={{ marginTop: 16 }}><MapView calibrate /></div>}
@@ -1999,11 +2107,13 @@ function SplitPlayView(props: {
   /** Seat the local human controls — '0' in hotseat, the server-assigned seat
    *  online. Used to gate which side's pendingChoice prompts render. */
   mySeat: string;
+  /** Open the pile inspector overlay for one of the player's own piles (#68). */
+  onViewPile: (pile: 'deck' | 'discard' | 'inner') => void;
 }) {
   const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
           clickableMarketSlots, humanMapPick, actionBar, interactivePromptBar,
-          mySeat: me } = props;
+          mySeat: me, onViewPile } = props;
   const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
 
   // Hover expansion: on hover-capable devices, mouse enter/leave drive
@@ -2060,6 +2170,17 @@ function SplitPlayView(props: {
           </div>
         )}
       {actionBar}
+      {/* Pile inspector strip (#68): split view has no full status line, so
+          surface clickable Deck / Discard / Inner Circle counts here. */}
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', fontSize: 13, flexWrap: 'wrap' }}>
+        {([['Deck', p.deck.length, 'deck'], ['Discard', p.discard.length, 'discard'], ['Inner Circle', p.innerCircle.length, 'inner']] as const).map(([label, count, key]) => (
+          <button key={key} onClick={() => onViewPile(key)}
+            title={`View the cards in your ${label.toLowerCase()}`}
+            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#a9c6ff', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+            {label}: {count}
+          </button>
+        ))}
+      </div>
       {/* Card-pile pickers that only render in the game tab by default —
           end-of-turn promote, devour-from-discard, devour-from-inner-circle.
           Without these in split view the user has no way to resolve those
