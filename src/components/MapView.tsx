@@ -729,9 +729,11 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
       {!editRoutes && G && SITES.filter(s => isSiteActive(s.id)).map(s => {
         const p = pos(s);
         const spies = G.spies[s.id] ?? [];
-        const marker = G.controlMarkers[s.id];
-        const markerHolder = marker?.holder ?? null;
-        if (spies.length === 0 && !markerHolder) return null;
+        // The control-marker holder is already shown by the ControlMarkerToken
+        // disc's coloured ring (image mode) / chip pair (schematic), so we no
+        // longer paint a separate little holder dot here — it was redundant
+        // visual noise on top of the ring colour. Only spies render in this pass.
+        if (spies.length === 0) return null;
         // Slot centroid (calibrated slots) or fall back to label position.
         const spaces = sitesSpaces(s.id);
         let centroidX = p.x, centroidY = p.y;
@@ -744,7 +746,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
         const cy = (p.y + centroidY) / 2;
         return (
           <div key={`s${s.id}`}
-            title={`${s.name}${spies.length ? ` · spies: ${spies.join(',')}` : ''}${markerHolder ? ` · marker: ${markerHolder}` : ''}`}
+            title={`${s.name}${spies.length ? ` · spies: ${spies.join(',')}` : ''}`}
             style={{
               position: 'absolute',
               left: `${cx * 100}%`,
@@ -753,13 +755,6 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
               display: 'flex', gap: 2,
               zIndex: 11, pointerEvents: 'none',
             }}>
-            {markerHolder && <span style={{
-              width: px(20), height: px(20), borderRadius: '50%',
-              background: COLOR_HEX[markerHolder], border: '2px solid #c4a3f5',
-              boxShadow: marker?.side === 'total-control'
-                ? '0 0 8px #ffcc44, inset 0 0 0 2px #ffcc44'
-                : '0 1px 3px rgba(0,0,0,0.6)',
-            }} />}
             {spies.map((sp, i) => (
               <span key={i} title={`spy: ${sp}`} style={{
                 width: px(24), height: px(24), background: COLOR_HEX[sp],
