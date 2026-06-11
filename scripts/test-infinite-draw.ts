@@ -8,7 +8,7 @@
 // reshuffle pool (by object identity), so they stay in front of you until the
 // turn ends.
 import { InitializeGame } from 'boardgame.io/internal';
-import { Mechanics } from '../src/engine/Mechanics';
+import { Mechanics } from '../src/engine/mechanics';
 import { TyrantsGame, type TyrantsState, type CardRef } from '../src/game';
 
 let ok = true;
