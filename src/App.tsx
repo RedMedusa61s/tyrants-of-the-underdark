@@ -385,7 +385,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // if any. Lets a player review what's in their deck / discard / inner
   // circle for planning (#68). The deck is shown UNORDERED (sorted by
   // deck+slot) so it isn't a peek at draw order.
-  const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | null>(null);
+  const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | 'trophy' | null>(null);
   // "Play all basic": when true, the driver effect auto-plays non-interactive
   // hand cards one at a time until none remain (#66).
   const [playingAll, setPlayingAll] = useState(false);
@@ -743,6 +743,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       const wrapped = { ...template, G, ctx } as { G: TyrantsState; ctx: typeof ctx };
       const next = reducer(wrapped, action('playCard', [i], me)) as { G: TyrantsState };
       if (next === wrapped) continue;        // invalid (shouldn't happen on your turn)
+      // Skip a card that would FIZZLE — e.g. Mind Flayer / Marilith played as
+      // your last card, where "devour a card from hand" has no food left. It
+      // opens no prompt, so the naive check below would treat it as a free
+      // basic and auto-play it for zero effect (#74). Leave it for the player.
+      if ((next.G as unknown as { _playFizzledNoFood?: boolean })._playFizzledNoFood) continue;
       if (!next.G.pendingChoice) return i;   // non-interactive → "basic"
     }
     return null;
@@ -1133,6 +1138,60 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // information). Rendered once at the top level so it overlays from any tab.
   const pileViewOverlay = (() => {
     if (!pileView) return null;
+    // The trophy hall holds captured enemy troop FIGURES, not cards — show it
+    // as a per-colour tally (#72) rather than the card grid the other piles use.
+    if (pileView === 'trophy') {
+      const entries = (Object.entries(p.trophyHall) as [string, number][])
+        .filter(([, n]) => n > 0)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      const total = entries.reduce((s, [, n]) => s + n, 0);
+      return (
+        <div
+          onClick={() => setPileView(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: 20,
+          }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#1a1030', border: '1px solid #3a2055', borderRadius: 8,
+              padding: 20, minWidth: 280, maxWidth: '90vw', maxHeight: '85vh', overflow: 'auto',
+              boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+            }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, marginBottom: 8 }}>
+              <h2 style={{ margin: 0 }}>
+                Your Trophy Hall <span style={{ opacity: 0.6, fontWeight: 'normal', fontSize: 15 }}>· {total} troop{total === 1 ? '' : 's'}</span>
+              </h2>
+              <button onClick={() => setPileView(null)}
+                style={{ padding: '4px 12px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
+                Close
+              </button>
+            </div>
+            <div style={{ marginBottom: 8, fontSize: 12, opacity: 0.6 }}>
+              Enemy (and white) troops you've removed from the board, kept by colour.
+            </div>
+            {entries.length === 0 ? (
+              <div style={{ opacity: 0.6, padding: '24px 8px' }}>No trophies captured yet.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {entries.map(([color, n]) => (
+                  <div key={color} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 15 }}>
+                    <span style={{
+                      width: 16, height: 16, borderRadius: '50%', background: color,
+                      border: '1px solid rgba(255,255,255,0.4)', display: 'inline-block', flexShrink: 0,
+                    }} />
+                    <span style={{ textTransform: 'capitalize', minWidth: 70 }}>{color}</span>
+                    <span style={{ opacity: 0.85 }}>× {n}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
     const cards = pileView === 'deck' ? p.deck
       : pileView === 'discard' ? p.discard
       : p.innerCircle;
@@ -1500,6 +1559,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         {' · '}{pileButton('Deck', p.deck.length, () => setPileView('deck'))}
         {' · '}{pileButton('Discard', p.discard.length, () => setPileView('discard'))}
         {' · '}{pileButton('Inner Circle', p.innerCircle.length, () => setPileView('inner'))}
+        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => setPileView('trophy'))}
         {' · '}Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
         {' · '}<b style={{ color: '#ffcc44' }}>VP: {p.vp}</b>
         {G.endGameTriggeredAtTurn !== null && <span style={{ color: '#ffcc44', marginLeft: 8 }}>· Final round!</span>}
@@ -2108,7 +2168,7 @@ function SplitPlayView(props: {
    *  online. Used to gate which side's pendingChoice prompts render. */
   mySeat: string;
   /** Open the pile inspector overlay for one of the player's own piles (#68). */
-  onViewPile: (pile: 'deck' | 'discard' | 'inner') => void;
+  onViewPile: (pile: 'deck' | 'discard' | 'inner' | 'trophy') => void;
 }) {
   const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
@@ -2173,7 +2233,7 @@ function SplitPlayView(props: {
       {/* Pile inspector strip (#68): split view has no full status line, so
           surface clickable Deck / Discard / Inner Circle counts here. */}
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', fontSize: 13, flexWrap: 'wrap' }}>
-        {([['Deck', p.deck.length, 'deck'], ['Discard', p.discard.length, 'discard'], ['Inner Circle', p.innerCircle.length, 'inner']] as const).map(([label, count, key]) => (
+        {([['Deck', p.deck.length, 'deck'], ['Discard', p.discard.length, 'discard'], ['Inner Circle', p.innerCircle.length, 'inner'], ['Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), 'trophy']] as const).map(([label, count, key]) => (
           <button key={key} onClick={() => onViewPile(key)}
             title={`View the cards in your ${label.toLowerCase()}`}
             style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#a9c6ff', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>

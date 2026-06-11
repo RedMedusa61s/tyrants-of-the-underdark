@@ -295,10 +295,20 @@ function redactState(state: BgioState, viewer: PlayerId | null): BgioState {
   const G = next.G;
 
   for (const [pid, p] of Object.entries(G.players)) {
-    // Draw deck order is secret to everyone, including its owner.
-    p.deck = hideCards(p.deck);
-    // Opponent hands are secret; the viewer keeps their own.
-    if (pid !== viewer) {
+    if (pid === viewer) {
+      // The viewer may see the CONTENTS of their own draw deck — they built it
+      // and can derive it from public piles anyway — but NOT its draw ORDER.
+      // Send it sorted (deck+slot+name) so the pile inspector can list it
+      // without revealing what's drawn next (#73: "view deck … cant see the
+      // cards" — previously the owner's own deck was redacted to blank backs).
+      p.deck = [...p.deck].sort(
+        (a, b) => a.deck.localeCompare(b.deck) || a.slot - b.slot || a.name.localeCompare(b.name)
+      );
+      // The viewer keeps their own hand as-is.
+    } else {
+      // Opponents: draw-deck order+contents and hand are all secret (counts
+      // stay public via array length).
+      p.deck = hideCards(p.deck);
       p.hand = hideCards(p.hand);
     }
   }

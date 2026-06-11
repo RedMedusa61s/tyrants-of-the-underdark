@@ -56,19 +56,30 @@ export const Mechanics = {
     const rng = random ? () => random.Number() : () => Math.random();
     for (let i = 0; i < n; i++) {
       if (pl.deck.length === 0) {
-        if (pl.discard.length === 0) return;
+        // Cards played THIS turn live in the play area in front of you until
+        // end of turn — they aren't in the discard pile yet, so a mid-turn
+        // reshuffle must not scoop them back into the deck. The engine keeps
+        // played cards in `discard` for bookkeeping but also tracks the exact
+        // object references in `cardsPlayedThisTurn`; exclude those from the
+        // shuffle so a freshly-played draw card can't be reshuffled and drawn
+        // again and again on the same turn (#76). They return to the
+        // reshuffle pool next turn, once cardsPlayedThisTurn is cleared.
+        const inPlay = new Set(G.cardsPlayedThisTurn ?? []);
+        const reshufflable = pl.discard.filter(c => !inPlay.has(c));
+        if (reshufflable.length === 0) return;
         // Reshuffle + draw exposes hidden card order — close the undo door.
         Mechanics.markInfoRevealed(G);
         // Deterministic reshuffle via the seeded boardgame.io RNG when passed
         // through. Callers in move handlers should pass ctx.random. Fenwick-
         // free Fisher-Yates on a copy so we don't mutate discard mid-loop.
-        const deck = pl.discard.slice();
+        const deck = reshufflable;
         for (let k = deck.length - 1; k > 0; k--) {
           const j = Math.floor(rng() * (k + 1));
           [deck[k], deck[j]] = [deck[j], deck[k]];
         }
         pl.deck = deck;
-        pl.discard = [];
+        // Keep the in-play cards in discard; everything else moved to the deck.
+        pl.discard = pl.discard.filter(c => inPlay.has(c));
       }
       const c = pl.deck.shift();
       if (c) {

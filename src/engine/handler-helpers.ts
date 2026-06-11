@@ -340,7 +340,15 @@ export function devourFromHandCost(thenEffect: EffectHandler, opts?: { promptLab
     if (!state.paid) {
       if (!ctx.pendingChoice) {
         const me = ctx.G.players[ctx.actorId];
-        if (me.hand.length === 0) { ctx.handlerState = null; return true; }
+        if (me.hand.length === 0) {
+          // No card to devour → the whole gated effect fizzles. Flag it so the
+          // "Play all basic" classifier doesn't silently auto-play (and waste)
+          // a devour card as if it were a free basic — the dry-run sees no
+          // prompt either way, but this marker tells it the play fizzled (#74).
+          (ctx.G as unknown as { _playFizzledNoFood?: boolean })._playFizzledNoFood = true;
+          ctx.handlerState = null;
+          return true;
+        }
         ctx.pendingChoice = {
           kind: 'select-card-in-hand',
           prompt: opts?.promptLabel ?? 'Devour a card from your hand to trigger this effect?',
@@ -580,10 +588,16 @@ function legalDeployTargets(
 }
 
 /** Assassinate `count` enemy troops the player has presence at. Trophy hall is auto-updated. */
-export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean }): EffectHandler {
+export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; sameSite?: boolean }): EffectHandler {
   const count = opts?.count ?? 1;
+  // The "site key" of a troop space is the segment before the colon — the
+  // parentSite for site spaces, the parentRoute for route spaces (see
+  // data/troop-spaces.ts: ids are `${site|route}:${index}`). Death Tyrant
+  // ("up to 3 troops at a single site") locks every kill after the first to
+  // the first target's site key.
+  const siteKeyOf = (spaceId: string) => spaceId.split(':')[0];
   return ctx => {
-    let state = (ctx.handlerState as { remaining: number } | null) ?? { remaining: count };
+    let state = (ctx.handlerState as { remaining: number; site?: string } | null) ?? { remaining: count };
 
     // 1. Process the prior response, if any.
     if (ctx.pendingChoice) {
@@ -595,7 +609,9 @@ export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean }
       if (killed === 'white') ctx.G.players[ctx.actorId].trophyHall.white += 1;
       else if (killed) ctx.G.players[ctx.actorId].trophyHall[killed] = (ctx.G.players[ctx.actorId].trophyHall[killed] ?? 0) + 1;
       Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
-      state = { remaining: state.remaining - 1 };
+      // Lock subsequent kills to this site when sameSite is set.
+      const lockedSite = opts?.sameSite ? (state.site ?? siteKeyOf(spaceId)) : undefined;
+      state = { remaining: state.remaining - 1, site: lockedSite };
     }
 
     // 2. Set up next prompt or finish.
@@ -605,6 +621,7 @@ export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean }
       const occ = ctx.G.troops[id];
       if (!occ || occ === me.color) return false;
       if (opts?.whiteOnly && occ !== 'white') return false;
+      if (opts?.sameSite && state.site && siteKeyOf(id) !== state.site) return false;
       return true;
     });
     if (eligible.length === 0) {

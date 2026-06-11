@@ -67,8 +67,13 @@ async function main() {
   assert(handHiddenCount(p1from1.hand) === 0, 'seat 1 sees its own hand');
   assert(handHiddenCount(p1from0.hand) === p1from0.hand.length,
     'seat 0 sees seat 1 hand FULLY hidden');
-  // Decks are hidden to everyone (order secret), market deck hidden.
-  assert(handHiddenCount(p0from0.deck) === p0from0.deck.length, 'own deck order hidden');
+  // Own deck: CONTENTS visible (so the pile inspector works — #73) but draw
+  // ORDER secret (sent sorted). Opponents' decks fully hidden; market hidden.
+  assert(handHiddenCount(p0from0.deck) === 0, 'seat 0 sees its own deck CONTENTS (not blank backs)');
+  const ownDeckKeys = p0from0.deck.map((c: any) => `${c.deck}:${c.slot}:${c.name}`);
+  const sortedKeys = [...ownDeckKeys].sort();
+  assert(JSON.stringify(ownDeckKeys) === JSON.stringify(sortedKeys), 'own deck sent SORTED (draw order not leaked)');
+  assert(handHiddenCount(p1from0.deck) === p1from0.deck.length, 'seat 0 sees seat 1 deck FULLY hidden');
   assert(v0.data.view.G.market.deck.every((c: any) => c.deck === HIDDEN), 'market deck hidden');
   console.log('[smoke] OK viewFor over the wire: hands/decks redacted per seat');
 

@@ -200,7 +200,7 @@ registerAll({
   //   money each. Approximate as 3 normal assassinates (the "at single
   //   site" restriction is a strategic narrowing; engine-wise the player
   //   can still pick targets independently). Money-per-kill TODO.
-  'death-tyrant':       assassinateChoice({ count: 3 }),
+  'death-tyrant':       assassinateChoice({ count: 3, sameSite: true }),
 
   // Cost 7 — Elder Brain: promote your top card + play a card from
   //   inner-circle as if it were in hand (it stays in inner circle).

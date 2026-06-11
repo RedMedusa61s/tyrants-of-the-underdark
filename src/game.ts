@@ -608,6 +608,15 @@ export const TyrantsGame: Game<TyrantsState> = {
         if (p.deck.length === 0) break;
         p.hand.push(p.deck.shift()!);
       }
+      // Safety net for the end-of-game trigger. The per-move calls
+      // (deployTroop / recruitFromMarket) miss two paths to an empty barracks:
+      // a troop deployed by a CARD EFFECT (the deployChoice handler, e.g.
+      // Gibbering Mouther / supplants) never routes through the deploy move,
+      // and once barracks is already 0 the deploy move early-returns (converts
+      // to VP) before its checkEndGameTriggers call. Either way a player could
+      // run out of troops and the game would never end (#78). Re-checking here
+      // at every real turn-end guarantees the trigger fires the turn it should.
+      checkEndGameTriggers(G, ctx);
       // Done with this player's turn — clear the active-turn marker so that
       // any state mutation in between turns (saves, replays) doesn't
       // accidentally grant influence to a player who isn't currently active.
@@ -651,6 +660,10 @@ export const TyrantsGame: Game<TyrantsState> = {
       const p = G.players[pid];
       const card = p.hand[handIndex];
       if (!card) return INVALID_MOVE;
+      // Clear the per-play fizzle marker (set by devour-from-hand effects that
+      // can't pay their cost). The "Play all basic" classifier reads it off a
+      // dry-run of this move to avoid auto-playing a card that would fizzle.
+      (G as unknown as { _playFizzledNoFood?: boolean })._playFizzledNoFood = false;
       // Undo restore-point captured before any mutation. If this card's effect
       // reveals hidden info (e.g. "draw 2"), markInfoRevealed wipes it again.
       pushUndoSnapshot(G, ctx.currentPlayer);
