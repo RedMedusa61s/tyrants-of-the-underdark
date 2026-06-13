@@ -758,15 +758,44 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // or the turn state changes. Online, each playCard is fire-and-forget: G only
   // updates after the server round-trip + useGame refetch, which re-runs this
   // effect (deps include G) and plays the next basic card — one per round-trip.
+  //
+  // The naive version stopped on the FIRST `basicPlayIdx == null`. Online that
+  // is fatal: between dispatching a play and the server's reply, G is unchanged
+  // and React still re-renders (transport polling churns the `moves` identity),
+  // so the effect re-runs while the move is in flight. Any blip — or simply
+  // re-running before the reply lands — let the old code either re-dispatch the
+  // same card (double-play) or, on a transient null, latch playingAll=false and
+  // stall after a single card (#71 / #80). We now gate on a per-dispatch
+  // signature: after we fire a playCard we record the state we played FROM, and
+  // we neither re-dispatch nor stop until the state actually moves past it (the
+  // reply landed). The signature folds in hand contents, the cards-played count
+  // and deck size, so it strictly advances on every real play even when the card
+  // also draws a replacement of the same type. Hot-seat is unaffected: there the
+  // reply is synchronous, so the signature changes on the very next render.
+  const playAllSigRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!playingAll) return;
-    if (isAiTurn || G.pendingChoice || G.setupPhase || ctx.gameover || basicPlayIdx == null) {
+    if (!playingAll) { playAllSigRef.current = null; return; }
+    // Hard stops: the turn is genuinely over, or input is required.
+    if (isAiTurn || ctx.gameover || !myTurn || G.setupPhase || G.pendingChoice) {
+      playAllSigRef.current = null;
       setPlayingAll(false);
       return;
     }
-    const h = setTimeout(() => moves.playCard(basicPlayIdx), 140);
+    const hand = G.players[me]?.hand ?? [];
+    const deckLen = G.players[me]?.deck.length ?? 0;
+    const sig = `${hand.map(c => `${c.deck}:${c.slot}`).join(',')}|${G.cardsPlayedThisTurn.length}|${deckLen}`;
+    // Our last auto-play hasn't landed yet (online round-trip): the next G sync
+    // re-runs this effect. Don't re-dispatch, and crucially don't stop.
+    if (playAllSigRef.current === sig) return;
+    // State has settled / advanced past our last play.
+    playAllSigRef.current = null;
+    if (basicPlayIdx == null) { setPlayingAll(false); return; }  // no basics left → done
+    const h = setTimeout(() => {
+      playAllSigRef.current = sig;   // remember the state we just played FROM
+      moves.playCard(basicPlayIdx);
+    }, 140);
     return () => clearTimeout(h);
-  }, [playingAll, basicPlayIdx, isAiTurn, G, ctx, moves]);
+  }, [playingAll, basicPlayIdx, isAiTurn, myTurn, me, G, ctx, moves]);
 
   // Human-facing pending choices that drive map UI.
   const humanSitePick = G.pendingChoice
