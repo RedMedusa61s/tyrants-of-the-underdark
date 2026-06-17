@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 import type { BoardProps } from 'boardgame.io/react';
-import { TyrantsGame, BASE_ACTION_POWER_COST, type TyrantsState, type CardRef } from './game';
+import { TyrantsGame, BASE_ACTION_POWER_COST, COLORS, type TyrantsState, type CardRef, type Color } from './game';
 import { MapView } from './components/MapView';
 import { CardCalibration } from './components/CardCalibration';
 import { CostVerify } from './components/CostVerify';
@@ -186,6 +186,9 @@ interface GameConfig {
   /** For 3-player games only: which outer section plays alongside the center.
    *  Ignored for 2-player (center only) and 4-player (all three sections). */
   thirdPlayerSide?: ThirdPlayerSide;
+  /** Colour the human (seat 0) plays. Remaining colours go to the AI seats.
+   *  Undefined → default seat order (black, red, orange, blue). */
+  humanColor?: Color;
 }
 const AI_FNS: Record<AiStyle, (G: TyrantsState, pid: string) => AiMove | null> = {
   random: decideAiMove,
@@ -1963,6 +1966,9 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   const [thirdSide, setThirdSide] = useState<ThirdPlayerSide>(
     lastConfig?.thirdPlayerSide ?? 'left'
   );
+  const [humanColor, setHumanColor] = useState<Color>(
+    lastConfig?.humanColor ?? COLORS[0]
+  );
 
   function setStyle(i: number, s: AiStyle) {
     setStyles(prev => {
@@ -2064,6 +2070,29 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
           ))}
         </div>
         <div style={{ marginBottom: 24 }}>
+          <label style={{ display: 'block', marginBottom: 4, opacity: 0.85 }}>Your colour</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {COLORS.map(c => {
+              const on = humanColor === c;
+              return (
+                <button key={c} onClick={() => setHumanColor(c)}
+                  style={{
+                    display: 'flex', alignItems: 'center',
+                    padding: '6px 12px', cursor: 'pointer', borderRadius: 4, fontSize: 12,
+                    background: on ? '#5a3380' : '#2a1840',
+                    color: '#e6e1f2', border: on ? '1px solid #b69cff' : '1px solid #3a2055',
+                    textTransform: 'capitalize',
+                  }}>
+                  <ColorSwatch color={c} />{c}
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 6, fontSize: 11, opacity: 0.55 }}>
+            The other colours go to the AI opponents.
+          </div>
+        </div>
+        <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', marginBottom: 4, opacity: 0.85 }}>
             Market half-decks (pick 2) <span style={{ opacity: 0.5, fontSize: 11 }}>· {halfDecks.length}/2 selected</span>
           </label>
@@ -2112,7 +2141,7 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
         </div>
         <button
           disabled={halfDecks.length !== 2}
-          onClick={() => onStart({ numPlayers, aiStyles: trimmedStyles, halfDecks, thirdPlayerSide: thirdSide })}
+          onClick={() => onStart({ numPlayers, aiStyles: trimmedStyles, halfDecks, thirdPlayerSide: thirdSide, humanColor })}
           style={{
             padding: '10px 24px', fontSize: 14, color: '#fff', border: 'none',
             borderRadius: 4,
@@ -2142,10 +2171,11 @@ function ClientHolder({ config, onNewGame }: { config: GameConfig; onNewGame: ()
         origSetup(args, {
           halfDecks: config.halfDecks,
           activeSections: activeSectionsFor(config),
+          humanColor: config.humanColor,
         }),
     };
     return Client({ game, board: Board, numPlayers: config.numPlayers, debug: false });
-  }, [config.numPlayers, config.halfDecks]);
+  }, [config.numPlayers, config.halfDecks, config.humanColor]);
   return (
     <SessionContext.Provider value={{ config, onNewGame }}>
       <ClientCmp />
@@ -2162,7 +2192,11 @@ function loadConfig(): GameConfig | null {
       const halfDecks = (Array.isArray(cfg.halfDecks) && cfg.halfDecks.length === 2
         ? cfg.halfDecks
         : ['drow', 'dragons']) as HalfDeck[];
-      return { numPlayers: cfg.numPlayers, aiStyles: cfg.aiStyles, halfDecks };
+      return {
+        numPlayers: cfg.numPlayers, aiStyles: cfg.aiStyles, halfDecks,
+        thirdPlayerSide: cfg.thirdPlayerSide,
+        humanColor: cfg.humanColor,
+      };
     }
   } catch { /* fall through */ }
   return null;

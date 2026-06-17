@@ -226,7 +226,7 @@ export interface TyrantsState {
   activeSections: string[];
 }
 
-const COLORS: Color[] = ['black', 'red', 'orange', 'blue'];
+export const COLORS: Color[] = ['black', 'red', 'orange', 'blue'];
 const HAND_SIZE = 5;
 
 function toCardRef(deck: string, slot: number): CardRef {
@@ -392,7 +392,7 @@ export const TyrantsGame: Game<TyrantsState> = {
     return undefined;
   },
 
-  setup: ({ ctx, random }, setupData?: { halfDecks?: string[]; activeSections?: Array<'left'|'center'|'right'> }) => {
+  setup: ({ ctx, random }, setupData?: { halfDecks?: string[]; activeSections?: Array<'left'|'center'|'right'>; humanColor?: Color }) => {
     const rng = () => random!.Number();
     const halfDecks = setupData?.halfDecks?.length === 2 ? setupData.halfDecks : ['drow', 'dragons'];
     // Rulebook p.5: limit the board to the sections in play. 2P = center only,
@@ -414,12 +414,18 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (ts.parentRoute) return activeRouteSet.has(ts.parentRoute);
       return false;
     };
+    // Seat → colour. The human is always seat 0; if they picked a colour, put
+    // it first and let the AI seats take the remaining colours in order. No
+    // pick → the default seat order (black, red, orange, blue).
+    const colorOrder: Color[] = setupData?.humanColor
+      ? [setupData.humanColor, ...COLORS.filter(c => c !== setupData.humanColor)]
+      : COLORS;
     const players: Record<string, PlayerData> = {};
     for (let i = 0; i < ctx.numPlayers; i++) {
       const deck = shuffle(startingDeck(), rng);
       const hand = deck.splice(0, HAND_SIZE);
       players[String(i)] = {
-        color: COLORS[i],
+        color: colorOrder[i],
         deck,
         hand,
         discard: [],
@@ -464,7 +470,7 @@ export const TyrantsGame: Game<TyrantsState> = {
     // Randomly choose who acts first. Re-log it so the player can see who
     // got the start in their game.
     const firstSeat = Math.floor(rng() * ctx.numPlayers);
-    const startLog = `Game started. P${firstSeat + 1} (${COLORS[firstSeat]}) goes first.`;
+    const startLog = `Game started. P${firstSeat + 1} (${colorOrder[firstSeat]}) goes first.`;
 
     return {
       firstPlayerId: String(firstSeat),
