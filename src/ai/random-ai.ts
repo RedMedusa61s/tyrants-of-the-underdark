@@ -130,6 +130,7 @@ export function decideAiMove(G: TyrantsState, currentPlayer: string): AiMove | n
     const hasAnyMapPresence = SITES.some(s => hasPresence(G, me.color, { site: s.id }));
     const deployTargets: string[] = [];
     for (const t of TROOP_SPACES) {
+      if (!(t.id in G.troops)) continue; // out-of-play section — absent from G.troops
       if (G.troops[t.id]) continue;
       if (!hasAnyMapPresence) deployTargets.push(t.id);
       else if (t.parentSite && hasPresence(G, me.color, { site: t.parentSite })) deployTargets.push(t.id);

@@ -272,6 +272,13 @@ export function hasTotalControl(G: TyrantsState, color: Color, siteId: SiteId): 
 // --- Mutations (route through these — never touch G.troops / G.spies directly) ---
 
 export function deployTroop(G: TyrantsState, color: Color, spaceId: TroopSpaceId): boolean {
+  // Only spaces in active board sections are keys in G.troops (2P = center,
+  // 3P = center + one outer, 4P = all three). Spaces in out-of-play sections —
+  // and the routes that connect an active site to an inactive one — are absent
+  // entirely. Reject those here so no deploy path (base action, card effect, or
+  // AI) can ever leak a troop into an out-of-play zone, which previously added a
+  // brand-new key and quietly extended the live board into the unused sections.
+  if (!(spaceId in G.troops)) return false;
   if (G.troops[spaceId]) return false;
   G.troops[spaceId] = color;
   // Stash for any chained handlers that care about the deploy location.

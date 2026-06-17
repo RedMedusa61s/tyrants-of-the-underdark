@@ -178,6 +178,11 @@ function legalDeployTargets(G: TyrantsState, pid: string): string[] {
   const hasAnyMapPresence = SITES.some(s => hasPresence(G, me.color, { site: s.id }));
   const out: string[] = [];
   for (const t of TROOP_SPACES) {
+    // Only active-section spaces are keys in G.troops; out-of-play spaces are
+    // absent (undefined), so an `if (G.troops[t.id]) continue` occupancy check
+    // alone would treat them as empty and offer them as deploy targets. Skip
+    // anything not in play, then skip occupied active spaces.
+    if (!(t.id in G.troops)) continue;
     if (G.troops[t.id]) continue;
     let ok = !hasAnyMapPresence;
     if (!ok) {

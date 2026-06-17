@@ -897,6 +897,10 @@ export const TyrantsGame: Game<TyrantsState> = {
       const hasMapPresence = SITES.some(s => hasPresence(G, color, { site: s.id }));
       const targetSpace = TROOP_SPACES.find(t => t.id === spaceId);
       if (!targetSpace) return INVALID_MOVE;
+      // Reject deploys into out-of-play sections: only active-section spaces are
+      // keys in G.troops. Must run before expendPower / the barracks-empty→VP
+      // conversion below, or a bad target could spend power or mint VP.
+      if (!(spaceId in G.troops)) return INVALID_MOVE;
       const targetSite = targetSpace.parentSite;
       const presenceOk = !hasMapPresence || (targetSite ? hasPresence(G, color, { site: targetSite }) : hasPresence(G, color, { space: spaceId }));
       if (!presenceOk) return INVALID_MOVE;
