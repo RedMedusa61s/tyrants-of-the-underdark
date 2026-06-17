@@ -379,6 +379,14 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // to the game-selection dialog). Initialized from localStorage; the
   // toggle button below writes both state and storage in lockstep.
   const [splitView, setSplitView] = useState<boolean>(isSplitViewMode);
+  // No-images mode as React state so the toggle can flip it WITHOUT a page
+  // reload. The old toggle called window.location.reload(), which ran the
+  // resume-from-save path and (via loadState keeping the fresh-mount snapshots)
+  // could poison the save and reset the game back to setup — the reported bug.
+  // Card / MapView / the preload gate read isNoImagesMode() (localStorage) at
+  // render; bumping this state re-renders the Board subtree so they pick up the
+  // new value with no reload.
+  const [noImages, setNoImages] = useState<boolean>(isNoImagesMode);
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
   const [reportOpen, setReportOpen] = useState(false);
   // Which of the player's own card piles is open in the inspector overlay,
@@ -1406,13 +1414,18 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark</h1>
         <button onClick={() => {
-          const cur = isNoImagesMode();
-          localStorage.setItem(NO_IMAGES_KEY, cur ? '0' : '1');
-          window.location.reload();
+          // Flip in React state — NO page reload (reload triggered the
+          // resume-from-save path that could reset the game; see noImages state).
+          // localStorage persists the choice; isNoImagesMode() reads it on next load.
+          setNoImages(prev => {
+            const next = !prev;
+            try { localStorage.setItem(NO_IMAGES_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+            return next;
+          });
         }}
           title="Toggle no-images mode (uses text-only placeholder cards). Persists across reloads."
-          style={{ padding: '6px 14px', background: isNoImagesMode() ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-          {isNoImagesMode() ? '🖼 images off' : '🖼 images on'}
+          style={{ padding: '6px 14px', background: noImages ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+          {noImages ? '🖼 images off' : '🖼 images on'}
         </button>
         <button onClick={() => {
           // Toggle in React state (no page reload — reload would dump the
