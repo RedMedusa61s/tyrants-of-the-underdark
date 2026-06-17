@@ -6,7 +6,8 @@
 
 import type { TyrantsState, CardRef } from '../game';
 
-export type Color = 'black' | 'red' | 'orange' | 'blue';
+// Single source of truth lives in game.ts (canonical four + human-pick extras).
+export type { Color } from '../game';
 
 export type PendingChoiceKind =
   | 'select-card-in-hand'

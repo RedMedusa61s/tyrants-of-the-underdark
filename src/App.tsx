@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 import type { BoardProps } from 'boardgame.io/react';
-import { TyrantsGame, BASE_ACTION_POWER_COST, COLORS, type TyrantsState, type CardRef, type Color } from './game';
+import { TyrantsGame, BASE_ACTION_POWER_COST, COLORS, SELECTABLE_COLORS, type TyrantsState, type CardRef, type Color } from './game';
 import { MapView } from './components/MapView';
 import { CardCalibration } from './components/CardCalibration';
 import { CostVerify } from './components/CostVerify';
@@ -2072,7 +2072,7 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
         <div style={{ marginBottom: 24 }}>
           <label style={{ display: 'block', marginBottom: 4, opacity: 0.85 }}>Your colour</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {COLORS.map(c => {
+            {SELECTABLE_COLORS.map(c => {
               const on = humanColor === c;
               return (
                 <button key={c} onClick={() => setHumanColor(c)}
@@ -2089,7 +2089,7 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
             })}
           </div>
           <div style={{ marginTop: 6, fontSize: 11, opacity: 0.55 }}>
-            The other colours go to the AI opponents.
+            Opponents take the classic colours (black, red, orange, blue).
           </div>
         </div>
         <div style={{ marginBottom: 24 }}>

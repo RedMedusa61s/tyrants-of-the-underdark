@@ -16,6 +16,13 @@ const COLOR_HEX: Record<Color, string> = {
   red: '#c2362e',
   orange: '#d97a1d',
   blue: '#2b53b0',
+  // Extra colours human players may pick — chosen to stay distinct from each
+  // other and from the canonical four against the dark board.
+  purple: '#9b5de5',
+  green: '#3fa34d',
+  teal: '#1fb6b0',
+  pink: '#e36bb0',
+  yellow: '#d9c520',
 };
 // White tokens darkened toward light grey so they stand out on white-bordered site boxes.
 const WHITE_TOKEN = '#d0d0d0';

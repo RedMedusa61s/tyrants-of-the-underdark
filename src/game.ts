@@ -11,7 +11,12 @@ import { ROUTES } from './data/routes';
 import { deployTroop, assassinateTroop, hasPresence, returnSpy, payHeldMarkerEffectsAtTurnStart } from './engine/map-state';
 import { ensureSpiesLeftInitialized, applyEotInnerCircleVp } from './engine/handler-helpers';
 
-export type Color = 'black' | 'red' | 'orange' | 'blue';
+// The four canonical seat colours from the printed game, plus extras we offer
+// human players who want something different. The AI seats only ever use the
+// canonical four — see COLORS / SELECTABLE_COLORS below.
+export type Color =
+  | 'black' | 'red' | 'orange' | 'blue'
+  | 'purple' | 'green' | 'teal' | 'pink' | 'yellow';
 
 /** Power cost of the base-action assassinate and return-enemy-spy moves
  *  (rulebook p.10). Hardcoded engine-side in the move handlers; the UI
@@ -36,7 +41,9 @@ export interface PlayerData {
   /** Per-color count of captured tokens. Orcus moves specific colored tokens out,
    *  so we keep the source color around (we don't aggregate non-white into one
    *  "enemy" bucket). Black Dragon's scoring rider reads `.white`. */
-  trophyHall: Record<Color | 'white', number>;
+  // Keyed by the killed troop's colour (+ 'white' for neutrals). Counts are
+  // added on demand, so extra human colours need no special init.
+  trophyHall: Record<string, number>;
   /** Troops remaining in your barracks (start 40, rulebook p.2). When 0, deploys give 1 VP. */
   barracksLeft: number;
   /** Spy figures left in your supply (start 5, rulebook). When 0, a "place
@@ -226,7 +233,13 @@ export interface TyrantsState {
   activeSections: string[];
 }
 
+// Canonical seat order — AI seats always draw from these four, and a game with
+// no colour pick uses them in order (keeps old saves / training comparable).
 export const COLORS: Color[] = ['black', 'red', 'orange', 'blue'];
+// Everything a human may pick for their own seat: the canonical four plus extras.
+export const SELECTABLE_COLORS: Color[] = [
+  ...COLORS, 'purple', 'green', 'teal', 'pink', 'yellow',
+];
 const HAND_SIZE = 5;
 
 function toCardRef(deck: string, slot: number): CardRef {
