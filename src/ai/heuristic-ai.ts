@@ -195,6 +195,25 @@ function legalDeployTargets(G: TyrantsState, pid: string): string[] {
   return out;
 }
 
+/** Sample from `sorted` (best first) among the top-K entries, weighted by rank
+ *  (N, N-1, …, 1) so the strongest stays most likely but the pick varies. With
+ *  topK ≤ 1 it always returns the single best (deterministic — the old
+ *  behaviour). Used to give the AI's opening starting-site some variety so it
+ *  doesn't anchor the same spot every game — Drew W.'s feedback (#83). A top-4
+ *  pool yields roughly 40/30/20/10%, matching his suggested distribution. */
+function weightedRankPick<T>(sorted: T[], topK: number): T | undefined {
+  if (sorted.length === 0) return undefined;
+  const pool = sorted.slice(0, Math.max(1, Math.floor(topK || 1)));
+  if (pool.length <= 1) return pool[0];
+  const total = pool.reduce((s, _v, i) => s + (pool.length - i), 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < pool.length; i++) {
+    r -= pool.length - i;
+    if (r < 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
 function legalAssassinateTargets(G: TyrantsState, pid: string): string[] {
   const me = G.players[pid];
   const out: string[] = [];
@@ -494,13 +513,15 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
       sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
       !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
     );
-    // Prefer a starting site with a control marker / highest VP.
+    // Prefer a starting site with a control marker / highest VP, then sample
+    // among the top few (weighted by rank) so the AI doesn't open at the same
+    // site every game — keeps the strongest most likely but adds variety (#83).
     open.sort((a, b) => {
       const av = (a.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + a.vp;
       const bv = (b.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + b.vp;
       return bv - av;
     });
-    const pick = open[0] ?? pickRandom(open);
+    const pick = weightedRankPick(open, WEIGHTS.openingVarianceTopK) ?? pickRandom(open);
     return pick ? { name: 'deployStartingTroop', args: [pick.id] } : null;
   }
 

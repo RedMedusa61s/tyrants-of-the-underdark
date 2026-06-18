@@ -69,6 +69,7 @@ const KNOBS = Object.keys(DEFAULT_WEIGHTS) as (keyof HeuristicWeights)[];
 const INT_KNOBS = new Set<keyof HeuristicWeights>([
   'minCyclingDeck',
   'powerThresholdForAssassinate',
+  'openingVarianceTopK',
 ]);
 
 function loadSeed(path: string | null): HeuristicWeights {

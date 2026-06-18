@@ -24,6 +24,12 @@ export interface HeuristicWeights {
   deployFirstFootBonus: number;
   /** Score for a non-site (route) space. */
   deployRouteSpace: number;
+  /** Opening-move variety: on its very first deploy of the game (no map
+   *  presence yet), the AI samples its starting SITE from the top-K sites by
+   *  deploy score, weighted by rank so the strongest stays most likely but
+   *  isn't guaranteed. 1 = old behaviour (always the single best site).
+   *  Per Drew W.'s feedback that the AI always opens at the same place (#83). */
+  openingVarianceTopK: number;
 
   // --- Assassinate-space scoring ---
   assassinateWhite: number;
@@ -124,6 +130,7 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
   deployEstablishBonus: 3,
   deployFirstFootBonus: 2,
   deployRouteSpace: 1,
+  openingVarianceTopK: 4,
 
   assassinateWhite: 2,
   assassinateEnemy: 6,
