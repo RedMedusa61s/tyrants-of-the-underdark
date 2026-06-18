@@ -109,6 +109,23 @@ export interface HeuristicWeights {
    *  1 = score by value/cost (per-influence efficiency — favors Priestess
    *  and House Guard). Intermediate values interpolate. */
   recruitPerInfluenceBlend: number;
+  /** Flat bonus added to a market candidate whose card is 'tactical' — i.e.
+   *  its effect touches the board (place/return spy, assassinate, supplant,
+   *  promote; categories from src/ai/card-classes.ts). Motivated by
+   *  RedMedusa61s's feedback (#84): the AI never contests a human's
+   *  total-site-control lead because its recruit step values cards only by
+   *  VP + cost and so underbuys spy/assassinate denial cards.
+   *
+   *  KEPT AT 0 (no behavior change). Tournament testing (240-game 2P A/B vs
+   *  default) showed a FLAT bonus does not help and overdoing it hurts: at
+   *  +8 and +12 the baseline beat it ~62-64% (past the ±9pp noise floor); +4
+   *  was a wash. Tactical cards tend to carry lower VP, so a flat acquisition
+   *  bonus distorts buying toward cheap board-action filler over high-VP
+   *  cards and the influence engine. A real fix needs CONDITIONAL valuation
+   *  — e.g. only prize spy/denial cards when an opponent is at/near total
+   *  control — not a blanket bonus. This knob is left as a tunable lever
+   *  (same pattern as recruitAuxStackBonus) for that future work. */
+  recruitTacticalBonus: number;
 
   // --- Lookahead toggle ---
   /** Enable 1-ply lookahead at high-leverage decision points (assassinate
@@ -167,6 +184,7 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
   recruitCostWeight: 2,
   recruitAuxStackBonus: 0,
   recruitPerInfluenceBlend: 0,
+  recruitTacticalBonus: 0,
 
   useLookahead: 1,
   useCardOrdering: 1,

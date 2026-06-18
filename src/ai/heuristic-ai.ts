@@ -658,8 +658,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   // had nothing cheap. Per competitive-play notes, Priestess at 2 inf
   // is a strong buy and worth recruiting repeatedly.
   type Cand =
-    | { kind: 'market'; idx: number; cost: number; icVp: number; deckVp: number; isAux: false }
-    | { kind: 'aux'; stack: 'houseGuards' | 'priestesses'; cost: number; icVp: number; deckVp: number; isAux: true };
+    | { kind: 'market'; idx: number; cost: number; icVp: number; deckVp: number; isAux: false; tactical: boolean }
+    | { kind: 'aux'; stack: 'houseGuards' | 'priestesses'; cost: number; icVp: number; deckVp: number; isAux: true; tactical: false };
   const candidates: Cand[] = [];
 
   for (let i = 0; i < G.market.row.length; i++) {
@@ -670,6 +670,9 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     candidates.push({
       kind: 'market', idx: i, cost: data.cost,
       icVp: data.innerCircleVp ?? 0, deckVp: data.deckVp ?? 0, isAux: false,
+      // 'tactical' = effect touches the board (spy / assassinate / supplant /
+      // promote). Aux stacks (Priestess=influence, House Guard=power) never are.
+      tactical: categoryOfCard(c) === 'tactical',
     });
   }
   // Aux stacks: lookup once, push if affordable + stack non-empty.
@@ -683,7 +686,7 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     if (ref.cost > me.influence) continue;
     candidates.push({
       kind: 'aux', stack, cost: ref.cost,
-      icVp: ref.innerCircleVp ?? 0, deckVp: ref.deckVp ?? 0, isAux: true,
+      icVp: ref.innerCircleVp ?? 0, deckVp: ref.deckVp ?? 0, isAux: true, tactical: false,
     });
   }
 
@@ -693,7 +696,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
         WEIGHTS.recruitIcVpWeight * c.icVp +
         WEIGHTS.recruitDeckVpWeight * c.deckVp +
         WEIGHTS.recruitCostWeight * c.cost +
-        (c.isAux ? WEIGHTS.recruitAuxStackBonus : 0);
+        (c.isAux ? WEIGHTS.recruitAuxStackBonus : 0) +
+        (c.tactical ? WEIGHTS.recruitTacticalBonus : 0);
       // Blend raw value vs per-influence efficiency. Per-inf favors low-cost
       // high-IC-VP cards (Priestess). Blend factor 0..1: 0=raw only, 1=per-inf only.
       const blend = Math.max(0, Math.min(1, WEIGHTS.recruitPerInfluenceBlend));
