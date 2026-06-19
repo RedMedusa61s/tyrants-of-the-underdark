@@ -397,6 +397,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // circle for planning (#68). The deck is shown UNORDERED (sorted by
   // deck+slot) so it isn't a peek at draw order.
   const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | 'trophy' | null>(null);
+  // Which player's pile the overlay is showing. null = the local viewer (me).
+  // Opponents' discard / inner circle / trophy hall are public info, so any
+  // player can be inspected from the scoreboard (#82, Drew W.). Deck and hand
+  // stay private and are never offered for opponents.
+  const [pilePlayer, setPilePlayer] = useState<string | null>(null);
   // "Play all basic": when true, the driver effect auto-plays non-interactive
   // hand cards one at a time until none remain (#66).
   const [playingAll, setPlayingAll] = useState(false);
@@ -1178,10 +1183,14 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // information). Rendered once at the top level so it overlays from any tab.
   const pileViewOverlay = (() => {
     if (!pileView) return null;
+    // Resolve which player's pile we're showing (defaults to the local viewer).
+    const pp = G.players[pilePlayer ?? me] ?? p;
+    const isMe = (pilePlayer ?? me) === me;
+    const who = isMe ? 'Your' : `P${Number(pilePlayer) + 1} (${pp.color})'s`;
     // The trophy hall holds captured enemy troop FIGURES, not cards — show it
     // as a per-colour tally (#72) rather than the card grid the other piles use.
     if (pileView === 'trophy') {
-      const entries = (Object.entries(p.trophyHall) as [string, number][])
+      const entries = (Object.entries(pp.trophyHall) as [string, number][])
         .filter(([, n]) => n > 0)
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
       const total = entries.reduce((s, [, n]) => s + n, 0);
@@ -1202,7 +1211,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16, marginBottom: 8 }}>
               <h2 style={{ margin: 0 }}>
-                Your Trophy Hall <span style={{ opacity: 0.6, fontWeight: 'normal', fontSize: 15 }}>· {total} troop{total === 1 ? '' : 's'}</span>
+                {who} Trophy Hall <span style={{ opacity: 0.6, fontWeight: 'normal', fontSize: 15 }}>· {total} troop{total === 1 ? '' : 's'}</span>
               </h2>
               <button onClick={() => setPileView(null)}
                 style={{ padding: '4px 12px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
@@ -1210,7 +1219,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               </button>
             </div>
             <div style={{ marginBottom: 8, fontSize: 12, opacity: 0.6 }}>
-              Enemy (and white) troops you've removed from the board, kept by colour.
+              {isMe
+                ? "Enemy (and white) troops you've removed from the board, kept by colour."
+                : 'Troops this player has removed from the board, kept by colour.'}
             </div>
             {entries.length === 0 ? (
               <div style={{ opacity: 0.6, padding: '24px 8px' }}>No trophies captured yet.</div>
@@ -1232,12 +1243,12 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </div>
       );
     }
-    const cards = pileView === 'deck' ? p.deck
-      : pileView === 'discard' ? p.discard
-      : p.innerCircle;
-    const title = pileView === 'deck' ? 'Your Deck'
-      : pileView === 'discard' ? 'Your Discard Pile'
-      : 'Your Inner Circle';
+    const cards = pileView === 'deck' ? pp.deck
+      : pileView === 'discard' ? pp.discard
+      : pp.innerCircle;
+    const title = pileView === 'deck' ? `${who} Deck`
+      : pileView === 'discard' ? `${who} Discard Pile`
+      : `${who} Inner Circle`;
     const sorted = [...cards].sort(
       (a, b) => a.deck.localeCompare(b.deck) || a.slot - b.slot || a.name.localeCompare(b.name)
     );
@@ -1601,23 +1612,75 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       <div style={{ marginTop: 8, opacity: 0.7 }}>
         Player P{Number(me) + 1} ({p.color}) — Turn: P{Number(ctx.currentPlayer) + 1} {myTurn ? '(your turn)' : ''}
         {' · '}Power: {p.power} · Influence: {p.influence}
-        {' · '}{pileButton('Deck', p.deck.length, () => setPileView('deck'))}
-        {' · '}{pileButton('Discard', p.discard.length, () => setPileView('discard'))}
-        {' · '}{pileButton('Inner Circle', p.innerCircle.length, () => setPileView('inner'))}
-        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => setPileView('trophy'))}
+        {' · '}{pileButton('Deck', p.deck.length, () => { setPilePlayer(null); setPileView('deck'); })}
+        {' · '}{pileButton('Discard', p.discard.length, () => { setPilePlayer(null); setPileView('discard'); })}
+        {' · '}{pileButton('Inner Circle', p.innerCircle.length, () => { setPilePlayer(null); setPileView('inner'); })}
+        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => { setPilePlayer(null); setPileView('trophy'); })}
         {' · '}Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
         {' · '}<b style={{ color: '#ffcc44' }}>VP: {p.vp}</b>
         {G.endGameTriggeredAtTurn !== null && <span style={{ color: '#ffcc44', marginLeft: 8 }}>· Final round!</span>}
       </div>
-      <div style={{ marginTop: 4, fontSize: 12, opacity: 0.6 }}>
-        Scoreboard: {Object.entries(G.players).map(([pid, pl]) => (
-          <span key={pid} style={{ marginRight: 12 }}>
-            P{Number(pid) + 1} ({pl.color}): {pl.vp} VP tokens
-            {' · '}{Object.values(G.controlMarkers).filter(m => m.holder === pl.color).length} markers
-            {' · '}{Object.values(pl.trophyHall).reduce((s, n) => s + n, 0)} trophies
-            {' · '}{pl.innerCircle.length} inner-circle
-          </span>
-        ))}
+      <div style={{ marginTop: 6, fontSize: 12 }}>
+        {(() => {
+          // One line per player so it's easy to read at a glance. Barracks are
+          // shown because the game ends when any player's barracks hit 0, so the
+          // lowest count tells you how close the end is (Drew W., #82). A
+          // player's public piles (discard / inner circle / trophies) are
+          // clickable to inspect the actual cards.
+          const minBarracks = Math.min(...Object.values(G.players).map(pl => pl.barracksLeft));
+          const link = (label: string, n: number, pid: string, kind: 'discard' | 'inner' | 'trophy') => (
+            <button
+              onClick={() => { setPilePlayer(pid); setPileView(kind); }}
+              title={`View P${Number(pid) + 1}'s ${label.toLowerCase()}`}
+              style={{
+                background: 'none', border: 'none', padding: 0, font: 'inherit',
+                color: '#9ecbff', cursor: 'pointer', textDecoration: 'underline',
+              }}>
+              {n} {label}
+            </button>
+          );
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div style={{ opacity: 0.6, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 }}>Scoreboard</div>
+              {Object.entries(G.players).map(([pid, pl]) => {
+                const isCurrent = pid === ctx.currentPlayer;
+                const isViewer = pid === me;
+                const markers = Object.values(G.controlMarkers).filter(m => m.holder === pl.color).length;
+                const trophies = Object.values(pl.trophyHall).reduce((s, n) => s + n, 0);
+                return (
+                  <div key={pid} style={{
+                    display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                    padding: '2px 6px', borderRadius: 4,
+                    background: isCurrent ? 'rgba(255,204,68,0.10)' : 'transparent',
+                  }}>
+                    <ColorSwatch color={pl.color} />
+                    <span style={{ minWidth: 78, opacity: 0.9 }}>
+                      P{Number(pid) + 1}{isViewer ? ' (you)' : ''}
+                    </span>
+                    <span style={{ color: '#ffcc44' }}>{pl.vp} VP</span>
+                    <span style={{ opacity: 0.55 }}>·</span>
+                    <span title="Sites you control">{markers} markers</span>
+                    <span style={{ opacity: 0.55 }}>·</span>
+                    {link('discard', pl.discard.length, pid, 'discard')}
+                    <span style={{ opacity: 0.55 }}>·</span>
+                    {link('inner-circle', pl.innerCircle.length, pid, 'inner')}
+                    <span style={{ opacity: 0.55 }}>·</span>
+                    {link('trophies', trophies, pid, 'trophy')}
+                    <span style={{ opacity: 0.55 }}>·</span>
+                    <span
+                      title="Troops left in barracks. The game ends when any player's barracks reach 0."
+                      style={{
+                        color: pl.barracksLeft === minBarracks ? '#ff9d6c' : undefined,
+                        fontWeight: pl.barracksLeft === minBarracks ? 600 : undefined,
+                      }}>
+                      {pl.barracksLeft} barracks
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {G.setupPhase && (
