@@ -498,7 +498,7 @@
     "slot": 28,
     "name": "Masters of Sorcere",
     "image": "assets/cards/drow/28-unnamed.jpg",
-    "cost": 3,
+    "cost": 5,
     "deckVp": 2,
     "innerCircleVp": 5,
     "aspect": "Guile",

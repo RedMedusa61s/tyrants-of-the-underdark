@@ -58,7 +58,7 @@ count,name,cost,vp1,vp2,set,gain ratio,gain approx,benefit1,benefit2,benefit3,ty
 4,Blackguard,3,1,3,Drow,0.83,2.5,or 2 attack,or assassinate,,Malice,Drow,,,,,
 15,Priestess of Lolth,2,1,2,Drow,1.00,2,2 money,,,Obedience,Drow,,,,,
 2,Mercenary Squad,3,1,4,Drow,1.00,3,3 troops,,,Conquest,Drow,,,,,
-1,Masters of Sorcere,3,2,5,Drow,1.33,4,or place 2 spies,or return a spy for 4 atk,,Guile,Drow,,,,,
+1,Masters of Sorcere,5,2,5,Drow,1.33,4,or place 2 spies,or return a spy for 4 atk,,Guile,Drow,,,,,
 2,Chosen of Lolth,4,2,4,Drow,0.75,3,return troop or spy,eot promote a card played,,Ambition,Drow,,,,,
 1,Deathblade,6,3,6,Drow,1.00,6,assassinate 2 troops,,,Malice,Drow,,,,,
 3,Advance Scout,3,1,3,Drow,1.33,4,Supplant white troop,,,Conquest,Drow,,,,,
