@@ -10,6 +10,7 @@ import { SlotCalibration } from './components/SlotCalibration';
 import { SectionDividerCalibration } from './components/SectionDividerCalibration';
 import { MarkerCalibration } from './components/MarkerCalibration';
 import { GameLog } from './components/GameLog';
+import { CardLogText } from './components/CardLogText';
 import { CardTextVerify } from './components/CardTextVerify';
 import { RouteVerify } from './components/RouteVerify';
 import { ProblemReportDialog } from './components/ProblemReportDialog';
@@ -1413,7 +1414,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               {pendingAiSummary.lines.length === 0
                 ? <div style={{ opacity: 0.6 }}>(no actions)</div>
                 : pendingAiSummary.lines.map((l, i) => (
-                  <div key={i} style={{ padding: '2px 0', borderBottom: '1px solid #2a1840' }}>{l}</div>
+                  <div key={i} style={{ padding: '2px 0', borderBottom: '1px solid #2a1840' }}><CardLogText line={l} /></div>
                 ))}
             </div>
             <div style={{ marginTop: 16, textAlign: 'right' }}>

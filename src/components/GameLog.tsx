@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import type { TyrantsState } from '../game';
+import { CardLogText } from './CardLogText';
 
 interface Props {
   G: TyrantsState;
@@ -108,7 +109,7 @@ export function GameLog({ G, onLoad }: Props) {
                       <div style={{ opacity: 0.7, marginBottom: 4 }}>Actions during this turn:</div>
                       {log.lines.length === 0
                         ? <div style={{ opacity: 0.5 }}>(no actions logged)</div>
-                        : log.lines.map((l, i) => <div key={i} style={{ padding: '1px 0', opacity: 0.9 }}>{l}</div>)
+                        : log.lines.map((l, i) => <div key={i} style={{ padding: '1px 0', opacity: 0.9 }}><CardLogText line={l} /></div>)
                       }
                     </>
                   ) : (
