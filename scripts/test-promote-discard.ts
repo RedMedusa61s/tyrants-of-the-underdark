@@ -12,17 +12,23 @@ const check = (label: string, cond: boolean) => {
 };
 const C = (deck: string, slot: number, name: string): CardRef => ({ deck, slot, name, image: '' });
 
-function optionsFor(discard: CardRef[], playedThisTurn: CardRef[]): number[] {
+function run(discard: CardRef[], playedThisTurn: CardRef[]): { options: number[]; log: string[] } {
+  const log: string[] = [];
   const ctx: any = {
-    G: { players: { '0': { discard } }, cardsPlayedThisTurn: playedThisTurn },
+    G: { players: { '0': { discard } }, cardsPlayedThisTurn: playedThisTurn, log },
+    card: C('undead', 28, 'Vampire'),
     actorId: '0',
     pendingChoice: null,
     paused: false,
     handlerState: null,
   };
   const done = promoteFromDiscardChoice()(ctx);
-  if (done) return []; // handler returned true => no eligible options
-  return (ctx.pendingChoice.options as number[]);
+  if (done) return { options: [], log }; // handler returned true => no eligible options
+  return { options: ctx.pendingChoice.options as number[], log };
+}
+
+function optionsFor(discard: CardRef[], playedThisTurn: CardRef[]): number[] {
+  return run(discard, playedThisTurn).options;
 }
 
 // 1. A card played this turn is excluded from the discard options.
@@ -45,8 +51,20 @@ function optionsFor(discard: CardRef[], playedThisTurn: CardRef[]): number[] {
 {
   const played = [C('drow', 10, 'A'), C('drow', 11, 'B'), C('drow', 12, 'C'), C('drow', 13, 'D')];
   const discard = [...played]; // engine dumped them all into discard during the turn
-  const opts = optionsFor(discard, played);
+  const { options: opts, log } = run(discard, played);
   check('all-played-this-turn -> zero promotable discard cards (#65)', opts.length === 0);
+  // #86 / #87: silently skipping confused players. We now log WHY no picker
+  // appeared, distinguishing "all played this turn" from a truly empty pile.
+  check('all-played-this-turn -> logs the "cards played this turn don\'t count" note',
+    log.some(l => l.includes('cards played this turn')));
+}
+
+// 3b. Truly empty discard -> no options, and a distinct "pile is empty" note.
+{
+  const { options: opts, log } = run([], []);
+  check('empty discard -> zero options', opts.length === 0);
+  check('empty discard -> logs the "discard pile is empty" note',
+    log.some(l => l.includes('discard pile is empty')));
 }
 
 // 4. Nothing played this turn -> every discard card is offered (Necromancer mid-deck).

@@ -1263,7 +1263,23 @@ export function promoteFromDiscardChoice(opts?: { optional?: boolean }): EffectH
         if (n > 0) { playedLeft.set(k, n - 1); continue; } // play-area card — skip
         options.push(i);
       }
-      if (options.length === 0) return true;
+      if (options.length === 0) {
+        // No eligible cards, so no picker opens. Players reported this as a
+        // silent no-op — they chose "promote from discard" and nothing
+        // happened, with no explanation (#86 Vampire / #87 Necromancer). The
+        // promote is correctly skipped (and any later effect, e.g. Vampire's
+        // VP, still applies), but surface a note so the player understands
+        // why the prompt never appeared. Distinguish a truly empty discard
+        // from "everything in the discard is a card played this turn" — the
+        // latter is the common case (cards played this turn sit in the play
+        // area, not the discard pile, per #65) and is the more confusing one.
+        const name = ctx.card?.name ?? 'This card';
+        const msg = me.discard.length > 0
+          ? `(${name}: no cards in your discard pile to promote — cards played this turn don't count)`
+          : `(${name}: your discard pile is empty — nothing to promote)`;
+        ctx.G.log?.push?.(msg);
+        return true;
+      }
       ctx.pendingChoice = {
         kind: 'select-card-in-discard',
         prompt: 'Promote a card from your discard.',
