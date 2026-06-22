@@ -2180,8 +2180,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "devour a card in hand to supplant a white troop anywhere on the board",
-      "supplant 2 white troops, each opponent recruits 2 insane outcasts"
+      "devour a card in hand to supplant 2 white troops,",
+      "each opponent recruits 2 insane outcasts"
     ],
     "effectKey": "demogorgon",
     "_matchedSheet": true
@@ -2198,8 +2198,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "devour a card in your hand for 5 attack",
-      "assassinate 2 troops, take 2 trophies from another hand and deploy them anywhere."
+      "devour a card in your hand to assassinate 2 troops,",
+      "then take 2 trophies from any trophy hall and deploy them anywhere."
     ],
     "effectKey": "orcus",
     "_matchedSheet": true
@@ -2361,7 +2361,7 @@
     "rarity": 1,
     "benefits": [
       "deploy 2 troops",
-      "give insane outcase t player troop adjacent to deployed troop"
+      "give insane outcase to player troop adjacent to deployed troop"
     ],
     "effectKey": "gibbering-mouther",
     "_matchedSheet": true
@@ -2379,7 +2379,7 @@
     "rarity": 1,
     "benefits": [
       "deploy 2 troops",
-      "give insane outcase t player troop adjacent to deployed troop"
+      "give insane outcase to player troop adjacent to deployed troop"
     ],
     "effectKey": "gibbering-mouther",
     "_matchedSheet": true
@@ -2397,7 +2397,7 @@
     "rarity": 1,
     "benefits": [
       "deploy 2 troops",
-      "give insane outcase t player troop adjacent to deployed troop"
+      "give insane outcase to player troop adjacent to deployed troop"
     ],
     "effectKey": "gibbering-mouther",
     "_matchedSheet": true
