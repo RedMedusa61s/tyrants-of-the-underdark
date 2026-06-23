@@ -74,7 +74,7 @@ registerAll({
   'minotaur-skeleton':   chooseOne(
                            { label: 'Deploy 3 troops', handler: deployChoice({ count: 3 }) },
                            { label: 'Devour this → assassinate up to 3 white troops at one site',
-                             handler: devourSelfThen(assassinateChoice({ count: 3, whiteOnly: true })),
+                             handler: devourSelfThen(assassinateChoice({ count: 3, whiteOnly: true, sameSite: true })),
                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
 
   // Cost 4 — Banshee: spy + "if there is another spy there, +3 attack."
@@ -215,8 +215,57 @@ registerAll({
   //   - "any number" should chain prompts as long as eligibles remain
   //     AND the player keeps picking. We don't model that — we queue 1.
   //     Worth a follow-up but doesn't break correctness of single uses.
-  'high-priest-of-myrkul': sequence(returnEnemyTroopOrSpyChoice(),
-                                    flagEotPromote({ optional: true })),
+
+  // Behaviour should be fixed, untested
+  'high-priest-of-myrkul': sequence(
+                            returnEnemyTroopOrSpyChoice(),
+                            (ctx => {
+                              const me = ctx.G.players[ctx.actorId];
+
+                              // Process prior response if any.
+                              if (ctx.pendingChoice) {
+                                const idx = ctx.pendingChoice.response as number | null;
+                                ctx.pendingChoice = null;
+                                ctx.paused = false;
+                                if (idx == null) { ctx.handlerState = null; return true; } // declined — stop
+                                const card = ctx.G.cardsPlayedThisTurn[idx];
+                                if (card) {
+                                  ctx.G.cardsPlayedThisTurn.splice(idx, 1);
+                                  const di = me.discard.findIndex(c => c.deck === card.deck && c.slot === card.slot);
+                                  if (di >= 0) me.discard.splice(di, 1);
+                                  Mechanics.promote(ctx.G, ctx.actorId, card);
+                                }
+                              }
+
+                              // Re-evaluate remaining eligible cards after each promote.
+                              const eligible = ctx.G.cardsPlayedThisTurn
+                                .map((c, i) => ({ c, i }))
+                                .filter(({ c }) => {
+                                  const data = lookupCard(c.deck, c.slot);
+                                  return data?.type === 'Undead';
+                                })
+                                .map(({ i }) => i);
+
+                              if (eligible.length === 0) {
+                                if (!ctx.handlerState) {
+                                  // Only log on first entry — if we get here after a promote
+                                  // the player already acted so no message is needed.
+                                  Mechanics.log(ctx.G, '(High Priest of Myrkul: no Undead cards played this turn to promote)');
+                                }
+                                ctx.handlerState = null;
+                                return true;
+                              }
+
+                              ctx.handlerState = true; // mark that we have entered at least once
+                              ctx.pendingChoice = {
+                                kind: 'select-played-card',
+                                prompt: 'High Priest of Myrkul: you may promote an Undead card played this turn (or decline to stop).',
+                                options: eligible,
+                                optional: true,
+                              };
+                              ctx.paused = true;
+                              return false;
+                            })),
 
   // Cost 7 — Vampire: chooseOne(supplant a troop, promote a card from
   //   discard then +1 VP per 3 promoted cards in inner circle).
