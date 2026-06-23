@@ -107,12 +107,23 @@ registerAll({
                             { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }),
                               available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
   'white-wyrmling':       sequence(deployChoice({ count: 2 }), devourMarketChoice()),
+ // Dragonclaw - Assassinate a troop. Then if you have 5 or more player trophies, gain +2 Power
   'dragonclaw':           sequence(
                             assassinateChoice(),
-                            conditionalGrant(
-                              (G, pid) => totalTrophies(G.players[pid]) >= 5,
-                              grant({ power: 2 }),
-                              '5+ trophies in trophy hall')),
+                            (ctx => {
+                             const me = ctx.G.players[ctx.actorId];
+                             // "Player trophies" = colored trophies (not white).
+                             let coloredTrophies = 0;
+                             for (const [color, n] of Object.entries(me.trophyHall)) {
+                               if (color === 'white') continue;
+                               coloredTrophies += n;
+                             }
+                             if (coloredTrophies >= 5) {
+                               me.power += 2;
+                               ctx.G.log.push(`P${Number(ctx.actorId) + 1} +2 Power from Dragonclaw (5+ player trophies in trophy hall)`);
+                              }
+                             return true;
+                            })),
 
   // Big dragons. Each card says "Gain X VP …", which the rulebook defines as
   // taking VP tokens IMMEDIATELY when the card resolves (Final Scoring lists no
