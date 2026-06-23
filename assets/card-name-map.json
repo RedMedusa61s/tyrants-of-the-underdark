@@ -200,3 +200,9 @@
   "undead::37": "Carrion Crawler",
   "undead::38": "Revenant"
 }
+
+{
+  "demons::10": "Demogorgon",
+  "demons::11": "Demogorgon",
+  "demons::12": "Demogorgon"
+}
