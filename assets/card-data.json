@@ -1928,7 +1928,8 @@
     "rarity": 1,
     "benefits": [
       "or spy",
-      "or return a spy 3 money, focus: 1 attack"
+      "or return a spy 3 money",
+      "focus: 1 attack"
     ],
     "effectKey": "howling-hatred-cultist",
     "_matchedSheet": true
@@ -1946,7 +1947,8 @@
     "rarity": 1,
     "benefits": [
       "or spy",
-      "or return a spy 3 money, focus: 1 attack"
+      "or return a spy 3 money",
+      "focus: 1 attack"
     ],
     "effectKey": "howling-hatred-cultist",
     "_matchedSheet": true
