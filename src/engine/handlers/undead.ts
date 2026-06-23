@@ -156,9 +156,9 @@ registerAll({
   'necromancer':         chooseOne(
                            { label: '+3 Influence', handler: grant({ influence: 3 }) },
                            { label: 'Promote this card (Necromancer → inner circle)', handler: promoteSelf() },
-                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice({ optional: true }),
+                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice({ optional: false }),
                              available: (G, a) => G.players[a].hand.length > 0 },
-                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice({ optional: true }),
+                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice({ optional: false }),
                              available: (G, a) => G.players[a].discard.length > 0 }),
 
   // Cost 6 — Death Knight: supplant a troop + 1 VP per 5 player trophies
