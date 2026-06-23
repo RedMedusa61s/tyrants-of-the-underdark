@@ -21,6 +21,8 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 import { TROOP_SPACES } from '../../data/troop-spaces';
 import { totalTrophies } from '../../game';
+import { Mechanics } from '../mechanics';
+import { lookupCard } from '../../card-data';
 
 registerAll({
   // Cost 2 — Vampire Spawn: +1 money + return another player's troop/spy

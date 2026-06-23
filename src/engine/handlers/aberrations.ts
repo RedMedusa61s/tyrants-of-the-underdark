@@ -16,7 +16,9 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          forcePlayerOfColorToDiscardIfMinHand,
          registerOnForcedDiscard, playForeignCard,
          playerHasOwnSpy, playerCanAssassinate,
-         playerCanReturnEnemyTroop, playerCanReturnEnemySpy } from '../handler-helpers';
+         playerCanReturnEnemyTroop, playerCanReturnEnemySpy,
+         playerCanReturnAnyTroop, playerHasOwnTroopOnBoard,
+         returnEnemyTroopChoice, returnEnemySpyChoice, returnOwnTroopChoice } from '../handler-helpers';
 import { Mechanics } from '../mechanics';
 import { assassinateTroop, hasPresence } from '../map-state';
 import { TROOP_SPACES } from '../../data/troop-spaces';
@@ -318,3 +320,5 @@ registerOnForcedDiscard('ambassador', (G, ownerPid) => {
 
 // Suppress unused-import warning if any helper isn't yet referenced.
 void playerCanAssassinate;
+void returnEnemyTroopOrSpyChoice;
+void playerCanReturnEnemyTroop

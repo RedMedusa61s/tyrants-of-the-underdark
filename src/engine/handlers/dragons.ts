@@ -149,3 +149,7 @@ registerAll({
                                    grantVpPerTotalControlledSite),
   'white-dragon':         sequence(deployChoice({ count: 3 }), grantVpPerTwoSitesControlled),
 });
+
+// Suppress unused-import noise.
+void conditionalGrant;
+void totalTrophies;
