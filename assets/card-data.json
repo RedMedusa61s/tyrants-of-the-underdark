@@ -1076,7 +1076,7 @@
     "rarity": 1,
     "benefits": [
       "place a spy",
-      "it troop there, 2 money"
+      "if another player's troop there, 2 money"
     ],
     "effectKey": "green-wyrmling",
     "_matchedSheet": true
@@ -1094,7 +1094,7 @@
     "rarity": 1,
     "benefits": [
       "place a spy",
-      "it troop there, 2 money"
+      "if another player's troop there, 2 money"
     ],
     "effectKey": "green-wyrmling",
     "_matchedSheet": true
