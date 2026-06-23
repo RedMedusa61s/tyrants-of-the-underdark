@@ -24,10 +24,10 @@ import { SITES } from '../../data/sites';
 import { totalTrophies, type Color } from '../../game';
 
 registerAll({
-  // Cost 1 — Grimlock: deploy 2 troops; "if your opponent causes you to
+  // Cost 1 — Grimlock: deploy 1 troop; "if your opponent causes you to
   //   discard this, draw 2" — the reactive part isn't yet implemented
   //   (no engine hook for cards-discarded-by-other-player). Deploy fires.
-  'grimlock':           deployChoice({ count: 2 }),
+  'grimlock':           deployChoice({ count: 1 }),
 
   // Cost 2 — Cranium Rats: deploy 2 + choose opponent with MORE THAN 3 cards
   //   (i.e. 4+) to discard. Cards read "more than 3 cards" — a player at
@@ -126,8 +126,25 @@ registerAll({
   'intellect-devourer': chooseOne(
                           { label: '+3 Influence', handler: grant({ influence: 3 }) },
                           { label: 'Return up to 2 troops/spies',
-                            handler: times(2, returnEnemyTroopOrSpyChoice()),
-                            available: (G, actorId) => playerCanReturnEnemyTroop(G, actorId) || playerCanReturnEnemySpy(G, actorId) }),
+                            handler: times(2, chooseOne(
+                              { label: 'Return an enemy troop',
+                                handler: returnEnemyTroopChoice({ includeWhite: true }),
+                                available: playerCanReturnAnyTroop },
+                              { label: 'Return an enemy spy',
+                                handler: returnEnemySpyChoice(),
+                                available: playerCanReturnEnemySpy },
+                              { label: 'Return one of your own troops',
+                                handler: returnOwnTroopChoice({ optional: false }),
+                                available: playerHasOwnTroopOnBoard },
+                              { label: 'Return one of your own spies',
+                                handler: returnOwnSpyChoice({ optional: false }),
+                                available: playerHasOwnSpy },
+                            )),
+                            available: (G, actorId) =>
+                              playerCanReturnAnyTroop(G, actorId) ||
+                              playerCanReturnEnemySpy(G, actorId) ||
+                              playerHasOwnTroopOnBoard(G, actorId) ||
+                              playerHasOwnSpy(G, actorId) }),
   // Cost 4 — Umber Hulk: deploy 3 + reactive (if-discarded). Deploy fires;
   //   reactive deferred.
   'umber-hulk':         deployChoice({ count: 3 }),
@@ -195,12 +212,44 @@ registerAll({
   // Cost 7 — Neogi: deploy 4 + eot each-opp-discard (here we just discard
   //   immediately rather than queueing for end of turn; outcome is the
   //   same since no card-play happens between deploy and end-of-turn).
-  'neogi':              sequence(deployChoice({ count: 4 }), eachOpponentDiscardsIfMinHand(4)),
+  'neogi':              sequence(deployChoice({ count: 4 }), eachOpponentDiscardsIfMinHand(1)),
   // Cost 7 — Death Tyrant: assassinate up to 3 troops at a single site +1
   //   money each. Approximate as 3 normal assassinates (the "at single
   //   site" restriction is a strategic narrowing; engine-wise the player
-  //   can still pick targets independently). Money-per-kill TODO.
-  'death-tyrant':       assassinateChoice({ count: 3, sameSite: true }),
+  //   can still pick targets independently).
+  'death-tyrant':       (ctx => {
+                        // Track phase so the assassinate loop's pendingChoice
+                        // state survives across resumptions.
+                        interface S { phase: 'assassinate'; sub?: unknown }
+                        const state = (ctx.handlerState as S | null) ?? { phase: 'assassinate', sub: null };
+                        // Snapshot trophy total before the assassinate loop so
+                        // we can count exactly how many troops were killed
+                        // regardless of their color.
+                        const me = ctx.G.players[ctx.actorId];
+                        const totalBefore = totalTrophies(me);
+                        // Delegate the full multi-pick loop to assassinateChoice,
+                        // which handles the (3 left)→(2 left)→(1 left) prompt
+                        // countdown and the sameSite site-lock.
+                        const childCtx = { ...ctx, handlerState: state.sub ?? null };
+                        const done = assassinateChoice({ count: 3, sameSite: true })(childCtx);
+                        ctx.pendingChoice = childCtx.pendingChoice;
+                        ctx.paused = childCtx.paused;
+                        if (!done) {
+                          // Assassinate loop still in progress — preserve child
+                          // state and suspend until the next resolveChoice.
+                          ctx.handlerState = { phase: 'assassinate', sub: childCtx.handlerState };
+                          return false;
+                        }
+                        // Assassinate loop complete — grant 1 influence per
+                        // troop killed (white or enemy).
+                        const killed = totalTrophies(me) - totalBefore;
+                        if (killed > 0) {
+                          me.influence += killed;
+                          ctx.G.log.push(`P${Number(ctx.actorId) + 1} +${killed} Influence from Death Tyrant (${killed} troop${killed === 1 ? '' : 's'} assassinated)`);
+                        }
+                        ctx.handlerState = null;
+                        return true;
+                      }),
 
   // Cost 7 — Elder Brain: promote your top card + play a card from
   //   inner-circle as if it were in hand (it stays in inner circle).

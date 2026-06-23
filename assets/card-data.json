@@ -3096,7 +3096,7 @@
     "type": "Grimlock",
     "rarity": 2,
     "benefits": [
-      "deploy 2 troops",
+      "deploy 1 troop",
       "if your opponent causes you to discard this, draw 2"
     ],
     "effectKey": "grimlock",
