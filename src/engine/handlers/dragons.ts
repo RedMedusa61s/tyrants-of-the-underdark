@@ -94,7 +94,7 @@ registerAll({
                             { label: 'Return a spy → +3 Influence', handler: sequence(returnOwnSpyChoice(), grant({ influence: 3 })), available: playerHasOwnSpy }),
 
   'blue-wyrmling':        sequence(grant({ influence: 3 }), returnEnemyTroopOrSpyChoice()),
-  'cleric-of-laogzed':    sequence(flagEotPromote(), moveEnemyTroopChoice()),
+  'cleric-of-laogzed':    sequence(moveEnemyTroopChoice(), flagEotPromote()),
 
   'cult-fanatic':         sequence(grant({ influence: 2 }), devourMarketChoice()),
   'dragon-cultist':       chooseOne(

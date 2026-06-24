@@ -57,6 +57,7 @@ registerAll({
   // Cost 3 — Mindwitness: assassinate; the killed troop's OWNER discards
   //   a card if they have MORE THAN 3 cards (4+). Hand-rolled to capture
   //   the killed troop's color BEFORE the assassinate clears the slot.
+  // TODO: Does not force the player to discard
   'mindwitness':        (ctx => {
                           const me = ctx.G.players[ctx.actorId];
                           // Phase 1: pick the assassinate target.
@@ -88,7 +89,7 @@ registerAll({
                               kind: 'select-troop-space',
                               prompt: 'Mindwitness: assassinate a troop.',
                               options: eligible,
-                              optional: true,
+                              optional: false,
                             };
                             ctx.paused = true;
                             return false;
@@ -136,10 +137,10 @@ registerAll({
                                 handler: returnEnemySpyChoice(),
                                 available: playerCanReturnEnemySpy },
                               { label: 'Return one of your own troops',
-                                handler: returnOwnTroopChoice({ optional: false }),
+                                handler: returnOwnTroopChoice(),
                                 available: playerHasOwnTroopOnBoard },
                               { label: 'Return one of your own spies',
-                                handler: returnOwnSpyChoice({ optional: false }),
+                                handler: returnOwnSpyChoice(),
                                 available: playerHasOwnSpy },
                             )),
                             available: (G, actorId) =>
@@ -219,6 +220,7 @@ registerAll({
   //   money each. Approximate as 3 normal assassinates (the "at single
   //   site" restriction is a strategic narrowing; engine-wise the player
   //   can still pick targets independently).
+  // TODO: Fix money gained
   'death-tyrant':       (ctx => {
                         // Track phase so the assassinate loop's pendingChoice
                         // state survives across resumptions.
@@ -233,7 +235,7 @@ registerAll({
                         // which handles the (3 left)→(2 left)→(1 left) prompt
                         // countdown and the sameSite site-lock.
                         const childCtx = { ...ctx, handlerState: state.sub ?? null };
-                        const done = assassinateChoice({ count: 3, sameSite: true })(childCtx);
+                        const done = assassinateChoice({ count: 3, sameSite: true, optional: true })(childCtx);
                         ctx.pendingChoice = childCtx.pendingChoice;
                         ctx.paused = childCtx.paused;
                         if (!done) {

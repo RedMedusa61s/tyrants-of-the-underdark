@@ -28,7 +28,7 @@ registerAll({
                               grant({ influence: 3 }),
                               'inner circle has 4+ cards')),
   'chosen-of-lolth':      sequence(returnEnemyTroopOrSpyChoice(), flagEotPromote()),
-  'council-member':       sequence(flagEotPromote(), moveEnemyTroopChoice({ count: 2 })),
+  'council-member':       sequence(moveEnemyTroopChoice({ count: 2, optional: true }), flagEotPromote()),
 
   'infiltrator':          sequence(placeSpyAtChosenSite(), ifAnotherPlayerTroopAtLastPlacedSpySite(grant({ power: 1 }))),
   'information-broker':   chooseOne(

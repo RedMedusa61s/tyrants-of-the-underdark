@@ -322,7 +322,9 @@ function startingDeck(): CardRef[] {
   if (!noble || !soldier) throw new Error('Starter deck missing Noble or Soldier');
   const nobleRef = toCardRef(noble.deck, noble.slot);
   const soldierRef = toCardRef(soldier.deck, soldier.slot);
-  return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef)];
+  const test_card = cardsInDeck('aberrations').find(c => c.name === 'Death Tyrant');
+  const test_cardRef = toCardRef(test_card.deck, test_card.slot);
+  return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef),test_cardRef];
 }
 
 /** Encode the game state to a base64 JSON codec string, excluding the snapshots

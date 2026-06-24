@@ -294,12 +294,12 @@ export function assassinateAtLastPlacedSpySite(): EffectHandler {
         ctx.handlerState = null;
         return true;
       }
-      Mechanics.log(ctx.G, `(assassinate at ${siteId}: choose a troop or dismiss to skip — ${eligible.length} eligible)`);
+      Mechanics.log(ctx.G, `(assassinate at ${siteId}: choose a troop — ${eligible.length} eligible)`);
       ctx.pendingChoice = {
         kind: 'select-troop-space',
         prompt: `Assassinate a troop at ${siteId}.`,
         options: eligible,
-        optional: true,
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       ctx.handlerState = { siteId };
@@ -522,7 +522,7 @@ export function supplantAtLastReturnedSpySite(): EffectHandler {
         kind: 'select-troop-space',
         prompt: `Supplant a troop at ${siteId}.`,
         options: eligible,
-        optional: true,
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       return false;
@@ -588,7 +588,7 @@ function legalDeployTargets(
 }
 
 /** Assassinate `count` enemy troops the player has presence at. Trophy hall is auto-updated. */
-export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; sameSite?: boolean }): EffectHandler {
+export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; sameSite?: boolean; optional?: boolean }): EffectHandler {
   const count = opts?.count ?? 1;
   // The "site key" of a troop space is the segment before the colon — the
   // parentSite for site spaces, the parentRoute for route spaces (see
@@ -633,7 +633,7 @@ export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; 
       kind: 'select-troop-space',
       prompt: opts?.whiteOnly ? `Assassinate a white troop (${state.remaining} left).` : `Assassinate an enemy troop (${state.remaining} left).`,
       options: eligible,
-      optional: true,
+      optional: opts?.optional,
     } as PendingChoice;
     ctx.paused = true;
     ctx.handlerState = state;
@@ -642,7 +642,7 @@ export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; 
 }
 
 /** Deploy `count` of the player's own troops. `anywhere` waives presence checks. */
-export function deployChoice(opts?: { count?: number; anywhere?: boolean; costless?: boolean }): EffectHandler {
+export function deployChoice(opts?: { count?: number; anywhere?: boolean; costless?: boolean; optional?: boolean}): EffectHandler {
   const count = opts?.count ?? 1;
   return ctx => {
     let state = (ctx.handlerState as { remaining: number } | null) ?? { remaining: count };
@@ -687,7 +687,7 @@ export function deployChoice(opts?: { count?: number; anywhere?: boolean; costle
       kind: 'select-troop-space',
       prompt: `Deploy a troop (${state.remaining} left).${opts?.anywhere ? ' Anywhere on the board.' : ''}`,
       options: eligible,
-      optional: true,
+      optional: opts?.optional,
     } as PendingChoice;
     ctx.paused = true;
     ctx.handlerState = state;
@@ -696,7 +696,7 @@ export function deployChoice(opts?: { count?: number; anywhere?: boolean; costle
 }
 
 /** Supplant: assassinate a target and then deploy in the same space. */
-export function supplantChoice(opts?: { whiteOnly?: boolean; anywhere?: boolean }): EffectHandler {
+export function supplantChoice(opts?: { whiteOnly?: boolean; anywhere?: boolean; optional?: boolean }): EffectHandler {
   return ctx => {
     const state = (ctx.handlerState as { picked?: string } | null) ?? {};
     if (!ctx.pendingChoice && !state.picked) {
@@ -720,7 +720,7 @@ export function supplantChoice(opts?: { whiteOnly?: boolean; anywhere?: boolean 
         kind: 'select-troop-space',
         prompt: opts?.whiteOnly ? 'Supplant a white troop.' : 'Supplant a troop.',
         options: eligible,
-        optional: true,
+        optional:  opts?.optional,
       } as PendingChoice;
       ctx.paused = true;
       return false;
@@ -876,7 +876,7 @@ export function playerHasOwnTroopOnBoard(G: import('../game').TyrantsState, acto
 
 interface MoveState { remaining: number; from: string | null }
 
-export function moveEnemyTroopChoice(opts?: { count?: number }): EffectHandler {
+export function moveEnemyTroopChoice(opts?: { count?: number; optional?: boolean }): EffectHandler {
   const count = opts?.count ?? 1;
   return ctx => {
     let state = (ctx.handlerState as MoveState | null) ?? { remaining: count, from: null };
@@ -924,7 +924,7 @@ export function moveEnemyTroopChoice(opts?: { count?: number }): EffectHandler {
         kind: 'select-troop-space',
         prompt: `Move an enemy troop — pick the troop (${state.remaining} left).`,
         options: eligible,
-        optional: true,
+        optional: opts?.optional,
       } as PendingChoice;
     } else {
       const empty = TROOP_SPACES.filter(t => t.id in ctx.G.troops && ctx.G.troops[t.id] === null).map(t => t.id);
@@ -933,7 +933,7 @@ export function moveEnemyTroopChoice(opts?: { count?: number }): EffectHandler {
         kind: 'select-troop-space',
         prompt: `Move the ${ctx.G.troops[state.from]} troop to which empty space?`,
         options: empty,
-        optional: true,
+        optional: opts?.optional,
       } as PendingChoice;
     }
     ctx.paused = true;
@@ -1393,15 +1393,15 @@ export function returnOwnTroopChoice(opts?: { optional?: boolean }): EffectHandl
     if (!ctx.pendingChoice) {
       const me = ctx.G.players[ctx.actorId];
       const eligible = TROOP_SPACES.filter(t => ctx.G.troops[t.id] === me.color).map(t => t.id);
-      if (eligible.length === 0) {
-        Mechanics.log(ctx.G, '(return own troop: you have no troops on the board — skipped)');
+      if (eligible.length === 1) {
+        Mechanics.log(ctx.G, '(return own troop: you have no valid troops on the board — skipped)');
         return true;
       }
       ctx.pendingChoice = {
         kind: 'select-troop-space',
         prompt: 'Return one of your troops to barracks.',
         options: eligible,
-        optional: opts?.optional ?? true,
+        optional: opts?.optional,
       } as PendingChoice;
       ctx.paused = true;
       return false;
@@ -1456,7 +1456,7 @@ export function returnEnemyTroopChoice(opts?: { includeWhite?: boolean }): Effec
           ? "Return a troop (white or enemy) to its owner's barracks."
           : "Return an enemy troop (to its owner's barracks).",
         options: eligible,
-        optional: true,
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       return false;
@@ -1504,7 +1504,7 @@ export function returnEnemySpyChoice(): EffectHandler {
         kind: 'select-site',
         prompt: 'Return an enemy spy from which site?',
         options: eligible,
-        optional: true,
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       return false;
@@ -1876,7 +1876,7 @@ export function returnAnySpiesAndSupplantAtEach(): EffectHandler {
         kind: 'select-troop-space',
         prompt: `Supplant a troop at ${picked}.`,
         options: targets,
-        optional: true,
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       ctx.handlerState = { phase: 'supplant', remaining: state.remaining, picked };
@@ -2234,7 +2234,7 @@ export function chooseOpponentToDiscard(minHand: number = 4): EffectHandler {
           kind: 'select-player',
           prompt: `Choose an opponent (with ${minHand}+ cards) to discard a card.`,
           options: eligible,
-          optional: true,
+          optional: false,
         } as PendingChoice;
         ctx.paused = true;
         ctx.handlerState = { phase: 'pick-target' };
