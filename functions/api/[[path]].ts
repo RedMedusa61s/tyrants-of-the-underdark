@@ -54,6 +54,9 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     // GitHub issue. The relay holds the GitHub token; this Function does not.
     forwarder: new GitHubIssueForwarder({ endpoint: `${relay}/problem-report` }),
     gameUrl: (gameId, token) => `${site}/play/${gameId}?as=${token}`,
+    // Best-effort play counter: createGame fires an 'online' beacon to the
+    // games hub. Never throws or blocks gameplay.
+    playBeacon: { appId: 'tyrants' },
   });
 
   let body: unknown = undefined;
