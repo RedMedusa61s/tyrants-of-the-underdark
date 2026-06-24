@@ -103,7 +103,7 @@ export function CardCalibration() {
 
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(nameMap)); }, [nameMap]);
 
-  const DECKS = ['drow', 'dragons', 'elemental', 'demons', 'core'];
+  const DECKS = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'core'];
   const slots = manifest.cards.filter(c => c.deck === activeDeck).sort((a, b) => a.slot - b.slot);
   const groupIdx = slotToGroupIndex(activeDeck);
   const sheetNames = (sheetByDeck[activeDeck] ?? []).map(r => r.name);
