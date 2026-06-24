@@ -1211,7 +1211,7 @@ export function giveOutcastToChosenOpponent(): EffectHandler {
         kind: 'select-player',
         prompt: 'Give an Insane Outcast to which opponent?',
         options: opponents,
-        optional: true,
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       return false;
@@ -1767,7 +1767,7 @@ export function giveOutcastToOpponentAdjacentToLastDeploy(): EffectHandler {
         kind: 'select-player',
         prompt: 'Give an Insane Outcast to which adjacent opponent?',
         options: opponentIds,
-        optional: true,
+        optional: false,
       } as PendingChoice;
       ctx.paused = true;
       return false;
