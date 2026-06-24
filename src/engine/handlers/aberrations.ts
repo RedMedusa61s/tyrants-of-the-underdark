@@ -24,6 +24,101 @@ import { assassinateTroop, hasPresence } from '../map-state';
 import { TROOP_SPACES } from '../../data/troop-spaces';
 import { SITES } from '../../data/sites';
 import { totalTrophies, type Color } from '../../game';
+import type { EffectContext, EffectHandler, PendingChoice } from '../types';
+
+// In registerAll({...}), replace the 'mindwitness' entry with:
+
+/** Per Mindwitness's action:
+ * assassinate; the killed troop's OWNER discards
+ * a card if they have MORE THAN 3 cards (4+)
+ */
+const forcePlayerOfAssassinatedColorToDiscard: EffectHandler = ctx => {
+  const me = ctx.G.players[ctx.actorId];
+
+  interface S {
+    phase: 'assassinate' | 'force-discard';
+    killedColor?: Color | 'white' | null;
+    fdState?: unknown;
+  }
+  let state = (ctx.handlerState as S | null) ?? { phase: 'assassinate' };
+
+  // --- Phase 1: pick and execute the assassinate ---
+  if (state.phase === 'assassinate') {
+    if (!ctx.pendingChoice) {
+      const eligible: string[] = [];
+      for (const t of TROOP_SPACES) {
+        const occ = ctx.G.troops[t.id];
+        if (!occ || occ === me.color) continue;
+        const hasPres = t.parentSite
+          ? hasPresence(ctx.G, me.color, { site: t.parentSite })
+          : t.parentRoute
+            ? hasPresence(ctx.G, me.color, { space: t.id })
+            : false;
+        if (!hasPres) continue;
+        eligible.push(t.id);
+      }
+      if (eligible.length === 0) {
+        Mechanics.log(ctx.G, '(Mindwitness: no enemy/white targets — skipped)');
+        return true;
+      }
+      ctx.pendingChoice = {
+        kind: 'select-troop-space',
+        prompt: 'Mindwitness: assassinate a troop.',
+        options: eligible,
+        optional: false,
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { phase: 'assassinate' };
+      return false;
+    }
+
+    const spaceId = ctx.pendingChoice.response as string | null;
+    ctx.pendingChoice = null;
+    ctx.paused = false;
+
+    if (!spaceId) { ctx.handlerState = null; return true; }
+
+    const killedColor = ctx.G.troops[spaceId];
+    if (!killedColor || killedColor === me.color) { ctx.handlerState = null; return true; }
+
+    const killed = assassinateTroop(ctx.G, spaceId);
+    if (killed === 'white') me.trophyHall.white += 1;
+    else if (killed) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
+
+    // Transition to force-discard phase, recording the killed color
+    state = { phase: 'force-discard', killedColor: killed, fdState: null };
+    ctx.handlerState = state;
+  }
+
+  // --- Phase 2: force the owner of the killed troop to discard ---
+  if (state.phase === 'force-discard') {
+    const killedColor = state.killedColor;
+
+    // White troops have no owner — nothing to do
+    if (!killedColor || killedColor === 'white') { ctx.handlerState = null; return true; }
+
+    const forceFn = forcePlayerOfColorToDiscardIfMinHand(killedColor as Color, ctx.actorId, 4);
+    const childCtx: EffectContext = {
+      ...ctx,
+      handlerState: state.fdState ?? null,
+      pendingChoice: ctx.pendingChoice,
+      paused: ctx.paused,
+    };
+    const done = forceFn(childCtx);
+    if (!done) {
+      ctx.pendingChoice = childCtx.pendingChoice;
+      ctx.paused = childCtx.paused;
+      ctx.handlerState = { phase: 'force-discard', killedColor, fdState: childCtx.handlerState };
+      return false;
+    }
+    ctx.handlerState = null;
+    return true;
+  }
+
+  ctx.handlerState = null;
+  return true;
+};
 
 registerAll({
   // Cost 1 — Grimlock: deploy 1 troop; "if your opponent causes you to
@@ -57,61 +152,7 @@ registerAll({
   // Cost 3 — Mindwitness: assassinate; the killed troop's OWNER discards
   //   a card if they have MORE THAN 3 cards (4+). Hand-rolled to capture
   //   the killed troop's color BEFORE the assassinate clears the slot.
-  // TODO: Does not force the player to discard
-  'mindwitness':        (ctx => {
-                          const me = ctx.G.players[ctx.actorId];
-                          // Phase 1: pick the assassinate target.
-                          if (!ctx.pendingChoice) {
-                            // Eligible: any space where you have presence
-                            // occupied by an enemy/white troop. The earlier
-                            // implementation skipped the presence check and
-                            // let Mindwitness assassinate anywhere on the
-                            // map — reported as #49. "Assassinate a troop"
-                            // on a card inherits the rulebook constraint
-                            // (p.13) unless the text says "anywhere."
-                            const eligible: string[] = [];
-                            for (const t of TROOP_SPACES) {
-                              const occ = ctx.G.troops[t.id];
-                              if (!occ || occ === me.color) continue;
-                              const hasPres = t.parentSite
-                                ? hasPresence(ctx.G, me.color, { site: t.parentSite })
-                                : t.parentRoute
-                                  ? hasPresence(ctx.G, me.color, { space: t.id })
-                                  : false;
-                              if (!hasPres) continue;
-                              eligible.push(t.id);
-                            }
-                            if (eligible.length === 0) {
-                              Mechanics.log(ctx.G, '(Mindwitness: no enemy/white targets — skipped)');
-                              return true;
-                            }
-                            ctx.pendingChoice = {
-                              kind: 'select-troop-space',
-                              prompt: 'Mindwitness: assassinate a troop.',
-                              options: eligible,
-                              optional: false,
-                            };
-                            ctx.paused = true;
-                            return false;
-                          }
-                          const spaceId = ctx.pendingChoice.response as string | null;
-                          ctx.pendingChoice = null;
-                          ctx.paused = false;
-                          if (!spaceId) return true;
-                          const killedColor = ctx.G.troops[spaceId];
-                          if (!killedColor || killedColor === me.color) return true;
-                          // Do the assassinate via map-state helper.
-                          const killed = assassinateTroop(ctx.G, spaceId);
-                          if (killed === 'white') me.trophyHall.white += 1;
-                          else if (killed) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
-                          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
-                          // Force the owner of the killed color to discard.
-                          if (killedColor !== 'white') {
-                            const forceFn = forcePlayerOfColorToDiscardIfMinHand(killedColor as Color, ctx.actorId, 4);
-                            forceFn(ctx);
-                          }
-                          return true;
-                        }),
+  'mindwitness':        forcePlayerOfAssassinatedColorToDiscard,
   // Cost 3 — Gauth: chooseOne(+2 money OR draw + force opponent with 4+ cards to discard)
   'gauth':              chooseOne(
                           { label: '+2 Influence', handler: grant({ influence: 2 }) },
@@ -220,40 +261,32 @@ registerAll({
   //   money each. Approximate as 3 normal assassinates (the "at single
   //   site" restriction is a strategic narrowing; engine-wise the player
   //   can still pick targets independently).
-  // TODO: Fix money gained
   'death-tyrant':       (ctx => {
-                        // Track phase so the assassinate loop's pendingChoice
-                        // state survives across resumptions.
-                        interface S { phase: 'assassinate'; sub?: unknown }
-                        const state = (ctx.handlerState as S | null) ?? { phase: 'assassinate', sub: null };
-                        // Snapshot trophy total before the assassinate loop so
-                        // we can count exactly how many troops were killed
-                        // regardless of their color.
-                        const me = ctx.G.players[ctx.actorId];
-                        const totalBefore = totalTrophies(me);
-                        // Delegate the full multi-pick loop to assassinateChoice,
-                        // which handles the (3 left)→(2 left)→(1 left) prompt
-                        // countdown and the sameSite site-lock.
-                        const childCtx = { ...ctx, handlerState: state.sub ?? null };
-                        const done = assassinateChoice({ count: 3, sameSite: true, optional: true })(childCtx);
-                        ctx.pendingChoice = childCtx.pendingChoice;
-                        ctx.paused = childCtx.paused;
-                        if (!done) {
-                          // Assassinate loop still in progress — preserve child
-                          // state and suspend until the next resolveChoice.
-                          ctx.handlerState = { phase: 'assassinate', sub: childCtx.handlerState };
-                          return false;
-                        }
-                        // Assassinate loop complete — grant 1 influence per
-                        // troop killed (white or enemy).
-                        const killed = totalTrophies(me) - totalBefore;
-                        if (killed > 0) {
-                          me.influence += killed;
-                          ctx.G.log.push(`P${Number(ctx.actorId) + 1} +${killed} Influence from Death Tyrant (${killed} troop${killed === 1 ? '' : 's'} assassinated)`);
-                        }
-                        ctx.handlerState = null;
-                        return true;
-                      }),
+                          interface S { phase: 'assassinate'; sub?: unknown; kills: number }
+                          const state = (ctx.handlerState as S | null) ?? { phase: 'assassinate', sub: null, kills: 0 };
+                          // Snapshot before THIS call so we count only kills made in this step.
+                          const me = ctx.G.players[ctx.actorId];
+                          const trophiesAtEntry = totalTrophies(me);
+                          const childCtx = { ...ctx, handlerState: state.sub ?? null };
+                          const done = assassinateChoice({ count: 3, sameSite: true, optional: true })(childCtx);
+                          ctx.pendingChoice = childCtx.pendingChoice;
+                          ctx.paused = childCtx.paused;
+                          // Accumulate kills across all re-entries.
+                          const killsThisStep = totalTrophies(me) - trophiesAtEntry;
+                          const totalKills = state.kills + killsThisStep;
+                          if (!done) {
+                            ctx.handlerState = { phase: 'assassinate', sub: childCtx.handlerState, kills: totalKills };
+                            return false;
+                          }
+
+                          // Loop complete or declined — grant 1 influence per total kills.
+                          if (totalKills > 0) {
+                            me.influence += totalKills;
+                            ctx.G.log.push(`P${Number(ctx.actorId) + 1} +${totalKills} Influence from Death Tyrant (${totalKills} troop${totalKills === 1 ? '' : 's'} assassinated)`);
+                          }
+                          ctx.handlerState = null;
+                          return true;
+                        }),
 
   // Cost 7 — Elder Brain: promote your top card + play a card from
   //   inner-circle as if it were in hand (it stays in inner circle).
