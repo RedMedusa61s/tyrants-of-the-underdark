@@ -76,7 +76,8 @@ registerAll({
   'minotaur-skeleton':   chooseOne(
                            { label: 'Deploy 3 troops', handler: deployChoice({ count: 3 }) },
                            { label: 'Devour this → assassinate up to 3 white troops at one site',
-                             handler: devourSelfThen(assassinateChoice({ count: 3, whiteOnly: true, sameSite: true })),
+                             handler: optionalDevourSelfThen(assassinateChoice({ count: 3, whiteOnly: true, sameSite: true }),
+                                                              'Devour Minotaur Skeleton?'),
                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
 
   // Cost 4 — Banshee: spy + "if there is another spy there, +3 attack."
@@ -158,9 +159,9 @@ registerAll({
   'necromancer':         chooseOne(
                            { label: '+3 Influence', handler: grant({ influence: 3 }) },
                            { label: 'Promote this card (Necromancer → inner circle)', handler: promoteSelf() },
-                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice({ optional: false }),
+                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice(),
                              available: (G, a) => G.players[a].hand.length > 0 },
-                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice({ optional: false }),
+                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice(),
                              available: (G, a) => G.players[a].discard.length > 0 }),
 
   // Cost 6 — Death Knight: supplant a troop + 1 VP per 5 player trophies
@@ -196,7 +197,7 @@ registerAll({
                            { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }),
                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) },
                            { label: 'Take a white trophy from any hall and place it',
-                             handler: takeTrophyAndPlace({ count: 1, whiteOnly: true }),
+                             handler: takeTrophyAndPlace({ count: 1, whiteOnly: true, optional: false }),
                              available: (G) => {
                                // Any player's trophy hall (including the actor's own).
                                for (const p of Object.values(G.players)) {
@@ -218,56 +219,59 @@ registerAll({
   //     AND the player keeps picking. We don't model that — we queue 1.
   //     Worth a follow-up but doesn't break correctness of single uses.
 
-  // Behaviour should be fixed, untested
+  // TODO: Fix flagEotPromote to que pendingEotPromotions eqaul to eligible cards.
   'high-priest-of-myrkul': sequence(
-                            returnEnemyTroopOrSpyChoice(),
-                            (ctx => {
-                              const me = ctx.G.players[ctx.actorId];
+                            // fizzleIfNoTargets: true - prevents card from being played when there are
+                            //                            no targets and "Play all basic" is selected.
+                            returnEnemyTroopOrSpyChoice({ fizzleIfNoTargets: true }),
+                            flagEotPromote({ optional: true, typeFilter: 'Undead' })),
+                            // (ctx => {
+                            //   const me = ctx.G.players[ctx.actorId];
 
-                              // Process prior response if any.
-                              if (ctx.pendingChoice) {
-                                const idx = ctx.pendingChoice.response as number | null;
-                                ctx.pendingChoice = null;
-                                ctx.paused = false;
-                                if (idx == null) { ctx.handlerState = null; return true; } // declined — stop
-                                const card = ctx.G.cardsPlayedThisTurn[idx];
-                                if (card) {
-                                  ctx.G.cardsPlayedThisTurn.splice(idx, 1);
-                                  const di = me.discard.findIndex(c => c.deck === card.deck && c.slot === card.slot);
-                                  if (di >= 0) me.discard.splice(di, 1);
-                                  Mechanics.promote(ctx.G, ctx.actorId, card);
-                                }
-                              }
+                            //   // Process prior response if any.
+                            //   if (ctx.pendingChoice) {
+                            //     const idx = ctx.pendingChoice.response as number | null;
+                            //     ctx.pendingChoice = null;
+                            //     ctx.paused = false;
+                            //     if (idx == null) { ctx.handlerState = null; return true; } // declined — stop
+                            //     const card = ctx.G.cardsPlayedThisTurn[idx];
+                            //     if (card) {
+                            //       ctx.G.cardsPlayedThisTurn.splice(idx, 1);
+                            //       const di = me.discard.findIndex(c => c.deck === card.deck && c.slot === card.slot);
+                            //       if (di >= 0) me.discard.splice(di, 1);
+                            //       Mechanics.promote(ctx.G, ctx.actorId, card);
+                            //     }
+                            //   }
 
-                              // Re-evaluate remaining eligible cards after each promote.
-                              const eligible = ctx.G.cardsPlayedThisTurn
-                                .map((c, i) => ({ c, i }))
-                                .filter(({ c }) => {
-                                  const data = lookupCard(c.deck, c.slot);
-                                  return data?.type === 'Undead';
-                                })
-                                .map(({ i }) => i);
+                            //   // Re-evaluate remaining eligible cards after each promote.
+                            //   const eligible = ctx.G.cardsPlayedThisTurn
+                            //     .map((c, i) => ({ c, i }))
+                            //     .filter(({ c }) => {
+                            //       const data = lookupCard(c.deck, c.slot);
+                            //       return data?.type === 'Undead';
+                            //     })
+                            //     .map(({ i }) => i);
 
-                              if (eligible.length === 0) {
-                                if (!ctx.handlerState) {
-                                  // Only log on first entry — if we get here after a promote
-                                  // the player already acted so no message is needed.
-                                  Mechanics.log(ctx.G, '(High Priest of Myrkul: no Undead cards played this turn to promote)');
-                                }
-                                ctx.handlerState = null;
-                                return true;
-                              }
-
-                              ctx.handlerState = true; // mark that we have entered at least once
-                              ctx.pendingChoice = {
-                                kind: 'select-played-card',
-                                prompt: 'High Priest of Myrkul: you may promote an Undead card played this turn (or decline to stop).',
-                                options: eligible,
-                                optional: true,
-                              };
-                              ctx.paused = true;
-                              return false;
-                            })),
+                            //   if (eligible.length === 0) {
+                            //     if (!ctx.handlerState) {
+                            //       // Only log on first entry — if we get here after a promote
+                            //       // the player already acted so no message is needed.
+                            //       Mechanics.log(ctx.G, '(High Priest of Myrkul: no Undead cards played this turn to promote)');
+                            //     }
+                            //     ctx.handlerState = null;
+                            //     return true;
+                            //   }
+ 
+                            //   ctx.handlerState = true; // mark that we have entered at least once
+                            //   ctx.pendingChoice = {
+                            //     kind: 'select-played-card',
+                            //     prompt: 'High Priest of Myrkul: you may promote an Undead card played this turn (or decline to stop).',
+                            //     options: eligible,
+                            //     optional: true,
+                            //   };
+                            //   ctx.paused = true;
+                            //   return false;
+                            // })),
 
   // Cost 7 — Vampire: chooseOne(supplant a troop, promote a card from
   //   discard then +1 VP per 3 promoted cards in inner circle).

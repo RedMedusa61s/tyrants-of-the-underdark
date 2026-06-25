@@ -32,7 +32,7 @@ export function grant(opts: { power?: number; influence?: number; draw?: number 
 // played-card list lives on the per-turn promotion queue.
 
 export function flagEotPromote(
-  opts?: { count?: number; aspectFilter?: string; optional?: boolean },
+  opts?: { count?: number; aspectFilter?: string; typeFilter?: string; optional?: boolean },
 ): EffectHandler {
   return ctx => {
     const n = opts?.count ?? 1;
@@ -51,11 +51,18 @@ export function flagEotPromote(
     // "you may promote..." opt out with `optional: true`. The flag is
     // carried on the trigger so game.ts's endTurn prompt can use it.
     const trigger: import('../game').EotPromoteTrigger = { ...ctx.card };
-    if (opts?.aspectFilter) trigger.aspectFilter = opts.aspectFilter;
+    let tag = ' another card';
+    if (opts?.aspectFilter) {
+      trigger.aspectFilter = opts.aspectFilter;
+      tag = ` ${opts.aspectFilter} card`;
+    }
+    if (opts?.typeFilter) {
+      trigger.typeFilter = opts.typeFilter;
+      tag = ` ${opts.typeFilter} cards`
+    }
     if (opts?.optional) trigger.optional = true;
-    for (let i = 0; i < n; i++) ctx.G.pendingEotPromotions.push(trigger);
-    const tag = opts?.aspectFilter ? ` ${opts.aspectFilter} card` : ' another card';
-    Mechanics.log(ctx.G, `(eot: queued ${n} promote —${tag} played this turn${opts?.optional ? ', optional' : ''})`);
+    for (let i = 0; i < n; i++) ctx.G.pendingEotPromotions.push(trigger); 
+    Mechanics.log(ctx.G, `(eot: queued ${opts?.typeFilter ? '' : n} promote —${tag} played this turn${opts?.optional ? ', optional' : ''})`);
     return true;
   };
 }
@@ -423,7 +430,7 @@ export function returnOwnSpyChoice(opts?: { optional?: boolean }): EffectHandler
         kind: 'select-site',
         prompt: 'Return one of your spies from which site?',
         options: eligible,
-        optional: opts?.optional,
+        optional: opts?.optional ?? true,
       } as PendingChoice;
       ctx.paused = true;
       return false;
@@ -1531,18 +1538,53 @@ export function returnEnemySpyChoice(): EffectHandler {
 
 /** "Return an enemy troop or spy" — Blue Wyrmling's secondary effect.
  *  Pass `{ includeWhite: true }` to also let the player return white
- *  (Underdark) troops — used by Intellect Devourer. */
-export function returnEnemyTroopOrSpyChoice(opts?: { includeWhite?: boolean }): EffectHandler {
+ *  (Underdark) troops — used by Intellect Devourer.
+ *  Pass `{ fizzleIfNoTargets: true }` to set _playFizzledNoFood when
+ *  no enemy troops or spies are returnable, preventing "play all basic"
+ *  from auto-playing the card for zero effect (e.g. High Priest of Myrkul). */
+export function returnEnemyTroopOrSpyChoice(opts?: { includeWhite?: boolean; fizzleIfNoTargets?: boolean }): EffectHandler {
   const includeWhite = !!opts?.includeWhite;
-  return chooseOne(
-    {
-      label: includeWhite ? 'Return a troop (white or enemy)' : 'Return an enemy troop',
-      handler: returnEnemyTroopChoice({ includeWhite }),
-      available: includeWhite ? playerCanReturnAnyTroop : playerCanReturnEnemyTroop,
-    },
-    { label: 'Return an enemy spy', handler: returnEnemySpyChoice(), available: playerCanReturnEnemySpy },
-  );
+  const fizzleIfNoTargets = !!opts?.fizzleIfNoTargets;
+  return ctx => {
+    // When fizzleIfNoTargets is set, check upfront whether either option has
+    // any valid targets. If not, mark the fizzle flag so the "Play all basic"
+    // classifier skips this card — exactly as devourFromHandCost does when
+    // the hand is empty.
+    if (fizzleIfNoTargets && !ctx.pendingChoice && !ctx.handlerState) {
+      const troopAvailable = includeWhite
+        ? playerCanReturnAnyTroop(ctx.G, ctx.actorId)
+        : playerCanReturnEnemyTroop(ctx.G, ctx.actorId);
+      const spyAvailable = playerCanReturnEnemySpy(ctx.G, ctx.actorId);
+      if (!troopAvailable && !spyAvailable) {
+        (ctx.G as unknown as { _playFizzledNoFood?: boolean })._playFizzledNoFood = true;
+        ctx.handlerState = null;
+        Mechanics.log(ctx.G, '(return enemy troop or spy: no valid targets availiable — skipped)');
+        return true;
+      }
+    }
+    return chooseOne(
+      {
+        label: includeWhite ? 'Return a troop (white or enemy)' : 'Return an enemy troop',
+        handler: returnEnemyTroopChoice({ includeWhite }),
+        available: includeWhite ? playerCanReturnAnyTroop : playerCanReturnEnemyTroop,
+      },
+      { label: 'Return an enemy spy', handler: returnEnemySpyChoice(), available: playerCanReturnEnemySpy },
+    )(ctx);
+  };
 }
+// ! Depreciated method below:
+// export function returnEnemyTroopOrSpyChoice(opts?: { includeWhite?: boolean }): EffectHandler {
+//   const includeWhite = !!opts?.includeWhite;
+//   return chooseOne(
+//     {
+//       label: includeWhite ? 'Return a troop (white or enemy)' : 'Return an enemy troop',
+//       handler: returnEnemyTroopChoice({ includeWhite }),
+//       available: includeWhite ? playerCanReturnAnyTroop : playerCanReturnEnemyTroop,
+//     },
+//     { label: 'Return an enemy spy', handler: returnEnemySpyChoice(), available: playerCanReturnEnemySpy },
+//   );
+// }
+
 
 /** True when the player has at least one enemy player-color troop they could
  *  legally return — i.e. a troop in a space where they have presence. */
@@ -1976,7 +2018,7 @@ interface OrcusIterState {
  *  used by Lich ("take 2 trophies from THEIR hall" where "they" is the
  *  opponent with a troop at the spy site). When omitted, any player's
  *  hall is eligible (Orcus's behavior). */
-export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whiteOnly?: boolean; restrictToPresence?: boolean }): EffectHandler {
+export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whiteOnly?: boolean; restrictToPresence?: boolean; optional?: boolean }): EffectHandler {
   return ctx => {
     let state = (ctx.handlerState as OrcusIterState | null) ?? { remaining: opts.count };
 
@@ -2030,7 +2072,7 @@ export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whi
         kind: 'select-troop-space',
         prompt: `Place the ${sel.color} trophy on an empty space${opts.restrictToPresence ? ' where you have presence' : ''} (or decline to skip).`,
         options: eligible,
-        optional: true,
+        optional: opts?.optional ?? true,
       } as PendingChoice;
       ctx.paused = true;
       ctx.handlerState = state;
@@ -2049,7 +2091,7 @@ export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whi
       kind: 'choose-one',
       prompt: `Take a trophy${targetTag} (${state.remaining} remaining). Pick which trophy + color:`,
       options: choices.map(c => c.label),
-      optional: true,
+      optional: opts?.optional ?? true,
     } as PendingChoice;
     ctx.paused = true;
     ctx.handlerState = { remaining: state.remaining, picked: undefined };
@@ -2511,7 +2553,7 @@ export function promoteFromHandChoice(opts?: { optional?: boolean }): EffectHand
         kind: 'select-card-in-hand',
         prompt: 'Promote a card from your hand (it moves to your inner circle)',
         options: me.hand.map((_, i) => i),
-        optional: opts?.optional ?? true,
+        optional: opts?.optional,
       } as PendingChoice;
       ctx.paused = true;
       return false;

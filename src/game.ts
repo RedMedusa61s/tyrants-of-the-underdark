@@ -254,6 +254,7 @@ function toCardRef(deck: string, slot: number): CardRef {
  *  "may") to declinable. */
 export type EotPromoteTrigger = CardRef & {
   aspectFilter?: string;
+  typeFilter?: string;
   optional?: boolean;
 };
 
@@ -267,10 +268,12 @@ export type EotPromoteTrigger = CardRef & {
  *  targets for the given EoT trigger. Always excludes the trigger card
  *  itself ("another card played this turn"). When the trigger carries
  *  an aspectFilter (Air/Fire/Water Myrmidons → 'Obedience'), also
+ *  restricts to cards of that aspect. When the trigger carries
+ *  a typeFilter (High Priest of Myrkul → 'Undead'), also
  *  restricts to cards of that aspect. */
 function eotEligibleIndices(
   G: TyrantsState,
-  trigger: CardRef & { aspectFilter?: string },
+  trigger: CardRef & { aspectFilter?: string; typeFilter?: string; },
 ): number[] {
   const out: number[] = [];
   for (let i = 0; i < G.cardsPlayedThisTurn.length; i++) {
@@ -279,6 +282,10 @@ function eotEligibleIndices(
     if (trigger.aspectFilter) {
       const data = lookupCard(c.deck, c.slot);
       if (data?.aspect !== trigger.aspectFilter) continue;
+    }
+    if (trigger.typeFilter) {
+      const data = lookupCard(c.deck, c.slot);
+      if (data?.type!== trigger.typeFilter) continue;
     }
     out.push(i);
   }
@@ -322,9 +329,19 @@ function startingDeck(): CardRef[] {
   if (!noble || !soldier) throw new Error('Starter deck missing Noble or Soldier');
   const nobleRef = toCardRef(noble.deck, noble.slot);
   const soldierRef = toCardRef(soldier.deck, soldier.slot);
-  const test_card = cardsInDeck('aberrations').find(c => c.name === 'Death Tyrant');
+  const test_card = cardsInDeck('undead').find(c => c.name === 'High Priest of Myrkul');
   const test_cardRef = toCardRef(test_card.deck, test_card.slot);
-  return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef),test_cardRef];
+  const test_card2 = cardsInDeck('undead').find(c => c.name === 'Conjurer');
+  const test_cardRef2 = toCardRef(test_card2.deck, test_card2.slot);
+  const test_card3 = cardsInDeck('undead').find(c => c.name === 'Wight');
+  const test_cardRef3 = toCardRef(test_card3.deck, test_card3.slot);
+  const test_card4 = cardsInDeck('undead').find(c => c.name === 'Ghost');
+  const test_cardRef4 = toCardRef(test_card4.deck, test_card4.slot);
+  const test_card5 = cardsInDeck('drow').find(c => c.name === 'Chosen of Lolth');
+  const test_cardRef5 = toCardRef(test_card5.deck, test_card5.slot);
+  //return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef),test_cardRef, test_card2, test_card3];
+  return [...Array(1).fill(nobleRef), test_cardRef, test_cardRef2, test_cardRef3, test_cardRef4];
+  //return [...Array(4).fill(nobleRef), test_cardRef5];
 }
 
 /** Encode the game state to a base64 JSON codec string, excluding the snapshots
@@ -779,6 +796,9 @@ export const TyrantsGame: Game<TyrantsState> = {
         // Trigger entries can include an optional aspectFilter (Air/Fire/Water
         // Myrmidons restrict to Obedience); eligible cards must also match
         // that aspect when the filter is set.
+        // Trigger entries can include an optional typeFilter (High Priest of
+        // Myrkul restrict to Undead); eligible cards must also match
+        // that type when the filter is set.
         while (G.pendingEotPromotions.length > 0) {
           const t = G.pendingEotPromotions[0];
           if (eotEligibleIndices(G, t).length > 0) break;
@@ -788,9 +808,15 @@ export const TyrantsGame: Game<TyrantsState> = {
           const t = G.pendingEotPromotions[0];
           const eligible = eotEligibleIndices(G, t);
           const aspectTag = t.aspectFilter ? ` ${t.aspectFilter}` : '';
+          const typeTag = t.typeFilter ? ` ${t.typeFilter}` : '';
+
+          if (t.typeFilter === 'Undead') {
+            G.pendingEotPromotions.length += (eligible.length - 1);
+          }
+
           G.pendingChoice = {
             kind: 'select-played-card',
-            prompt: `End of turn — promote ${t.optional ? 'an optional' : 'a'}${aspectTag} card played this turn — ${t.optional ? 'you may decline this one' : `${t.name} requires it, so you must promote one`} (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
+            prompt: `End of turn — promote ${t.optional ? 'an optional' : 'a'}${aspectTag}${typeTag} card played this turn — ${t.optional ? 'you may decline this one' : `${t.name} requires it, so you must promote one`} (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
             options: eligible,
             // Mandatory by default; only declinable when the trigger
             // explicitly says so (printed "you may promote..." cards).
@@ -1053,10 +1079,18 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (G.pendingEotPromotions.length > 0) {
         const trigger = G.pendingEotPromotions[0];
         const eligible = eotEligibleIndices(G, trigger);
+        
+        if (trigger.typeFilter === 'Undead') {
+          G.pendingEotPromotions.length += (eligible.length - 1);
+        }
+
         if (eligible.length === 0) {
           // No eligible card to promote (either no other played card, or none
           // matching the trigger's aspectFilter) — drop this trigger and try
           // the next or finish.
+          if (trigger.typeFilter === 'Undead') {
+            Mechanics.log(G, '(High Priest of Myrkul: no Undead cards played this turn to promote)');
+          }
           G.pendingEotPromotions.shift();
           while (G.pendingEotPromotions.length > 0) {
             const t = G.pendingEotPromotions[0];
@@ -1068,9 +1102,10 @@ export const TyrantsGame: Game<TyrantsState> = {
         const trigger2 = G.pendingEotPromotions[0];
         const eligible2 = eotEligibleIndices(G, trigger2);
         const aspectTag = trigger2.aspectFilter ? ` ${trigger2.aspectFilter}` : '';
+        const typeTag = trigger2.typeFilter ? ` ${trigger2.typeFilter}` : '';
         G.pendingChoice = {
           kind: 'select-played-card',
-          prompt: `End of turn — promote ${trigger2.optional ? 'an optional' : 'a'}${aspectTag} card played this turn — ${trigger2.optional ? 'you may decline this one' : `${trigger2.name} requires it, so you must promote one`} (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
+          prompt: `End of turn — promote ${trigger2.optional ? 'an optional' : 'a'}${aspectTag}${typeTag} card played this turn — ${trigger2.optional ? 'you may decline this one' : `${trigger2.name} requires it, so you must promote one`} (triggered by ${trigger2.name}; ${G.pendingEotPromotions.length} remaining).`,
           options: eligible2,
           // See companion site at the top of resolveChoice — mandatory by
           // default, declinable only when the trigger flags itself optional.

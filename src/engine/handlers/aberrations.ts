@@ -112,6 +112,17 @@ const forcePlayerOfAssassinatedColorToDiscard: EffectHandler = ctx => {
       ctx.handlerState = { phase: 'force-discard', killedColor, fdState: childCtx.handlerState };
       return false;
     }
+
+    // Pop the undo snapshot that resolveChoice just pushed for this resume,
+    // so the assassinate + discard collapse into a single undoable action.
+    // The assassinate's resolveChoice already has a snapshot on the stack;
+    // this resume's snapshot would create a second entry that would let the
+    // player undo only the discard, leaving the troop dead. Removing it means
+    // undoing lands back before the assassinate pick was made.
+    if (ctx.G.undoStack && ctx.G.undoStack.length > 0) {
+      ctx.G.undoStack.pop();
+    }
+
     ctx.handlerState = null;
     return true;
   }
@@ -181,7 +192,7 @@ registerAll({
                                 handler: returnOwnTroopChoice(),
                                 available: playerHasOwnTroopOnBoard },
                               { label: 'Return one of your own spies',
-                                handler: returnOwnSpyChoice(),
+                                handler: returnOwnSpyChoice({ optional: false }),
                                 available: playerHasOwnSpy },
                             )),
                             available: (G, actorId) =>

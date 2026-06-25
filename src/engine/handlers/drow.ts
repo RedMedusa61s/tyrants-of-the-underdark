@@ -27,7 +27,9 @@ registerAll({
                               (G, pid) => G.players[pid].innerCircle.length >= 4,
                               grant({ influence: 3 }),
                               'inner circle has 4+ cards')),
-  'chosen-of-lolth':      sequence(returnEnemyTroopOrSpyChoice(), flagEotPromote()),
+// fizzleIfNoTargets: true - prevents card from being played when there are
+//                            no targets and "Play all basic" is selected.
+  'chosen-of-lolth':      sequence(returnEnemyTroopOrSpyChoice({ fizzleIfNoTargets: true }), flagEotPromote()),
   'council-member':       sequence(moveEnemyTroopChoice({ count: 2, optional: true }), flagEotPromote()),
 
   'infiltrator':          sequence(placeSpyAtChosenSite(), ifAnotherPlayerTroopAtLastPlacedSpySite(grant({ power: 1 }))),
