@@ -331,16 +331,16 @@ function startingDeck(): CardRef[] {
   const soldierRef = toCardRef(soldier.deck, soldier.slot);
   const test_card = cardsInDeck('undead').find(c => c.name === 'High Priest of Myrkul');
   const test_cardRef = toCardRef(test_card.deck, test_card.slot);
-  const test_card2 = cardsInDeck('undead').find(c => c.name === 'Conjurer');
+  const test_card2 = cardsInDeck('elemental').find(c => c.name === 'Fire Elemental Myrmidon');
   const test_cardRef2 = toCardRef(test_card2.deck, test_card2.slot);
-  const test_card3 = cardsInDeck('undead').find(c => c.name === 'Wight');
+  const test_card3 = cardsInDeck('dragons').find(c => c.name === 'Blue Dragon');
   const test_cardRef3 = toCardRef(test_card3.deck, test_card3.slot);
   const test_card4 = cardsInDeck('undead').find(c => c.name === 'Ghost');
   const test_cardRef4 = toCardRef(test_card4.deck, test_card4.slot);
-  const test_card5 = cardsInDeck('drow').find(c => c.name === 'Chosen of Lolth');
+  const test_card5 = cardsInDeck('drow').find(c => c.name === 'Council Member');
   const test_cardRef5 = toCardRef(test_card5.deck, test_card5.slot);
-  //return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef),test_cardRef, test_card2, test_card3];
-  return [...Array(1).fill(nobleRef), test_cardRef, test_cardRef2, test_cardRef3, test_cardRef4];
+  //return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef)];
+  return [ ...Array(1).fill(nobleRef), test_cardRef, test_cardRef2, test_cardRef3, test_cardRef5];
   //return [...Array(4).fill(nobleRef), test_cardRef5];
 }
 
@@ -791,14 +791,34 @@ export const TyrantsGame: Game<TyrantsState> = {
           }
         }
         // Consume the trigger we were responding to.
-        G.pendingEotPromotions.shift();
+        const consumedTrigger = G.pendingEotPromotions.shift()!;
+
+        // If the consumed trigger was an Undead-type repeating promote (High
+        // Priest of Myrkul) AND the player just picked a card (didn't decline),
+        // check whether more Undead cards remain eligible. If so, re-insert the
+        // same trigger at the FRONT of the queue so it fires again before any
+        // other queued promotes.
+        if (idx != null && consumedTrigger.typeFilter === 'Undead') {
+          const stillEligible = eotEligibleIndices(G, consumedTrigger);
+          if (stillEligible.length > 0) {
+            G.pendingEotPromotions.unshift(consumedTrigger);
+          }
+        }
+
+        // Sort: Mandatory promotes are offered first, 
+        // followed by aspect=Obedience, then type=Undead, then optional.
+        // This allows the player to selectively reduce promotes, if desired.
+        G.pendingEotPromotions.sort((a, b) => {
+          const aObedience = a.aspectFilter === 'Obedience' ? 0 : 1;
+          const bObedience = b.aspectFilter === 'Obedience' ? 0 : 1;
+          const aUndead = a.typeFilter === 'Undead' ? 0 : 1;
+          const bUndead = b.typeFilter === 'Undead' ? 0 : 1;
+          const aOptional = a.optional === true ? 0 : 1;
+          const bOptional = b.optional === true ? 0 : 1;
+          return bObedience - aObedience || bUndead - aUndead || bOptional - aOptional;
+        });
+
         // Skip any subsequent triggers that have no other cards to promote.
-        // Trigger entries can include an optional aspectFilter (Air/Fire/Water
-        // Myrmidons restrict to Obedience); eligible cards must also match
-        // that aspect when the filter is set.
-        // Trigger entries can include an optional typeFilter (High Priest of
-        // Myrkul restrict to Undead); eligible cards must also match
-        // that type when the filter is set.
         while (G.pendingEotPromotions.length > 0) {
           const t = G.pendingEotPromotions[0];
           if (eotEligibleIndices(G, t).length > 0) break;
@@ -809,11 +829,6 @@ export const TyrantsGame: Game<TyrantsState> = {
           const eligible = eotEligibleIndices(G, t);
           const aspectTag = t.aspectFilter ? ` ${t.aspectFilter}` : '';
           const typeTag = t.typeFilter ? ` ${t.typeFilter}` : '';
-
-          if (t.typeFilter === 'Undead') {
-            G.pendingEotPromotions.length += (eligible.length - 1);
-          }
-
           G.pendingChoice = {
             kind: 'select-played-card',
             prompt: `End of turn — promote ${t.optional ? 'an optional' : 'a'}${aspectTag}${typeTag} card played this turn — ${t.optional ? 'you may decline this one' : `${t.name} requires it, so you must promote one`} (triggered by ${t.name}; ${G.pendingEotPromotions.length} remaining).`,
@@ -1077,20 +1092,25 @@ export const TyrantsGame: Game<TyrantsState> = {
       // If end-of-turn promotions are queued, surface a picker over cards played this turn
       // before actually ending the turn. resolveChoice handles the special '__eot__' kind.
       if (G.pendingEotPromotions.length > 0) {
+        // Sort: Mandatory promotes are offered first, 
+        // followed by aspect=Obedience, then type=Undead, then optional.
+        // This allows the player to selectively reduce promotes, if desired.
+        G.pendingEotPromotions.sort((a, b) => {
+          const aObedience = a.aspectFilter === 'Obedience' ? 0 : 1;
+          const bObedience = b.aspectFilter === 'Obedience' ? 0 : 1;
+          const aUndead = a.typeFilter === 'Undead' ? 0 : 1;
+          const bUndead = b.typeFilter === 'Undead' ? 0 : 1;
+          const aOptional = a.optional === true ? 0 : 1;
+          const bOptional = b.optional === true ? 0 : 1;
+          return bObedience - aObedience || bUndead - aUndead || bOptional - aOptional;
+        });
+
         const trigger = G.pendingEotPromotions[0];
         const eligible = eotEligibleIndices(G, trigger);
-        
-        if (trigger.typeFilter === 'Undead') {
-          G.pendingEotPromotions.length += (eligible.length - 1);
-        }
-
         if (eligible.length === 0) {
           // No eligible card to promote (either no other played card, or none
-          // matching the trigger's aspectFilter) — drop this trigger and try
-          // the next or finish.
-          if (trigger.typeFilter === 'Undead') {
-            Mechanics.log(G, '(High Priest of Myrkul: no Undead cards played this turn to promote)');
-          }
+          // matching the trigger's aspectFilter / typeFilter) — drop this trigger
+          // and try the next or finish.
           G.pendingEotPromotions.shift();
           while (G.pendingEotPromotions.length > 0) {
             const t = G.pendingEotPromotions[0];
