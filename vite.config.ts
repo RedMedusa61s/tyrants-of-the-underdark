@@ -29,6 +29,8 @@ function onlineApiPlugin(): Plugin {
       // No GitHub token needed on the Pages project.
       forwarder: new GitHubIssueForwarder({ endpoint: `${origin}/__report-problem` }),
       gameUrl: (id, token) => `${origin}/play/${id}?as=${token}`,
+      // Best-effort play counter (dev parity with the Pages Function).
+      playBeacon: { appId: 'tyrants' },
     });
   }
   return {
