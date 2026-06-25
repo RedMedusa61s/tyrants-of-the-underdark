@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 import type { BoardProps } from 'boardgame.io/react';
+import { recordPlay } from 'digital-boardgame-framework';
 import { TyrantsGame, BASE_ACTION_POWER_COST, COLORS, SELECTABLE_COLORS, type TyrantsState, type CardRef, type Color } from './game';
 import { MapView } from './components/MapView';
 import { CardCalibration } from './components/CardCalibration';
@@ -2012,6 +2013,26 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   );
 }
 
+/** Best-effort "N games played" counter from the games hub. Renders nothing
+ *  until/unless the count loads; never blocks or errors the dialog. */
+function GamesPlayedCount() {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch('https://games-hub-5vo.pages.dev/stats?game=tyrants')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (live && d && typeof d.count === 'number') setCount(d.count); })
+      .catch(() => { /* best-effort: hub down / offline — show nothing */ });
+    return () => { live = false; };
+  }, []);
+  if (count === null || count <= 0) return null;
+  return (
+    <div style={{ marginTop: -8, marginBottom: 16, fontSize: 12, opacity: 0.55 }}>
+      {count.toLocaleString()} game{count === 1 ? '' : 's'} played
+    </div>
+  );
+}
+
 function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   onStart: (cfg: GameConfig) => void;
   hasSave: boolean;
@@ -2062,7 +2083,8 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ background: '#1a1228', color: '#e6e1f2', border: '2px solid #3a2055', borderRadius: 8, padding: 32, minWidth: 420, maxWidth: 560 }}>
-        <h1 style={{ marginTop: 0 }}>Tyrants of the Underdark</h1>
+        <h1 style={{ marginTop: 0, marginBottom: 8 }}>Tyrants of the Underdark</h1>
+        <GamesPlayedCount />
         {hasSave && (
           <div style={{ marginBottom: 24, padding: 12, background: '#2a1840', borderRadius: 4 }}>
             <div style={{ marginBottom: 8 }}>A game in progress was found.</div>
@@ -2543,6 +2565,9 @@ export function App() {
   function startNew(cfg: GameConfig) {
     localStorage.removeItem(SAVE_KEY);
     localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+    // Best-effort play counter — local games are always one human seat plus AI
+    // opponents. Fires once per new game (not on resume / reload / per move).
+    recordPlay('tyrants', 'ai');
     setConfig(cfg);
   }
 
