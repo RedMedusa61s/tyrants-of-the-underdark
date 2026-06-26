@@ -181,25 +181,108 @@ registerAll({
   'intellect-devourer': chooseOne(
                           { label: '+3 Influence', handler: grant({ influence: 3 }) },
                           { label: 'Return up to 2 troops/spies',
-                            handler: times(2, chooseOne(
-                              { label: 'Return an enemy troop',
-                                handler: returnEnemyTroopChoice({ includeWhite: true }),
-                                available: playerCanReturnAnyTroop },
-                              { label: 'Return an enemy spy',
-                                handler: returnEnemySpyChoice(),
-                                available: playerCanReturnEnemySpy },
-                              { label: 'Return one of your own troops',
-                                handler: returnOwnTroopChoice(),
-                                available: playerHasOwnTroopOnBoard },
-                              { label: 'Return one of your own spies',
-                                handler: returnOwnSpyChoice({ optional: false }),
-                                available: playerHasOwnSpy },
-                            )),
+                            handler: (ctx => {
+                              interface S { remaining: number; childLabel?: string; childState?: unknown }
+
+                              const subHandlerFor = (label: string): EffectHandler | null => {
+                                switch (label) {
+                                  case 'Return an enemy troop':      return returnEnemyTroopChoice();
+                                  case 'Return an enemy spy':        return returnEnemySpyChoice();
+                                  case 'Return one of your troops':  return returnOwnTroopChoice({ optional: false });
+                                  case 'Return one of your spies':   return returnOwnSpyChoice({ optional: false });
+                                  default: return null;
+                                }
+                              };
+
+                              const buildOptions = (G: TyrantsState, actorId: string): string[] => {
+                                const opts: string[] = [];
+                                if (playerCanReturnEnemyTroop(G, actorId))   opts.push('Return an enemy troop');
+                                if (playerCanReturnEnemySpy(G, actorId))    opts.push('Return an enemy spy');
+                                if (playerHasOwnTroopOnBoard(G, actorId, {returnFailsafe: true }))   opts.push('Return one of your troops');
+                                if (playerHasOwnSpy(G, actorId))            opts.push('Return one of your spies');
+                                opts.push('Skip (done returning)');
+                                return opts;
+                              };
+
+                              let state = (ctx.handlerState as S | null) ?? { remaining: 2 };
+
+                              // Inner loop: keep running until we need player input or are done.
+                              while (true) {
+                                // --- Resume a suspended sub-handler ---
+                                if (state.childLabel) {
+                                  const sub = subHandlerFor(state.childLabel);
+                                  if (sub) {
+                                    const childCtx = { ...ctx, handlerState: state.childState ?? null };
+                                    const done = sub(childCtx);
+                                    ctx.pendingChoice = childCtx.pendingChoice;
+                                    ctx.paused = childCtx.paused;
+                                    if (!done) {
+                                      ctx.handlerState = { ...state, childState: childCtx.handlerState };
+                                      return false;
+                                    }
+                                    // Sub done — decrement and clear child tracking
+                                    state = { remaining: state.remaining - 1 };
+                                    ctx.pendingChoice = null;
+                                    ctx.paused = false;
+                                  } else {
+                                    state = { remaining: state.remaining - 1 };
+                                  }
+                                }
+
+                                // --- Done? ---
+                                if (state.remaining <= 0) { ctx.handlerState = null; return true; }
+
+                                // --- Show the choose-one prompt for this iteration ---
+                                if (!ctx.pendingChoice) {
+                                  const options = buildOptions(ctx.G, ctx.actorId);
+                                  ctx.pendingChoice = {
+                                    kind: 'choose-one',
+                                    prompt: `Return a troop or spy (${state.remaining} left) — optional.`,
+                                    options,
+                                    optional: false,
+                                  } as PendingChoice;
+                                  ctx.paused = true;
+                                  ctx.handlerState = { remaining: state.remaining };
+                                  return false;
+                                }
+
+                                // --- Process the choose-one response ---
+                                const idx = ctx.pendingChoice.response as number | null;
+                                ctx.pendingChoice = null;
+                                ctx.paused = false;
+                                if (idx == null) { ctx.handlerState = null; return true; }
+
+                                const options = buildOptions(ctx.G, ctx.actorId);
+                                const chosen = options[idx];
+
+                                if (!chosen || chosen === 'Skip (done returning)') {
+                                  ctx.handlerState = null;
+                                  return true;
+                                }
+
+                                // Delegate to sub-handler
+                                const sub = subHandlerFor(chosen)!;
+                                const childCtx = { ...ctx, handlerState: null };
+                                const done = sub(childCtx);
+                                ctx.pendingChoice = childCtx.pendingChoice;
+                                ctx.paused = childCtx.paused;
+                                if (!done) {
+                                  ctx.handlerState = { remaining: state.remaining, childLabel: chosen, childState: childCtx.handlerState };
+                                  return false;
+                                }
+                                // Sub completed synchronously — loop to next iteration
+                                state = { remaining: state.remaining - 1 };
+                                ctx.pendingChoice = null;
+                                ctx.paused = false;
+                                // continue while loop
+                              }
+                            }),
                             available: (G, actorId) =>
                               playerCanReturnAnyTroop(G, actorId) ||
                               playerCanReturnEnemySpy(G, actorId) ||
-                              playerHasOwnTroopOnBoard(G, actorId) ||
+                              playerHasOwnTroopOnBoard(G, actorId, {returnFailsafe: true }) ||
                               playerHasOwnSpy(G, actorId) }),
+
   // Cost 4 — Umber Hulk: deploy 3 + reactive (if-discarded). Deploy fires;
   //   reactive deferred.
   'umber-hulk':         deployChoice({ count: 3 }),

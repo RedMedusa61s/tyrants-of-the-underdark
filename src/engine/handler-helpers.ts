@@ -869,9 +869,22 @@ export function playerHasOwnSpy(G: import('../game').TyrantsState, actorId: stri
   return false;
 }
 
-export function playerHasOwnTroopOnBoard(G: import('../game').TyrantsState, actorId: string): boolean {
+export function playerHasOwnTroopOnBoard(G: import('../game').TyrantsState, actorId: string, opts?: {returnFailsafe?: boolean}): boolean {
   const color = G.players[actorId].color;
-  for (const t of Object.values(G.troops)) if (t === color) return true;
+  // This is a failsafe to avoid a player removing their only troop
+  const returnFailsafeOn = opts?.returnFailsafe ?? false;
+  if (returnFailsafeOn) {
+    let count = 0;
+    for (const t of Object.values(G.troops)) {
+      if (t === color) {
+        count++;
+        // Optional optimization: exit early as soon as we find at least 2
+        if (count >= 2) return true;
+      }
+    }
+  } else {
+    for (const t of Object.values(G.troops)) if (t === color) return true;
+  }
   return false;
 }
 
@@ -1119,62 +1132,78 @@ export function recruitFromMarketFiltered(opts: {
   aspect?: string;
   maxCost: number;
   includeAuxStacks?: boolean;
+  quantity?: number;
 }): EffectHandler {
+  const count = opts.quantity ?? 1;
   return ctx => {
-    if (!ctx.pendingChoice) {
-      const eligible: number[] = [];
-      for (let i = 0; i < ctx.G.market.row.length; i++) {
-        const c = ctx.G.market.row[i];
-        if (!c) continue;
-        const data = lookupCard(c.deck, c.slot);
-        if (!data) continue;
-        if (opts.aspect && data.aspect.toLowerCase() !== opts.aspect.toLowerCase()) continue;
-        if (data.cost > opts.maxCost) continue;
-        eligible.push(i);
-      }
-      if (opts.includeAuxStacks) {
-        // House Guard: cost 3, drow/Obedience. Priestess of Lolth: cost 5,
-        // drow/Obedience. Aspect filter applies; both are Obedience.
+    let state = (ctx.handlerState as { remaining: number } | null) ?? { remaining: count };
+
+    // 1. Process the prior response, if any.
+    if (ctx.pendingChoice) {
+      const idx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (idx == null) { ctx.handlerState = null; return true; } // declined mid-sequence
+      if (idx === -1) {
         const HG = lookupCard('house-guards', 40);
+        if (HG) Mechanics.recruitFromAuxStack(ctx.G, ctx.actorId, 'houseGuards',
+          { deck: HG.deck, slot: HG.slot, name: HG.name, image: HG.image });
+      } else if (idx === -2) {
         const PR = lookupCard('priestesses', 43);
-        if (HG && ctx.G.auxStacks.houseGuards > 0
-          && HG.cost <= opts.maxCost
-          && (!opts.aspect || HG.aspect.toLowerCase() === opts.aspect.toLowerCase())) {
-          eligible.push(-1);
-        }
-        if (PR && ctx.G.auxStacks.priestesses > 0
-          && PR.cost <= opts.maxCost
-          && (!opts.aspect || PR.aspect.toLowerCase() === opts.aspect.toLowerCase())) {
-          eligible.push(-2);
-        }
+        if (PR) Mechanics.recruitFromAuxStack(ctx.G, ctx.actorId, 'priestesses',
+          { deck: PR.deck, slot: PR.slot, name: PR.name, image: PR.image });
+      } else {
+        Mechanics.recruitFromMarket(ctx.G, ctx.actorId, idx);
       }
-      if (eligible.length === 0) return true;
-      const label = opts.aspect ? `${opts.aspect} card` : 'card';
-      ctx.pendingChoice = {
-        kind: 'select-market-card',
-        prompt: `Recruit a ${label} costing ≤${opts.maxCost} (free).`,
-        options: eligible,
-        optional: true,
-      } as PendingChoice;
-      ctx.paused = true;
-      return false;
+      state = { remaining: state.remaining - 1 };
     }
-    const idx = ctx.pendingChoice.response as number | null;
-    ctx.pendingChoice = null;
-    ctx.paused = false;
-    if (idx == null) return true;
-    if (idx === -1) {
+
+    // 2. Set up next prompt or finish.
+    if (state.remaining <= 0) { ctx.handlerState = null; return true; }
+    const eligible: number[] = [];
+    for (let i = 0; i < ctx.G.market.row.length; i++) {
+      const c = ctx.G.market.row[i];
+      if (!c) continue;
+      const data = lookupCard(c.deck, c.slot);
+      if (!data) continue;
+      if (opts.aspect && data.aspect.toLowerCase() !== opts.aspect.toLowerCase()) continue;
+      if (data.cost > opts.maxCost) continue;
+      eligible.push(i);
+    }
+    if (opts.includeAuxStacks) {
+      // House Guard: cost 3, drow/Obedience. Priestess of Lolth: cost 5,
+      // drow/Obedience. Aspect filter applies; both are Obedience.
       const HG = lookupCard('house-guards', 40);
-      if (HG) Mechanics.recruitFromAuxStack(ctx.G, ctx.actorId, 'houseGuards',
-        { deck: HG.deck, slot: HG.slot, name: HG.name, image: HG.image });
-    } else if (idx === -2) {
       const PR = lookupCard('priestesses', 43);
-      if (PR) Mechanics.recruitFromAuxStack(ctx.G, ctx.actorId, 'priestesses',
-        { deck: PR.deck, slot: PR.slot, name: PR.name, image: PR.image });
-    } else {
-      Mechanics.recruitFromMarket(ctx.G, ctx.actorId, idx);
+      if (HG && ctx.G.auxStacks.houseGuards > 0
+        && HG.cost <= opts.maxCost
+        && (!opts.aspect || HG.aspect.toLowerCase() === opts.aspect.toLowerCase())) {
+        eligible.push(-1);
+      }
+      if (PR && ctx.G.auxStacks.priestesses > 0
+        && PR.cost <= opts.maxCost
+        && (!opts.aspect || PR.aspect.toLowerCase() === opts.aspect.toLowerCase())) {
+        eligible.push(-2);
+      }
     }
-    return true;
+    if (eligible.length === 0) {
+      if (state.remaining < count) {
+        Mechanics.log(ctx.G, `(recruit: market layout changed or lacks eligible targets — remaining picks skipped)`);
+      }
+      ctx.handlerState = null;
+      return true;
+    }
+    const label = opts.aspect ? `${opts.aspect} card` : 'card';
+    const quantityTag = count > 1 ? ` (${state.remaining} left)` : '';
+    ctx.pendingChoice = {
+      kind: 'select-market-card',
+      prompt: `Recruit a ${label} costing ≤${opts.maxCost} (free). ${quantityTag}`,
+      options: eligible,
+      optional: true,
+    } as PendingChoice;
+    ctx.paused = true;
+    ctx.handlerState = state;
+    return false;
   };
 }
 
