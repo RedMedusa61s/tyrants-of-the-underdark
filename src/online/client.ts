@@ -63,8 +63,15 @@ export function makeClient(gameId: string, token: string): GameClientApi<BgioSta
   const base = `/api/games/${gameId}`;
   const q = `?as=${encodeURIComponent(token)}`;
   const json = async (r: Response): Promise<any> => {
-    const data: any = await r.json();
-    if (!r.ok) throw new Error((data && data.error) || `HTTP ${r.status}`);
+    // Read as text first so an HTML response (e.g. the SPA 404 page served when a
+    // request lands mid-deploy) yields a clear message instead of a cryptic
+    // "Unexpected token '<' … is not valid JSON".
+    const text = await r.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
+    if (!r.ok || data === null) {
+      throw new Error((data && data.error) || `Server error (HTTP ${r.status}). Please reload and try again.`);
+    }
     return data;
   };
   return {
@@ -92,8 +99,15 @@ export function makeMessagingClient(gameId: string, token: string): MessagingCli
   const base = `/api/games/${gameId}/chat`;
   const q = `?as=${encodeURIComponent(token)}`;
   const json = async (r: Response): Promise<any> => {
-    const data: any = await r.json();
-    if (!r.ok) throw new Error((data && data.error) || `HTTP ${r.status}`);
+    // Read as text first so an HTML response (e.g. the SPA 404 page served when a
+    // request lands mid-deploy) yields a clear message instead of a cryptic
+    // "Unexpected token '<' … is not valid JSON".
+    const text = await r.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
+    if (!r.ok || data === null) {
+      throw new Error((data && data.error) || `Server error (HTTP ${r.status}). Please reload and try again.`);
+    }
     return data;
   };
   return {

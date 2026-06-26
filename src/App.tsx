@@ -955,6 +955,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     }
   };
   const logClick = (kind: string, target: string, extras?: Record<string, unknown>) => {
+    if (!import.meta.env.DEV) return; // dev-only telemetry; the endpoint 404s in prod
     fetch('/__log-click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
