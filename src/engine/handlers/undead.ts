@@ -155,7 +155,7 @@ registerAll({
                            { label: 'Return a spy → free-recruit up to 2 cards (cost ≤3)',
                              handler: sequence(
                                returnOwnSpyChoice(),
-                               recruitFromMarketFiltered({ maxCost: 3, includeAuxStacks: true, quantity: 2 })),
+                               recruitFromMarketFiltered({ maxCost: 3, includeAuxStacks: true, quantity: 2, optional: true })),
                              available: playerHasOwnSpy }),
   // Cost 5 — Necromancer: chooseOne over four branches per the printed
   //   text — "+3 money OR promote this card OR promote a card from your
