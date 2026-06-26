@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useIdentity, Leaderboard, SignInBar } from 'digital-boardgame-framework/client';
 import { createGame, fetchStatus, deleteGame, type Invites } from './client';
 import { listMyGames, rememberCreatedGame, forgetGame, type MyGame } from './myGames';
 import type { PlayerId } from '../adapter/tyrantsAdapter';
@@ -30,9 +31,13 @@ export function Lobby() {
   return (
     <div style={{ maxWidth: 700 }}>
       <h1>Tyrants of the Underdark — Online</h1>
+      <SignInBar />
       <p style={{ color: '#aab' }}>
         Minimal async multiplayer. Pick a player count, create a game, send one
         link per seat (or open them in separate tabs).
+      </p>
+      <p style={{ marginTop: -4 }}>
+        <a href="/" style={{ color: '#6cf' }}>← Play solo / vs AI / hotseat (main game)</a>
       </p>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
@@ -63,9 +68,26 @@ export function Lobby() {
       )}
 
       <GamesInProgress reloadKey={reloadKey} />
+
+      <div style={{ marginTop: 36 }}>
+        <h2 style={{ fontSize: 18 }}>Leaderboard</h2>
+        <p style={{ color: '#778', fontSize: 12, marginTop: -4 }}>
+          Per-game ratings (Glicko-2). Anon players are provisional (*); sign in
+          to make your rating permanent and carry it across devices. ·{' '}
+          <a href={`${HUB_URL}/leaderboard?game=tyrants`} target="_blank" rel="noopener"
+             style={{ color: '#6cf' }}>open full page ↗</a>
+        </p>
+        <TyrantsLeaderboard />
+      </div>
+
       <MoreGames />
     </div>
   );
+}
+
+function TyrantsLeaderboard() {
+  const { identity } = useIdentity();
+  return <Leaderboard game="tyrants" highlightPlayerId={identity?.playerId} />;
 }
 
 /** The cross-game hub's canonical URL. Its games.json is the single source of

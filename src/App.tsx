@@ -963,6 +963,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     }
   };
   const logClick = (kind: string, target: string, extras?: Record<string, unknown>) => {
+    if (!import.meta.env.DEV) return; // dev-only telemetry; the endpoint 404s in prod
     fetch('/__log-click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2014,7 +2015,23 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
         <details style={{ marginTop: 24 }}>
           <summary style={{ cursor: 'pointer', opacity: 0.7 }}>Log ({G.log.length})</summary>
-          <pre style={{ fontSize: 12, opacity: 0.7 }}>{G.log.slice(-20).reverse().join('\n')}</pre>
+          {/* Full log, newest first, in a scrollable + wrapping panel. The old
+              <pre> showed only the last 20 lines and, being preformatted, ran
+              long lines off-screen with no scroll — so most of the game was
+              unviewable here. */}
+          <div style={{
+            marginTop: 6, fontSize: 12, opacity: 0.85,
+            maxHeight: '40vh', overflowY: 'auto',
+            background: '#0c0814', borderRadius: 4, padding: '6px 8px',
+          }}>
+            {G.log.length === 0
+              ? <div style={{ opacity: 0.5 }}>(no log entries yet)</div>
+              : G.log.slice().reverse().map((line, i) => (
+                <div key={i} style={{ padding: '1px 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  <CardLogText line={line} />
+                </div>
+              ))}
+          </div>
         </details>
       </>}
     </div>

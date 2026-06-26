@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-import { GameServer, NoopNotifier } from 'digital-boardgame-framework/server';
+import { GameServer, NoopNotifier, verifyIdentityToken, type Jwks } from 'digital-boardgame-framework/server';
 import { versionStamp } from 'digital-boardgame-framework/vite';
 import { FsStore } from 'digital-boardgame-framework/server/node';
 import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from './src/adapter/tyrantsAdapter';
@@ -18,12 +18,24 @@ import { GitHubIssueForwarder } from './src/online/githubIssueForwarder';
 // (node:fs) is fine here: this code only ever runs in the Vite dev server.
 function onlineApiPlugin(): Plugin {
   const store = new FsStore('./.dev-store');
+  let jwks: Jwks | undefined; let jwksAt = 0;
+  const getJwks = async (): Promise<Jwks> => {
+    if (!jwks || Date.now() - jwksAt > 3_600_000) {
+      jwks = (await (await fetch('https://games-hub-5vo.pages.dev/id/jwks')).json()) as Jwks;
+      jwksAt = Date.now();
+    }
+    return jwks;
+  };
   function makeServer(origin: string) {
     return new GameServer<BgioState, TyrantsAction, PlayerId>({
       adapter: tyrantsAdapter,
       codec: snapshotCodec(),
       store,
       notifier: new NoopNotifier(),
+      // Dev parity: verify hub identity tokens for claimSeat. Ratings auto-report
+      // is left OFF in dev (no ingest key) so local games don't hit the real
+      // leaderboard.
+      verifyIdentity: async (t) => verifyIdentityToken(t, await getJwks()),
       // Dev parity: forward to the LOCAL /__report-problem middleware (files a
       // GitHub issue if TOTU_BUGREPORT_TOKEN/REPO are set, else writes to disk).
       // No GitHub token needed on the Pages project.

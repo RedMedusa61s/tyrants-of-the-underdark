@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
-import { useGame, ChatPanel } from 'digital-boardgame-framework/client';
-import { makeClient, makeMessagingClient } from './client';
+import { useGame, ChatPanel, useIdentity, SignInBar } from 'digital-boardgame-framework/client';
+import { makeClient, makeMessagingClient, claimSeat } from './client';
 import { rememberOpenedGame } from './myGames';
 import { Board, BoardModeContext, type OnlineReportCategory } from '../App';
 import { AI_VERSION } from '../ai-version';
@@ -55,14 +55,29 @@ function makeMovesProxy(
 }
 
 export function OnlinePlay({ gameId, token }: { gameId: string; token: string }) {
-  const client = useMemo(() => makeClient(gameId, token), [gameId, token]);
+  // Identity (anon or signed-in), kept in a ref so each move carries it to the
+  // server — per-move attribution is robust + race-free (turns are sequential).
+  const { identity } = useIdentity();
+  const identityTokenRef = useRef<string | undefined>(undefined);
+  identityTokenRef.current = identity?.token;
+
+  const client = useMemo(
+    () => makeClient(gameId, token, () => identityTokenRef.current),
+    [gameId, token],
+  );
   const messagingClient = useMemo(() => makeMessagingClient(gameId, token), [gameId, token]);
-  const { view, yourTurn, you, submit, loading, error } =
-    useGame<BgioState, TyrantsAction>(client, { pollMs: 2000 });
+  const { view, yourTurn, gameOver, you, ranked, submit, loading, error } =
+    useGame<BgioState, TyrantsAction>(client, { pollMs: 2000, trackLegalActions: false });
 
   useEffect(() => {
     if (you != null) rememberOpenedGame(gameId, you as PlayerId, token);
   }, [you, gameId, token]);
+
+  // Also claim on load (covers a game where you never get a turn). Per-move
+  // attribution above is the primary, more reliable path.
+  useEffect(() => {
+    if (identity?.token) void claimSeat(gameId, token, identity.token);
+  }, [identity?.token, gameId, token]);
 
   // submit() returns a Promise; the board calls moves.x(...) synchronously and
   // ignores the result, so we fire-and-forget and let useGame re-fetch.
@@ -193,6 +208,23 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
 
   return (
     <BoardModeContext.Provider value={{ isOnline: true, mySeat: (you ?? '0') as string, onlineError: error, reportProblem }}>
+      {/* Invite-link joiners skip the lobby, so surface sign-in here too —
+          signing in redirects back to this game URL and re-attributes the seat
+          to the now-registered identity. Guests are still rated (provisional). */}
+      <div style={{ padding: '0 12px' }}>
+        <SignInBar leaderboardHref="https://games-hub-5vo.pages.dev/leaderboard?game=tyrants" />
+        {gameOver && ranked && (
+          <p style={{ margin: '0 0 8px', fontSize: 14, color: ranked.recorded ? '#6c6' : '#caa' }}>
+            {ranked.recorded
+              ? '✓ Recorded to the leaderboard.'
+              : ranked.reason === 'one-player'
+                ? 'Not ranked — both seats were the same player (you need two different people/identities).'
+                : ranked.reason === 'no-identities'
+                  ? 'Not ranked — no identities were attached to the seats.'
+                  : "Not ranked — couldn't reach the leaderboard."}
+          </p>
+        )}
+      </div>
       <Board {...boardProps} />
       {humanSeatCount >= 2 && (
         <ChatPanel client={messagingClient} you={(you ?? '0') as string} seatLabel={labelForSeat} />
