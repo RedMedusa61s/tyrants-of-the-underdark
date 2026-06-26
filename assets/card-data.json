@@ -11,7 +11,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "Supplant white troop"
+      "supplant white troop"
     ],
     "effectKey": "advance-scout",
     "_matchedSheet": true
@@ -28,7 +28,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "Supplant white troop"
+      "supplant white troop"
     ],
     "effectKey": "advance-scout",
     "_matchedSheet": true
@@ -45,7 +45,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "Supplant white troop"
+      "supplant white troop"
     ],
     "effectKey": "advance-scout",
     "_matchedSheet": true
@@ -62,8 +62,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "2 money",
-      "eot promote a card"
+      "or +2 money",
+      "or eot promote a card"
     ],
     "effectKey": "advocate",
     "_matchedSheet": true
@@ -80,8 +80,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "2 money",
-      "eot promote a card"
+      "or +2 money",
+      "or eot promote a card"
     ],
     "effectKey": "advocate",
     "_matchedSheet": true
@@ -98,8 +98,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "2 money",
-      "eot promote a card"
+      "or +2 money",
+      "or eot promote a card"
     ],
     "effectKey": "advocate",
     "_matchedSheet": true
@@ -116,8 +116,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "2 money",
-      "eot promote a card"
+      "or +2 money",
+      "or eot promote a card"
     ],
     "effectKey": "advocate",
     "_matchedSheet": true
@@ -134,8 +134,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or assassinate"
+      "or +2 attack",
+      "or assassinate a troop"
     ],
     "effectKey": "blackguard",
     "_matchedSheet": true
@@ -152,8 +152,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or assassinate"
+      "or +2 attack",
+      "or assassinate a troop"
     ],
     "effectKey": "blackguard",
     "_matchedSheet": true
@@ -170,8 +170,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or assassinate"
+      "or +2 attack",
+      "or assassinate a troop"
     ],
     "effectKey": "blackguard",
     "_matchedSheet": true
@@ -188,8 +188,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or assassinate"
+      "or +2 attack",
+      "or assassinate a troop"
     ],
     "effectKey": "blackguard",
     "_matchedSheet": true
@@ -206,7 +206,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "3 atk"
+      "+3 attack"
     ],
     "effectKey": "bounty-hunter",
     "_matchedSheet": true
@@ -223,7 +223,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "3 atk"
+      "+3 attack"
     ],
     "effectKey": "bounty-hunter",
     "_matchedSheet": true
@@ -240,7 +240,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "return troop or spy",
+      "return another player's troop/spy",
       "eot promote a card played"
     ],
     "effectKey": "chosen-of-lolth",
@@ -258,7 +258,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "return troop or spy",
+      "return another player's troop/spy",
       "eot promote a card played"
     ],
     "effectKey": "chosen-of-lolth",
@@ -276,7 +276,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "move 2 enemy troops",
+      "move up to 2 enemy troops",
       "eot promote played card"
     ],
     "effectKey": "council-member",
@@ -311,7 +311,7 @@
     "type": "Doppleganger",
     "rarity": 1,
     "benefits": [
-      "supplant"
+      "supplant a troop"
     ],
     "effectKey": "doppelganger",
     "_matchedSheet": true
@@ -328,7 +328,7 @@
     "type": "Doppleganger",
     "rarity": 1,
     "benefits": [
-      "supplant"
+      "supplant a troop"
     ],
     "effectKey": "doppelganger",
     "_matchedSheet": true
@@ -345,7 +345,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "If there are 4+ cards promoted, gain 3 money.",
+      "If there are 4+ cards promoted, +3 money.",
       "eot promote a card played this turn"
     ],
     "effectKey": "drow-negotiator",
@@ -363,7 +363,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "If there are 4+ cards promoted, gain 3 money.",
+      "If there are 4+ cards promoted, +3 money.",
       "eot promote a card played this turn"
     ],
     "effectKey": "drow-negotiator",
@@ -381,7 +381,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "spy, troop there for 1 attack"
+      "place spy, then if another player's troop there, +1 attack"
     ],
     "effectKey": "infiltrator",
     "_matchedSheet": true
@@ -398,7 +398,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "spy, troop there for 1 attack"
+      "place spy, then if another player's troop there, +1 attack"
     ],
     "effectKey": "infiltrator",
     "_matchedSheet": true
@@ -415,8 +415,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return spy for 3 cards"
+      "or place spy",
+      "or return spy to draw 3 cards"
     ],
     "effectKey": "information-broker",
     "_matchedSheet": true
@@ -433,8 +433,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return spy for 3 cards"
+      "or place spy",
+      "or return spy to draw 3 cards"
     ],
     "effectKey": "information-broker",
     "_matchedSheet": true
@@ -451,8 +451,8 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or 2 money",
-      "or assassinate"
+      "or +2 money",
+      "or assassinate a troop"
     ],
     "effectKey": "inquisitor",
     "_matchedSheet": true
@@ -506,7 +506,7 @@
     "rarity": 1,
     "benefits": [
       "or place 2 spies",
-      "or return a spy for 4 atk"
+      "or return a spy to +4 attack"
     ],
     "effectKey": "masters-of-sorcere",
     "_matchedSheet": true
@@ -541,8 +541,9 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
+      "choose 3 times:",
       "or deploy a troop",
-      "or assassinate white troop"
+      "or assassinate a white troop"
     ],
     "effectKey": "weaponmaster",
     "_matchedSheet": true
@@ -593,7 +594,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "spy"
+      "place spy"
     ],
     "effectKey": "spy-master",
     "_matchedSheet": true
@@ -610,7 +611,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "spy"
+      "place spy"
     ],
     "effectKey": "spy-master",
     "_matchedSheet": true
@@ -627,7 +628,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return spy to supplant a troop there"
     ],
     "effectKey": "spellspinner",
@@ -645,7 +646,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return spy to supplant a troop there"
     ],
     "effectKey": "spellspinner",
@@ -663,7 +664,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return spy to supplant a troop there"
     ],
     "effectKey": "spellspinner",
@@ -681,7 +682,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "3 troops"
+      "deploy 3 troops"
     ],
     "effectKey": "mercenary-squad",
     "_matchedSheet": true
@@ -698,7 +699,7 @@
     "type": "Drow",
     "rarity": 1,
     "benefits": [
-      "3 troops"
+      "deploy 3 troops"
     ],
     "effectKey": "mercenary-squad",
     "_matchedSheet": true
@@ -733,7 +734,7 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "1 money",
+      "+1 money",
       "assassinate a white troop"
     ],
     "effectKey": "black-wyrmling",
@@ -751,7 +752,7 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "1 money",
+      "+1 money",
       "assassinate a white troop"
     ],
     "effectKey": "black-wyrmling",
@@ -769,7 +770,7 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "eot promote 2 other cards",
+      "eot promote up to 2 other cards",
       "1vp per 3 promoted cards"
     ],
     "effectKey": "blue-dragon",
@@ -787,8 +788,8 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "3 money",
-      "return a troop or spy"
+      "+3 money",
+      "return another player's troop/spy"
     ],
     "effectKey": "blue-wyrmling",
     "_matchedSheet": true
@@ -805,8 +806,8 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "3 money",
-      "return a troop or spy"
+      "+3 money",
+      "return another player's troop/spy"
     ],
     "effectKey": "blue-wyrmling",
     "_matchedSheet": true
@@ -823,7 +824,7 @@
     "type": "Troglodyte",
     "rarity": 1,
     "benefits": [
-      "Move an enemy troop",
+      "move an enemy troop",
       "eot promote a played card"
     ],
     "effectKey": "cleric-of-laogzed",
@@ -841,7 +842,7 @@
     "type": "Troglodyte",
     "rarity": 1,
     "benefits": [
-      "Move an enemy troop",
+      "move an enemy troop",
       "eot promote a played card"
     ],
     "effectKey": "cleric-of-laogzed",
@@ -859,7 +860,7 @@
     "type": "Half-Dragon",
     "rarity": 1,
     "benefits": [
-      "2 money",
+      "+2 money",
       "may devour a market card"
     ],
     "effectKey": "cult-fanatic",
@@ -877,7 +878,7 @@
     "type": "Half-Dragon",
     "rarity": 1,
     "benefits": [
-      "2 money",
+      "+2 money",
       "may devour a market card"
     ],
     "effectKey": "cult-fanatic",
@@ -895,8 +896,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or 2 money"
+      "or +2 attack",
+      "or +2 money"
     ],
     "effectKey": "dragon-cultist",
     "_matchedSheet": true
@@ -913,8 +914,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or 2 money"
+      "or +2 attack",
+      "or +2 money"
     ],
     "effectKey": "dragon-cultist",
     "_matchedSheet": true
@@ -931,8 +932,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or 2 money"
+      "or +2 attack",
+      "or +2 money"
     ],
     "effectKey": "dragon-cultist",
     "_matchedSheet": true
@@ -949,8 +950,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or 2 money"
+      "or +2 attack",
+      "or +2 money"
     ],
     "effectKey": "dragon-cultist",
     "_matchedSheet": true
@@ -967,8 +968,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "assassinate a troop",
-      "5 trophies ? 2 attack"
+      "assassinate a troop, ",
+      "then 5 trophies ? +2 attack"
     ],
     "effectKey": "dragonclaw",
     "_matchedSheet": true
@@ -985,8 +986,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "assassinate a troop",
-      "5 trophies ? 2 attack"
+      "assassinate a troop, ",
+      "then 5 trophies ? +2 attack"
     ],
     "effectKey": "dragonclaw",
     "_matchedSheet": true
@@ -1003,8 +1004,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "spy",
-      "return spy 4 attack"
+      "or place spy",
+      "or return spy to +4 attack"
     ],
     "effectKey": "enchanter-of-thay",
     "_matchedSheet": true
@@ -1021,8 +1022,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "spy",
-      "return spy 4 attack"
+      "or place spy",
+      "or return spy to +4 attack"
     ],
     "effectKey": "enchanter-of-thay",
     "_matchedSheet": true
@@ -1039,8 +1040,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "spy",
-      "return spy 4 attack"
+      "or place spy",
+      "or return spy to +4 attack"
     ],
     "effectKey": "enchanter-of-thay",
     "_matchedSheet": true
@@ -1057,8 +1058,8 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "or spy, supplant troop there",
-      "or return spy, supplant a troop there, 1vp for each site control marker you have"
+      "or place spy, supplant troop there",
+      "or return spy to supplant a troop there, 1vp for each site control marker you have"
     ],
     "effectKey": "green-dragon",
     "_matchedSheet": true
@@ -1075,8 +1076,7 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "place a spy",
-      "if another player's troop there, 2 money"
+      "place spy, then if another player's troop there, +2 money"
     ],
     "effectKey": "green-wyrmling",
     "_matchedSheet": true
@@ -1093,8 +1093,7 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "place a spy",
-      "if another player's troop there, 2 money"
+      "place spy, then if another player's troop there, +2 money"
     ],
     "effectKey": "green-wyrmling",
     "_matchedSheet": true
@@ -1112,7 +1111,7 @@
     "rarity": 1,
     "benefits": [
       "draw 2 cards",
-      "spy"
+      "place spy"
     ],
     "effectKey": "rath-modar",
     "_matchedSheet": true
@@ -1130,7 +1129,8 @@
     "rarity": 1,
     "benefits": [
       "supplant a troop",
-      "return enemy spy, 1vp for each total controlled site"
+      "return enemy spy",
+      "1vp for each total controlled site"
     ],
     "effectKey": "red-dragon",
     "_matchedSheet": true
@@ -1147,7 +1147,7 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "2 atk 2 money"
+      "+2 attack +2 money"
     ],
     "effectKey": "red-wyrmling",
     "_matchedSheet": true
@@ -1164,7 +1164,7 @@
     "type": "Dragon",
     "rarity": 1,
     "benefits": [
-      "2 atk 2 money"
+      "+2 attack +2 money"
     ],
     "effectKey": "red-wyrmling",
     "_matchedSheet": true
@@ -1181,7 +1181,7 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "5 atk"
+      "+5 attack"
     ],
     "effectKey": "severin-silrajin",
     "_matchedSheet": true
@@ -1198,7 +1198,7 @@
     "type": "Dwarf",
     "rarity": 1,
     "benefits": [
-      "1 money",
+      "+1 money",
       "eot promote a played card"
     ],
     "effectKey": "wyrmspeaker",
@@ -1216,7 +1216,7 @@
     "type": "Dwarf",
     "rarity": 1,
     "benefits": [
-      "1 money",
+      "+1 money",
       "eot promote a played card"
     ],
     "effectKey": "wyrmspeaker",
@@ -1234,7 +1234,7 @@
     "type": "Dwarf",
     "rarity": 1,
     "benefits": [
-      "1 money",
+      "+1 money",
       "eot promote a played card"
     ],
     "effectKey": "wyrmspeaker",
@@ -1253,7 +1253,7 @@
     "rarity": 1,
     "benefits": [
       "deploy 2 troops",
-      "may discard a card in market"
+      "may devour a card in market"
     ],
     "effectKey": "white-wyrmling",
     "_matchedSheet": true
@@ -1271,7 +1271,7 @@
     "rarity": 1,
     "benefits": [
       "deploy 2 troops",
-      "may discard a card in market"
+      "may devour a card in market"
     ],
     "effectKey": "white-wyrmling",
     "_matchedSheet": true
@@ -1289,7 +1289,7 @@
     "rarity": 1,
     "benefits": [
       "deploy 2 troops",
-      "may discard a card in market"
+      "may devour a card in market"
     ],
     "effectKey": "white-wyrmling",
     "_matchedSheet": true
@@ -1360,8 +1360,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return spy for 3 money"
+      "or place spy",
+      "or return spy to +3 money"
     ],
     "effectKey": "watcher-of-thay",
     "_matchedSheet": true
@@ -1378,8 +1378,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return spy for 3 money"
+      "or place spy",
+      "or return spy to +3 money"
     ],
     "effectKey": "watcher-of-thay",
     "_matchedSheet": true
@@ -1396,8 +1396,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return spy for 3 money"
+      "or place spy",
+      "or return spy to +3 money"
     ],
     "effectKey": "watcher-of-thay",
     "_matchedSheet": true
@@ -1432,8 +1432,9 @@
     "type": "Elf",
     "rarity": 1,
     "benefits": [
-      "1 attack, spy",
-      "recruite a guile card that costs 4 or less"
+      "+1 attack",
+      "place spy",
+      "recruite a Guile card that costs 4 or less"
     ],
     "effectKey": "aerisi-kalinoth",
     "_matchedSheet": true
@@ -1450,7 +1451,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return a spy to deploy 3 troops",
       "focus: draw a card"
     ],
@@ -1469,7 +1470,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return a spy to deploy 3 troops",
       "focus: draw a card"
     ],
@@ -1488,7 +1489,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return a spy to deploy 3 troops",
       "focus: draw a card"
     ],
@@ -1507,7 +1508,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return a spy to deploy 3 troops",
       "focus: draw a card"
     ],
@@ -1526,7 +1527,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "spy",
+      "place spy",
       "eot promote an Obedience card played this turn"
     ],
     "effectKey": "air-elemental-myrmidon",
@@ -1544,7 +1545,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "spy",
+      "place spy",
       "eot promote an Obedience card played this turn"
     ],
     "effectKey": "air-elemental-myrmidon",
@@ -1563,7 +1564,7 @@
     "rarity": 1,
     "benefits": [
       "eot promote another played card",
-      "focus: 2 money"
+      "focus: +2 money"
     ],
     "effectKey": "black-earth-cultist",
     "_matchedSheet": true
@@ -1581,7 +1582,7 @@
     "rarity": 1,
     "benefits": [
       "eot promote another played card",
-      "focus: 2 money"
+      "focus: +2 money"
     ],
     "effectKey": "black-earth-cultist",
     "_matchedSheet": true
@@ -1599,7 +1600,7 @@
     "rarity": 1,
     "benefits": [
       "eot promote another played card",
-      "focus: 2 money"
+      "focus: +2 money"
     ],
     "effectKey": "black-earth-cultist",
     "_matchedSheet": true
@@ -1617,7 +1618,7 @@
     "rarity": 1,
     "benefits": [
       "eot promote another played card",
-      "focus: 2 money"
+      "focus: +2 money"
     ],
     "effectKey": "black-earth-cultist",
     "_matchedSheet": true
@@ -1688,8 +1689,8 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "1 money",
-      "return another troops/spy",
+      "+1 money",
+      "return another player's troop/spy",
       "focus: draw a card"
     ],
     "effectKey": "earth-elemental",
@@ -1707,8 +1708,8 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "1 money",
-      "return another troops/spy",
+      "+1 money",
+      "return another player's troop/spy",
       "focus: draw a card"
     ],
     "effectKey": "earth-elemental",
@@ -1726,7 +1727,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "2 money",
+      "+2 money",
       "eot promote another played card"
     ],
     "effectKey": "earth-elemental-myrmidon",
@@ -1744,7 +1745,7 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "2 money",
+      "+2 money",
       "eot promote another played card"
     ],
     "effectKey": "earth-elemental-myrmidon",
@@ -1763,7 +1764,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate a troop",
-      "focus: 2 attack"
+      "focus: +2 attack"
     ],
     "effectKey": "eternal-flame-cultist",
     "_matchedSheet": true
@@ -1781,7 +1782,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate a troop",
-      "focus: 2 attack"
+      "focus: +2 attack"
     ],
     "effectKey": "eternal-flame-cultist",
     "_matchedSheet": true
@@ -1799,7 +1800,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate a troop",
-      "focus: 2 attack"
+      "focus: +2 attack"
     ],
     "effectKey": "eternal-flame-cultist",
     "_matchedSheet": true
@@ -1816,8 +1817,8 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or 2 money",
+      "or +2 attack",
+      "or +2 money",
       "focus: draw a card"
     ],
     "effectKey": "fire-elemental",
@@ -1835,8 +1836,8 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or 2 money",
+      "or +2 attack",
+      "or +2 money",
       "focus: draw a card"
     ],
     "effectKey": "fire-elemental",
@@ -1854,8 +1855,8 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "or 2 attack",
-      "or 2 money",
+      "or +2 attack",
+      "or +2 money",
       "focus: draw a card"
     ],
     "effectKey": "fire-elemental",
@@ -1873,8 +1874,8 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "2 attack",
-      "eot promote an obedience card played this turn"
+      "+2 attack",
+      "eot promote an Obedience card played this turn"
     ],
     "effectKey": "fire-elemental-myrmidon",
     "_matchedSheet": true
@@ -1891,8 +1892,8 @@
     "type": "Elemental",
     "rarity": 1,
     "benefits": [
-      "2 attack",
-      "eot promote an obedience card played this turn"
+      "+2 attack",
+      "eot promote an Obedience card played this turn"
     ],
     "effectKey": "fire-elemental-myrmidon",
     "_matchedSheet": true
@@ -1910,7 +1911,7 @@
     "rarity": 1,
     "benefits": [
       "deploy 3 troops",
-      "recruit a conquest card that costs 4 or less"
+      "recruit a Conquest card that costs 4 or less"
     ],
     "effectKey": "gar-shatterkeel",
     "_matchedSheet": true
@@ -1927,9 +1928,9 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return a spy 3 money",
-      "focus: 1 attack"
+      "or place spy",
+      "or return a spy to +3 money",
+      "focus: +1 attack"
     ],
     "effectKey": "howling-hatred-cultist",
     "_matchedSheet": true
@@ -1946,9 +1947,9 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return a spy 3 money",
-      "focus: 1 attack"
+      "or place spy",
+      "or return a spy to +3 money",
+      "focus: +1 attack"
     ],
     "effectKey": "howling-hatred-cultist",
     "_matchedSheet": true
@@ -1965,8 +1966,8 @@
     "type": "Elemental Prince",
     "rarity": 1,
     "benefits": [
-      "4 attack",
-      "focus: 2 attack"
+      "+4 attack",
+      "focus: +2 attack"
     ],
     "effectKey": "imix",
     "_matchedSheet": true
@@ -1983,9 +1984,9 @@
     "type": "Medusa",
     "rarity": 1,
     "benefits": [
-      "1 money",
+      "+1 money",
       "eot promote another played card",
-      "recruit an ambition card that costs 4 or less"
+      "recruit an Ambition card that costs 4 or less"
     ],
     "effectKey": "marlos-urnrayle",
     "_matchedSheet": true
@@ -2002,7 +2003,8 @@
     "type": "Elemental Prince",
     "rarity": 1,
     "benefits": [
-      "2 money, eot promote another played card",
+      "+2 money",
+      "eot promote another played card",
       "focus: eot promote another played card"
     ],
     "effectKey": "ogremoch",
@@ -2039,7 +2041,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate a troop",
-      "recruit a malice card that costs 4 or less"
+      "recruit a Malice card that costs 4 or less"
     ],
     "effectKey": "vanifer",
     "_matchedSheet": true
@@ -2111,7 +2113,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate a white troop",
-      "eot promote an obedience card played this turn"
+      "eot promote an Obedience card played this turn"
     ],
     "effectKey": "water-elemental-myrmidon",
     "_matchedSheet": true
@@ -2129,7 +2131,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate a white troop",
-      "eot promote an obedience card played this turn"
+      "eot promote an Obedience card played this turn"
     ],
     "effectKey": "water-elemental-myrmidon",
     "_matchedSheet": true
@@ -2146,8 +2148,8 @@
     "type": "Elemental Prince",
     "rarity": 1,
     "benefits": [
-      "spy, assassinate a troop there",
-      "focus: spy"
+      "place spy, assassinate a troop there",
+      "focus: place spy"
     ],
     "effectKey": "yan-c-bin",
     "_matchedSheet": true
@@ -2183,7 +2185,7 @@
     "rarity": 1,
     "benefits": [
       "devour a card in hand to supplant 2 white troops,",
-      "each opponent recruits 2 insane outcasts"
+      "then each opponent recruits 2 insane outcasts"
     ],
     "effectKey": "demogorgon",
     "_matchedSheet": true
@@ -2308,7 +2310,7 @@
     "type": "Undead",
     "rarity": 1,
     "benefits": [
-      "2 attack",
+      "+2 attack",
       "give insane outcast to each opponent"
     ],
     "effectKey": "ghoul",
@@ -2326,7 +2328,7 @@
     "type": "Undead",
     "rarity": 1,
     "benefits": [
-      "2 attack",
+      "+2 attack",
       "give insane outcast to each opponent"
     ],
     "effectKey": "ghoul",
@@ -2344,7 +2346,7 @@
     "type": "Undead",
     "rarity": 1,
     "benefits": [
-      "2 attack",
+      "+2 attack",
       "give insane outcast to each opponent"
     ],
     "effectKey": "ghoul",
@@ -2416,8 +2418,7 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "devour a card from hand to",
-      "assassinate 2 troops"
+      "devour a card from hand to assassinate 2 troops"
     ],
     "effectKey": "glabrezu",
     "_matchedSheet": true
@@ -2488,8 +2489,8 @@
     "type": "Shapechanger",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or remove spy for 2 atk 2 money"
+      "or place spy",
+      "or remove spy to +2 attack +2 money"
     ],
     "effectKey": "jackalwere",
     "_matchedSheet": true
@@ -2506,8 +2507,8 @@
     "type": "Shapechanger",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or remove spy for 2 atk 2 money"
+      "or place spy",
+      "or remove spy to +2 attack +2 money"
     ],
     "effectKey": "jackalwere",
     "_matchedSheet": true
@@ -2524,8 +2525,8 @@
     "type": "Shapechanger",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or remove spy for 2 atk 2 money"
+      "or place spy",
+      "or remove spy to +2 attack +2 money"
     ],
     "effectKey": "jackalwere",
     "_matchedSheet": true
@@ -2542,7 +2543,7 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "devour a card in your hand for 5 attack"
+      "devour a card in your hand to +5 attack"
     ],
     "effectKey": "marilith",
     "_matchedSheet": true
@@ -2559,7 +2560,7 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "devour a card in your hand for 5 attack"
+      "devour a card in your hand to +5 attack"
     ],
     "effectKey": "marilith",
     "_matchedSheet": true
@@ -2577,7 +2578,8 @@
     "rarity": 1,
     "benefits": [
       "devour a card from hand to",
-      "3 money or assassinate a troop"
+      "or +3 money",
+      "or assassinate a troop"
     ],
     "effectKey": "mind-flayer",
     "_matchedSheet": true
@@ -2595,7 +2597,8 @@
     "rarity": 1,
     "benefits": [
       "devour a card from hand to",
-      "3 money or assassinate a troop"
+      "or +3 money",
+      "or assassinate a troop"
     ],
     "effectKey": "mind-flayer",
     "_matchedSheet": true
@@ -2613,7 +2616,8 @@
     "rarity": 1,
     "benefits": [
       "devour a card from hand to",
-      "3 money or assassinate a troop"
+      "or +3 money",
+      "or assassinate a troop"
     ],
     "effectKey": "mind-flayer",
     "_matchedSheet": true
@@ -2630,7 +2634,7 @@
     "type": "Myconid",
     "rarity": 1,
     "benefits": [
-      "2 money",
+      "+2 money",
       "give insane outcast"
     ],
     "effectKey": "myconid-adult",
@@ -2648,7 +2652,7 @@
     "type": "Myconid",
     "rarity": 1,
     "benefits": [
-      "2 money",
+      "+2 money",
       "give insane outcast"
     ],
     "effectKey": "myconid-adult",
@@ -2666,7 +2670,7 @@
     "type": "Myconid",
     "rarity": 1,
     "benefits": [
-      "2 money",
+      "+2 money",
       "give insane outcast"
     ],
     "effectKey": "myconid-adult",
@@ -2720,8 +2724,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "3 money",
-      "promote your top card"
+      "+3 money",
+      "promote top card of your deck"
     ],
     "effectKey": "nalfeshnee",
     "_matchedSheet": true
@@ -2738,8 +2742,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "3 money",
-      "promote your top card"
+      "+3 money",
+      "promote top card of your deck"
     ],
     "effectKey": "nalfeshnee",
     "_matchedSheet": true
@@ -2756,8 +2760,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or remove spy for 2 cards"
+      "or place spy",
+      "or remove spy to draw 2 cards"
     ],
     "effectKey": "night-hag",
     "_matchedSheet": true
@@ -2774,8 +2778,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or remove spy for 2 cards"
+      "or place spy",
+      "or remove spy to draw 2 cards"
     ],
     "effectKey": "night-hag",
     "_matchedSheet": true
@@ -2792,8 +2796,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or remove spy for 2 cards"
+      "or place spy",
+      "or remove spy to draw 2 cards"
     ],
     "effectKey": "night-hag",
     "_matchedSheet": true
@@ -2846,8 +2850,8 @@
     "type": "Fiend",
     "rarity": 1,
     "benefits": [
-      "or spy",
-      "or return a spy for 5 attack"
+      "or place spy",
+      "or return a spy to +5 attack"
     ],
     "effectKey": "vrock",
     "_matchedSheet": true
@@ -2865,7 +2869,7 @@
     "rarity": 1,
     "benefits": [
       "devour a card in your inner circle to",
-      "3 money and eot promote up to 2 other played cards"
+      "+3 money and eot promote up to 2 other played cards"
     ],
     "effectKey": "zuggtmoy",
     "_matchedSheet": true
@@ -2882,8 +2886,8 @@
     "type": "Aberration",
     "rarity": 1,
     "benefits": [
-      "promote your top card",
-      "Play a card from your inner-circle as if it were in your hand (it stays there)"
+      "promote top card of your deck",
+      "play a card from your inner-circle as if it were in your hand (it stays there)"
     ],
     "effectKey": "elder-brain",
     "_matchedSheet": true
@@ -2917,7 +2921,7 @@
     "type": "Illithid",
     "rarity": 2,
     "benefits": [
-      "2 money",
+      "+2 money",
       "eot promote another card played this turn"
     ],
     "effectKey": "puppeteer",
@@ -2935,7 +2939,7 @@
     "type": "Aberration",
     "rarity": 2,
     "benefits": [
-      "or 3 money",
+      "or +3 money",
       "or return up to 2 troops/spies"
     ],
     "effectKey": "intellect-devourer",
@@ -2954,7 +2958,7 @@
     "rarity": 4,
     "benefits": [
       "eot promote another played card",
-      "if you discard this, you may promote it"
+      "if your opponent causes you to discard this, you may promote it"
     ],
     "effectKey": "ambassador",
     "_matchedSheet": true
@@ -2989,8 +2993,8 @@
     "type": "Aberration",
     "rarity": 2,
     "benefits": [
-      "spy",
-      "each opponent there discards a card if they have 3+"
+      "place spy",
+      "each opponent there with 3+ cards discards a card"
     ],
     "effectKey": "chuul",
     "_matchedSheet": true
@@ -3007,8 +3011,8 @@
     "type": "Aberration",
     "rarity": 2,
     "benefits": [
-      "or spy",
-      "or return a spy for 2 attack 2 money"
+      "or place spy",
+      "or return a spy to +2 attack +2 money"
     ],
     "effectKey": "brainwashed-slave",
     "_matchedSheet": true
@@ -3025,8 +3029,8 @@
     "type": "Aberration",
     "rarity": 2,
     "benefits": [
-      "or spy",
-      "or return a spy to draw a card, each 3+ opponent discards a card"
+      "or place spy",
+      "or return a spy to draw a card, each opponent with 3+ cards discards a card"
     ],
     "effectKey": "nothic",
     "_matchedSheet": true
@@ -3043,7 +3047,7 @@
     "type": "Aberration",
     "rarity": 3,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return spy to assassinate a troop there"
     ],
     "effectKey": "cloaker",
@@ -3114,8 +3118,8 @@
     "type": "Aberration",
     "rarity": 1,
     "benefits": [
-      "Assassinate up to 3 troops at a single site.",
-      "For each troop removed gain 1 money."
+      "assassinate up to 3 troops at a single site.",
+      "for each troop removed +1 money."
     ],
     "effectKey": "death-tyrant",
     "_matchedSheet": true
@@ -3133,7 +3137,7 @@
     "rarity": 3,
     "benefits": [
       "deploy 2 troops",
-      "Choose an opponent with 3+ cards to discard a card."
+      "choose an opponent with 3+ cards to discard a card."
     ],
     "effectKey": "cranium-rats",
     "_matchedSheet": true
@@ -3151,7 +3155,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate a troop",
-      "gain 1 attack for every 3 troops in your trophy hall"
+      "+1 attack for every 3 troops in your trophy hall"
     ],
     "effectKey": "beholder",
     "_matchedSheet": true
@@ -3186,7 +3190,7 @@
     "type": "Aberration",
     "rarity": 2,
     "benefits": [
-      "or 2 money",
+      "or +2 money",
       "or draw a card, choose an opponent with 3+ cards to discard a card"
     ],
     "effectKey": "gauth",
@@ -3204,7 +3208,7 @@
     "type": "Aberration",
     "rarity": 3,
     "benefits": [
-      "2 attack 1 money"
+      "+2 attack +1 money"
     ],
     "effectKey": "spectator",
     "_matchedSheet": true
@@ -3239,7 +3243,7 @@
     "type": "Undead",
     "rarity": 2,
     "benefits": [
-      "spy",
+      "place spy",
       "if there is another spy there, +3 attack"
     ],
     "effectKey": "banshee",
@@ -3257,7 +3261,7 @@
     "type": "Undead",
     "rarity": 3,
     "benefits": [
-      "1 money",
+      "+1 money",
       "return another player's troop/spy"
     ],
     "effectKey": "vampire-spawn",
@@ -3276,7 +3280,7 @@
     "rarity": 1,
     "benefits": [
       "supplant a troop",
-      "gain 1 VP for every 5 player trophies you have"
+      "1 VP for every 5 player trophies you have"
     ],
     "effectKey": "death-knight",
     "_matchedSheet": true
@@ -3293,7 +3297,7 @@
     "type": "Human",
     "rarity": 3,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return a spy to recruit up to 2 cards that cost 3 or less"
     ],
     "effectKey": "conjurer",
@@ -3311,7 +3315,7 @@
     "type": "Undead",
     "rarity": 2,
     "benefits": [
-      "or spy",
+      "or place spy",
       "or return a spy to treat the top devoured card as if in market"
     ],
     "effectKey": "ghost",
@@ -3329,7 +3333,7 @@
     "type": "Undead",
     "rarity": 4,
     "benefits": [
-      "or 2 attack",
+      "or +2 attack",
       "or devour a card from hand to supplant a troop"
     ],
     "effectKey": "wight",
@@ -3347,9 +3351,9 @@
     "type": "Undead",
     "rarity": 1,
     "benefits": [
-      "choose twice:",
-      "assassinate a white troop",
-      "take a white trophy from another player and place it anwhere"
+      "choose 2 times",
+      "or assassinate a white troop",
+      "or take a white trophy from any player and place it anwhere"
     ],
     "effectKey": "mummy-lord",
     "_matchedSheet": true
@@ -3366,7 +3370,7 @@
     "type": "Undead",
     "rarity": 2,
     "benefits": [
-      "1 attack",
+      "+1 attack",
       "assassinate a white troop"
     ],
     "effectKey": "ravenous-zombies",
@@ -3384,8 +3388,8 @@
     "type": "Human",
     "rarity": 3,
     "benefits": [
-      "or 2 money",
-      "or devour this card to EOT promote up to 2 other cards played"
+      "or +2 money",
+      "or devour this card to eot promote up to 2 other cards played"
     ],
     "effectKey": "cultist-of-myrkul",
     "_matchedSheet": true
@@ -3438,7 +3442,7 @@
     "type": "Undead",
     "rarity": 2,
     "benefits": [
-      "spy",
+      "place spy",
       "devour this card to assassinate a troop there"
     ],
     "effectKey": "wraith",
@@ -3473,7 +3477,7 @@
     "type": "Undead",
     "rarity": 1,
     "benefits": [
-      "spy",
+      "place spy",
       "if another player has a troop there, take 2 troops from their trophy hall and deploy them"
     ],
     "effectKey": "lich",
@@ -3491,8 +3495,8 @@
     "type": "Human",
     "rarity": 1,
     "benefits": [
-      "return another player's troop or spy",
-      "EOT promote any undead cards you played"
+      "return another player's troop/spy",
+      "eot promote any undead cards you played (optional)"
     ],
     "effectKey": "high-priest-of-myrkul",
     "_matchedSheet": true
@@ -3509,7 +3513,7 @@
     "type": "Human",
     "rarity": 2,
     "benefits": [
-      "or 3 money",
+      "or +3 money",
       "or promote this card, or from hand, or from discard"
     ],
     "effectKey": "necromancer",
@@ -3545,7 +3549,7 @@
     "type": "Construct",
     "rarity": 2,
     "benefits": [
-      "2 attack",
+      "+2 attack",
       "devour this card to assassinate a troop"
     ],
     "effectKey": "flesh-golem",
@@ -3563,7 +3567,7 @@
     "type": "Monstrosity",
     "rarity": 2,
     "benefits": [
-      "3 attack",
+      "+3 attack",
       "devour a card in the market and replace it with this one"
     ],
     "effectKey": "carrion-crawler",
@@ -3582,7 +3586,7 @@
     "rarity": 1,
     "benefits": [
       "assassinate two troops,",
-      "If you have 8+ trophies, promote this card"
+      "if you have 8+ trophies, promote this card"
     ],
     "effectKey": "revenant",
     "_matchedSheet": true
@@ -3599,7 +3603,7 @@
     "type": "Drow",
     "rarity": 15,
     "benefits": [
-      "2 attack"
+      "+2 attack"
     ],
     "effectKey": "house-guard",
     "_matchedSheet": true
@@ -3616,8 +3620,8 @@
     "type": "Drow",
     "rarity": 30,
     "benefits": [
-      "discard a card from your hand to return this card to the supply.",
-      "If this card would be devoured or promoted, return it to the supply"
+      "discard a card from your hand to return this card to the supply",
+      "if this card would be devoured or promoted, return it to the supply"
     ],
     "effectKey": "insane-outcast",
     "_matchedSheet": true
@@ -3634,7 +3638,7 @@
     "type": "Drow",
     "rarity": 15,
     "benefits": [
-      "2 money"
+      "+2 money"
     ],
     "effectKey": "priestess-of-lolth",
     "_matchedSheet": true
@@ -3651,7 +3655,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "+1 money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3668,7 +3672,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "+1 attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3685,7 +3689,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "+1 money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3702,7 +3706,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "+1 attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3719,7 +3723,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "+1 money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3736,7 +3740,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "+1 attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
@@ -3753,7 +3757,7 @@
     "type": "Drow",
     "rarity": 7,
     "benefits": [
-      "money"
+      "+1 money"
     ],
     "effectKey": "noble",
     "_matchedSheet": true
@@ -3770,7 +3774,7 @@
     "type": "Drow",
     "rarity": 3,
     "benefits": [
-      "attack"
+      "+1 attack"
     ],
     "effectKey": "soldier",
     "_matchedSheet": true

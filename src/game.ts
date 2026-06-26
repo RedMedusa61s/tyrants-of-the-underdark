@@ -329,19 +329,7 @@ function startingDeck(): CardRef[] {
   if (!noble || !soldier) throw new Error('Starter deck missing Noble or Soldier');
   const nobleRef = toCardRef(noble.deck, noble.slot);
   const soldierRef = toCardRef(soldier.deck, soldier.slot);
-  const test_card = cardsInDeck('undead').find(c => c.name === 'High Priest of Myrkul');
-  const test_cardRef = toCardRef(test_card.deck, test_card.slot);
-  const test_card2 = cardsInDeck('elemental').find(c => c.name === 'Fire Elemental Myrmidon');
-  const test_cardRef2 = toCardRef(test_card2.deck, test_card2.slot);
-  const test_card3 = cardsInDeck('dragons').find(c => c.name === 'Blue Dragon');
-  const test_cardRef3 = toCardRef(test_card3.deck, test_card3.slot);
-  const test_card4 = cardsInDeck('undead').find(c => c.name === 'Wight');
-  const test_cardRef4 = toCardRef(test_card4.deck, test_card4.slot);
-  const test_card5 = cardsInDeck('undead').find(c => c.name === 'Ghost');
-  const test_cardRef5 = toCardRef(test_card5.deck, test_card5.slot);
-  //return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef)];
-  return [ ...Array(1).fill(nobleRef), test_cardRef, test_cardRef2, test_cardRef3, test_cardRef5];
-  //return [...Array(4).fill(nobleRef), test_cardRef5];
+  return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef)];
 }
 
 /** Encode the game state to a base64 JSON codec string, excluding the snapshots

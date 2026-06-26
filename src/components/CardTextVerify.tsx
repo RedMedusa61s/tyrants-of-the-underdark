@@ -23,7 +23,7 @@ function CachedCardImg({ path, alt, style }: { path: string; alt: string; style:
 
 const STORAGE_KEY = 'totu.card-text-overrides';
 type Overrides = Record<string, string>;
-const IN_SCOPE = new Set(['drow', 'dragons', 'elemental', 'demons', 'house-guards', 'priestesses']);
+const IN_SCOPE = new Set(['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'house-guards', 'priestesses']);
 
 function load(): Overrides {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch { return {}; }
