@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
-import { useGame, ChatPanel, useIdentity } from 'digital-boardgame-framework/client';
+import { useGame, ChatPanel, useIdentity, SignInBar } from 'digital-boardgame-framework/client';
 import { makeClient, makeMessagingClient, claimSeat } from './client';
 import { rememberOpenedGame } from './myGames';
 import { Board, BoardModeContext, type OnlineReportCategory } from '../App';
@@ -200,6 +200,10 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
 
   return (
     <BoardModeContext.Provider value={{ isOnline: true, mySeat: (you ?? '0') as string, onlineError: error, reportProblem }}>
+      {/* Invite-link joiners skip the lobby, so surface sign-in here too —
+          signing in redirects back to this game URL and re-attributes the seat
+          to the now-registered identity. Guests are still rated (provisional). */}
+      <div style={{ padding: '0 12px' }}><SignInBar /></div>
       <Board {...boardProps} />
       {humanSeatCount >= 2 && (
         <ChatPanel client={messagingClient} you={(you ?? '0') as string} seatLabel={labelForSeat} />
