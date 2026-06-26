@@ -217,7 +217,16 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
           {showStandings ? 'Hide standings ▴' : 'Standings ▾'}
         </button>
         {showStandings && (
-          <Leaderboard game="tyrants" highlightPlayerId={identity?.playerId} />
+          <>
+            <Leaderboard game="tyrants" highlightPlayerId={identity?.playerId} />
+            <a
+              href="https://games-hub-5vo.pages.dev/leaderboard?game=tyrants"
+              target="_blank" rel="noopener"
+              style={{ color: '#6cf', fontSize: 13, display: 'inline-block', marginTop: 6 }}
+            >
+              Open full leaderboard ↗
+            </a>
+          </>
         )}
       </div>
       <Board {...boardProps} />

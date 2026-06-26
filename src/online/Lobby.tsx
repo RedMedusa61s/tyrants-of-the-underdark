@@ -73,7 +73,9 @@ export function Lobby() {
         <h2 style={{ fontSize: 18 }}>Leaderboard</h2>
         <p style={{ color: '#778', fontSize: 12, marginTop: -4 }}>
           Per-game ratings (Glicko-2). Anon players are provisional (*); sign in
-          to make your rating permanent and carry it across devices.
+          to make your rating permanent and carry it across devices. ·{' '}
+          <a href={`${HUB_URL}/leaderboard?game=tyrants`} target="_blank" rel="noopener"
+             style={{ color: '#6cf' }}>open full page ↗</a>
         </p>
         <TyrantsLeaderboard />
       </div>
