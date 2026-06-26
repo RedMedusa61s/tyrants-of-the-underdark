@@ -90,6 +90,17 @@ export async function handleApi(
         const action = (body as { action: TyrantsAction }).action;
         return { status: 200, body: await server.submit(gameId, token, action) };
       }
+      // POST /api/games/:id/claim  → attach a hub identity to this seat (ranked).
+      // Body: { identityToken }. Best-effort from the client's view: a failure
+      // just leaves the seat unattributed (casual). Idempotent server-side.
+      if (segs[3] === 'claim' && method === 'POST') {
+        const identityToken = (body as { identityToken?: unknown }).identityToken;
+        if (typeof identityToken !== 'string' || !identityToken) {
+          return { status: 422, body: { error: 'identityToken required' } };
+        }
+        const verified = await server.claimSeat(gameId, token, identityToken);
+        return { status: 200, body: { ok: true, playerId: verified.playerId } };
+      }
       // POST /api/games/:id/report
       if (segs[3] === 'report' && method === 'POST') {
         return { status: 200, body: await server.report(gameId, token, body as ReportSubmission) };

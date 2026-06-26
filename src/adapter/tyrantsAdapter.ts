@@ -369,7 +369,16 @@ function resultOf(state: BgioState): GameResult<PlayerId> | null {
   for (const [pid, sb] of Object.entries(scores)) {
     if (sb.total === best) winners.push(pid);
   }
-  return { winners, reason: winners.length > 1 ? 'tie on final score' : 'highest final score' };
+  // Finishing order (best-first) for N-player ratings. Ties on exact final score
+  // are broken by seat order — rare, and only a half-pairwise rating difference.
+  const ranking = Object.entries(scores)
+    .sort(([, a], [, b]) => b.total - a.total)
+    .map(([pid]) => pid);
+  return {
+    winners,
+    ranking,
+    reason: winners.length > 1 ? 'tie on final score' : 'highest final score',
+  };
 }
 
 // ---------------------------------------------------------------------------

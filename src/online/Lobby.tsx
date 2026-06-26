@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useIdentity, Leaderboard } from 'digital-boardgame-framework/client';
 import { createGame, fetchStatus, deleteGame, type Invites } from './client';
 import { listMyGames, rememberCreatedGame, forgetGame, type MyGame } from './myGames';
 import type { PlayerId } from '../adapter/tyrantsAdapter';
@@ -30,6 +31,7 @@ export function Lobby() {
   return (
     <div style={{ maxWidth: 700 }}>
       <h1>Tyrants of the Underdark — Online</h1>
+      <IdentityBar />
       <p style={{ color: '#aab' }}>
         Minimal async multiplayer. Pick a player count, create a game, send one
         link per seat (or open them in separate tabs).
@@ -63,10 +65,75 @@ export function Lobby() {
       )}
 
       <GamesInProgress reloadKey={reloadKey} />
+
+      <div style={{ marginTop: 36 }}>
+        <h2 style={{ fontSize: 18 }}>Leaderboard</h2>
+        <p style={{ color: '#778', fontSize: 12, marginTop: -4 }}>
+          Per-game ratings (Glicko-2). Anon players are provisional (*); sign in
+          to make your rating permanent and carry it across devices.
+        </p>
+        <TyrantsLeaderboard />
+      </div>
+
       <MoreGames />
     </div>
   );
 }
+
+/** Sign-in / identity status. Anon by default (games work with no sign-in);
+ *  signing in makes ratings permanent and carries the anon rating forward. */
+function IdentityBar() {
+  const { identity, signedIn, signIn, signOut } = useIdentity();
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (signedIn) {
+    return (
+      <div style={{ ...idBar }}>
+        <span>Signed in as <strong>{identity?.displayName || 'you'}</strong> · ranked rating is permanent</span>
+        <button style={mini} onClick={signOut}>Sign out</button>
+      </div>
+    );
+  }
+  if (sent) {
+    return <div style={idBar}>Check your email for a sign-in link — open it to finish.</div>;
+  }
+  return (
+    <div style={idBar}>
+      <span style={{ color: '#aab' }}>Playing as guest (provisional rating).</span>
+      <input
+        type="email" value={email} placeholder="email to sign in"
+        onChange={(e) => setEmail(e.target.value)}
+        style={{ background: '#0d1117', color: '#e6edf3', border: '1px solid #445', borderRadius: 4, padding: '4px 8px' }}
+      />
+      <button
+        style={mini} disabled={busy || !email.includes('@')}
+        onClick={async () => {
+          setBusy(true); setErr(null);
+          const r = await signIn(email);
+          setBusy(false);
+          if (r.ok) setSent(true); else setErr(r.error ?? 'failed');
+        }}
+      >
+        {busy ? 'Sending…' : 'Sign in'}
+      </button>
+      {err && <span style={{ color: '#f66' }}>{err}</span>}
+    </div>
+  );
+}
+
+function TyrantsLeaderboard() {
+  const { identity } = useIdentity();
+  return <Leaderboard game="tyrants" highlightPlayerId={identity?.playerId} />;
+}
+
+const idBar: React.CSSProperties = {
+  display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+  margin: '8px 0 16px', padding: '8px 12px',
+  background: '#1b2030', border: '1px solid #ffffff14', borderRadius: 8, fontSize: 14,
+};
 
 /** The cross-game hub's canonical URL. Its games.json is the single source of
  *  truth (served CORS-open), so adding a game there makes it appear here with

@@ -8,7 +8,7 @@
 // NOTE: imports the Workers-SAFE server barrel (no node:fs). FsStore lives at
 // digital-boardgame-framework/server/node and is NEVER imported here.
 
-import { GameServer, SupabaseStore, ResendNotifier, NoopNotifier } from 'digital-boardgame-framework/server';
+import { GameServer, SupabaseStore, ResendNotifier, NoopNotifier, verifyIdentityToken, type Jwks } from 'digital-boardgame-framework/server';
 import { createClient } from '@supabase/supabase-js';
 import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } from '../../src/adapter/tyrantsAdapter';
 import { snapshotCodec } from '../../src/online/snapshotCodec';
@@ -24,12 +24,27 @@ interface Env {
   /** Relay worker base URL (holds GITHUB_TOKEN); its /problem-report files the
    *  issue. Defaults to the public relay so no Pages secret is required. */
   RELAY_URL?: string;
+  /** Shared secret matching the hub's RATINGS_INGEST_KEY. When set, finished
+   *  games auto-report to the hub's /ratings/record (ranked play). */
+  RATINGS_INGEST_KEY?: string;
 }
 
 const DEFAULT_RELAY = 'https://tyrants-relay.johnchampaign.workers.dev';
+const HUB = 'https://games-hub-5vo.pages.dev';
 
-// Module-scoped cache — persists across requests within a warm isolate.
+// Module-scoped caches — persist across requests within a warm isolate.
 let _supabase: ReturnType<typeof createClient> | null = null;
+let _jwks: Jwks | undefined;
+let _jwksAt = 0;
+
+/** Hub public verification keys, fetched once and cached for an hour. */
+async function getJwks(): Promise<Jwks> {
+  if (!_jwks || Date.now() - _jwksAt > 3_600_000) {
+    _jwks = (await (await fetch(`${HUB}/id/jwks`)).json()) as Jwks;
+    _jwksAt = Date.now();
+  }
+  return _jwks;
+}
 
 export const onRequest: PagesFunction<Env> = async (ctx) => {
   const { request, env } = ctx;
@@ -57,6 +72,12 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
     // Best-effort play counter: createGame fires an 'online' beacon to the
     // games hub. Never throws or blocks gameplay.
     playBeacon: { appId: 'tyrants' },
+    // Ranked play: verify hub identity tokens (claimSeat) against the hub JWKS,
+    // and auto-report each finished game to the hub for Glicko-2 ratings.
+    verifyIdentity: async (t) => verifyIdentityToken(t, await getJwks()),
+    ...(env.RATINGS_INGEST_KEY
+      ? { ratings: { game: 'tyrants', ingestKey: env.RATINGS_INGEST_KEY } }
+      : {}),
   });
 
   let body: unknown = undefined;

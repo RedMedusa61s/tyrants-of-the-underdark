@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
-import { useGame, ChatPanel } from 'digital-boardgame-framework/client';
-import { makeClient, makeMessagingClient } from './client';
+import { useGame, ChatPanel, useIdentity } from 'digital-boardgame-framework/client';
+import { makeClient, makeMessagingClient, claimSeat } from './client';
 import { rememberOpenedGame } from './myGames';
 import { Board, BoardModeContext, type OnlineReportCategory } from '../App';
 import { AI_VERSION } from '../ai-version';
@@ -63,6 +63,13 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
   useEffect(() => {
     if (you != null) rememberOpenedGame(gameId, you as PlayerId, token);
   }, [you, gameId, token]);
+
+  // Ranked attribution: once this client has an identity (anon by default, or
+  // registered after sign-in), bind it to this seat. Best-effort + idempotent.
+  const { identity } = useIdentity();
+  useEffect(() => {
+    if (identity?.token) void claimSeat(gameId, token, identity.token);
+  }, [identity?.token, gameId, token]);
 
   // submit() returns a Promise; the board calls moves.x(...) synchronously and
   // ignores the result, so we fire-and-forget and let useGame re-fetch.

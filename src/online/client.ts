@@ -46,6 +46,18 @@ export async function deleteGame(gameId: string, token: string): Promise<void> {
   if (!r.ok && r.status !== 404) throw new Error(`delete failed: ${r.status}`);
 }
 
+// Attach the player's hub identity to their seat (ranked attribution).
+// Best-effort: a failure just leaves the seat unattributed (casual play).
+export async function claimSeat(gameId: string, token: string, identityToken: string): Promise<void> {
+  try {
+    await fetch(`/api/games/${gameId}/claim?as=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identityToken }),
+    });
+  } catch { /* ignore — ranked attribution is optional */ }
+}
+
 // Per-(game, token) client the useGame hook consumes.
 export function makeClient(gameId: string, token: string): GameClientApi<BgioState, TyrantsAction> {
   const base = `/api/games/${gameId}`;
