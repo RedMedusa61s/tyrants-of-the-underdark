@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { BoardProps } from 'boardgame.io/react';
-import { useGame, ChatPanel, useIdentity, SignInBar } from 'digital-boardgame-framework/client';
+import { useGame, ChatPanel, useIdentity, SignInBar, Leaderboard } from 'digital-boardgame-framework/client';
 import { makeClient, makeMessagingClient, claimSeat } from './client';
 import { rememberOpenedGame } from './myGames';
 import { Board, BoardModeContext, type OnlineReportCategory } from '../App';
@@ -70,6 +70,7 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
   useEffect(() => {
     if (identity?.token) void claimSeat(gameId, token, identity.token);
   }, [identity?.token, gameId, token]);
+  const [showStandings, setShowStandings] = useState(false);
 
   // submit() returns a Promise; the board calls moves.x(...) synchronously and
   // ignores the result, so we fire-and-forget and let useGame re-fetch.
@@ -203,7 +204,22 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
       {/* Invite-link joiners skip the lobby, so surface sign-in here too —
           signing in redirects back to this game URL and re-attributes the seat
           to the now-registered identity. Guests are still rated (provisional). */}
-      <div style={{ padding: '0 12px' }}><SignInBar /></div>
+      <div style={{ padding: '0 12px' }}>
+        <SignInBar />
+        <button
+          type="button"
+          onClick={() => setShowStandings((v) => !v)}
+          style={{
+            background: 'transparent', color: '#b79cff', border: '1px solid #445',
+            borderRadius: 6, padding: '4px 12px', fontSize: 13, cursor: 'pointer', marginBottom: 8,
+          }}
+        >
+          {showStandings ? 'Hide standings ▴' : 'Standings ▾'}
+        </button>
+        {showStandings && (
+          <Leaderboard game="tyrants" highlightPlayerId={identity?.playerId} />
+        )}
+      </div>
       <Board {...boardProps} />
       {humanSeatCount >= 2 && (
         <ChatPanel client={messagingClient} you={(you ?? '0') as string} seatLabel={labelForSeat} />
