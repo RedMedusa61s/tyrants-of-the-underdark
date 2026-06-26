@@ -21,17 +21,17 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 import { TROOP_SPACES } from '../../data/troop-spaces';
 import { totalTrophies } from '../../game';
-import { Mechanics } from '../mechanics';
-import { lookupCard } from '../../card-data';
 
 registerAll({
   // Cost 2 — Vampire Spawn: +1 money + return another player's troop/spy
   'vampire-spawn':       sequence(grant({ influence: 1 }), returnEnemyTroopOrSpyChoice()),
+
   // Cost 2 — Skeletal Horde: deploy 2; optional devour-self → deploy 3
   'skeletal-horde':      sequence(
                            deployChoice({ count: 2 }),
                            optionalDevourSelfThen(deployChoice({ count: 3 }),
                                                   'Devour Skeletal Horde for 3 more deploys?')),
+
   // Cost 2 — Cultist of Myrkul: chooseOne(+2 money, devour-self → eot promote x2)
   'cultist-of-myrkul':   chooseOne(
                            { label: '+2 Influence', handler: grant({ influence: 2 }) },
@@ -40,9 +40,11 @@ registerAll({
                              // makes the promote count player-choosable; flip to optional
                              // so the player can decline each prompt.
                              handler: devourSelfThen(flagEotPromote({ count: 2, optional: true })) }),
+
   // Cost 2 — Carrion Crawler: +3 power + replace a market card with self
   //   (the card-being-played enters the market in place of a devoured one)
   'carrion-crawler':     sequence(grant({ power: 3 }), marketDevourReplaceWithSelf()),
+
   // Cost 2 — Wraith: spy; optional devour-self → assassinate at the spy site
   'wraith':              sequence(
                            placeSpyAtChosenSite(),
@@ -55,6 +57,7 @@ registerAll({
                            { label: 'Devour a hand card → supplant a troop',
                              handler: devourFromHandCost(supplantChoice()),
                              available: (G, a) => G.players[a].hand.length > 0 }),
+
   // Cost 3 — Ghost: chooseOne(place spy, return spy → recruit top of
   //   devoured pile as if from market). Devoured pile is tracked
   //   server-side in G.devouredPile (Mechanics.devour pushes to it).
@@ -63,12 +66,14 @@ registerAll({
                            { label: 'Return a spy → recruit top of devoured pile',
                              handler: sequence(returnOwnSpyChoice(), recruitFromDevouredPile()),
                              available: playerHasOwnSpy }),
+
   // Cost 3 — Flesh Golem: +2 power; optional devour-self → assassinate
   'flesh-golem':         sequence(
                            grant({ power: 2 }),
                            optionalDevourSelfThen(assassinateChoice(),
                                                   'Devour Flesh Golem to assassinate?',
                                                   )),
+
   // Cost 3 — Ravenous Zombies: +1 power + assassinate a white troop
   'ravenous-zombies':    sequence(grant({ power: 1 }), assassinateChoice({ whiteOnly: true })),
   // Cost 3 — Minotaur Skeleton: chooseOne(deploy 3, devour-self → assassinate up to 3 whites at one site)
@@ -97,6 +102,7 @@ registerAll({
                              }
                              return true;
                            })),
+
   // Cost 4 — Ogre Zombie: supplant a white troop anywhere
   'ogre-zombie':         supplantChoice({ whiteOnly: true, anywhere: true }),
   // Cost 4 — Revenant: assassinate 2 troops; if you have 8+ trophies,
@@ -205,6 +211,7 @@ registerAll({
                                }
                                return false;
                              } })),
+
   // Cost 6 — High Priest of Myrkul: return another player's troop or spy
   //   + eot promote (Undead aspect filter — but Undead aspect varies on
   //   cards in this deck so we leave unrestricted for now).
@@ -219,59 +226,11 @@ registerAll({
   //     AND the player keeps picking. We don't model that — we queue 1.
   //     Worth a follow-up but doesn't break correctness of single uses.
 
-  // TODO: Fix flagEotPromote to que pendingEotPromotions eqaul to eligible cards.
   'high-priest-of-myrkul': sequence(
                             // fizzleIfNoTargets: true - prevents card from being played when there are
                             //                            no targets and "Play all basic" is selected.
                             returnEnemyTroopOrSpyChoice({ fizzleIfNoTargets: true }),
                             flagEotPromote({ optional: true, typeFilter: 'Undead' })),
-                            // (ctx => {
-                            //   const me = ctx.G.players[ctx.actorId];
-
-                            //   // Process prior response if any.
-                            //   if (ctx.pendingChoice) {
-                            //     const idx = ctx.pendingChoice.response as number | null;
-                            //     ctx.pendingChoice = null;
-                            //     ctx.paused = false;
-                            //     if (idx == null) { ctx.handlerState = null; return true; } // declined — stop
-                            //     const card = ctx.G.cardsPlayedThisTurn[idx];
-                            //     if (card) {
-                            //       ctx.G.cardsPlayedThisTurn.splice(idx, 1);
-                            //       const di = me.discard.findIndex(c => c.deck === card.deck && c.slot === card.slot);
-                            //       if (di >= 0) me.discard.splice(di, 1);
-                            //       Mechanics.promote(ctx.G, ctx.actorId, card);
-                            //     }
-                            //   }
-
-                            //   // Re-evaluate remaining eligible cards after each promote.
-                            //   const eligible = ctx.G.cardsPlayedThisTurn
-                            //     .map((c, i) => ({ c, i }))
-                            //     .filter(({ c }) => {
-                            //       const data = lookupCard(c.deck, c.slot);
-                            //       return data?.type === 'Undead';
-                            //     })
-                            //     .map(({ i }) => i);
-
-                            //   if (eligible.length === 0) {
-                            //     if (!ctx.handlerState) {
-                            //       // Only log on first entry — if we get here after a promote
-                            //       // the player already acted so no message is needed.
-                            //       Mechanics.log(ctx.G, '(High Priest of Myrkul: no Undead cards played this turn to promote)');
-                            //     }
-                            //     ctx.handlerState = null;
-                            //     return true;
-                            //   }
- 
-                            //   ctx.handlerState = true; // mark that we have entered at least once
-                            //   ctx.pendingChoice = {
-                            //     kind: 'select-played-card',
-                            //     prompt: 'High Priest of Myrkul: you may promote an Undead card played this turn (or decline to stop).',
-                            //     options: eligible,
-                            //     optional: true,
-                            //   };
-                            //   ctx.paused = true;
-                            //   return false;
-                            // })),
 
   // Cost 7 — Vampire: chooseOne(supplant a troop, promote a card from
   //   discard then +1 VP per 3 promoted cards in inner circle).
@@ -290,6 +249,7 @@ registerAll({
                                  }
                                  return true;
                                })) }),
+
   // Cost 7 — Lich: place a spy. "If another player has a troop there,
   //   take 2 trophies from their trophy hall and deploy them."
   //   Restricted to THE qualifying opponent(s). If multiple opponents
