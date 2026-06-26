@@ -58,7 +58,7 @@ export function OnlinePlay({ gameId, token }: { gameId: string; token: string })
   const client = useMemo(() => makeClient(gameId, token), [gameId, token]);
   const messagingClient = useMemo(() => makeMessagingClient(gameId, token), [gameId, token]);
   const { view, yourTurn, you, submit, loading, error } =
-    useGame<BgioState, TyrantsAction>(client, { pollMs: 2000 });
+    useGame<BgioState, TyrantsAction>(client, { pollMs: 2000, trackLegalActions: false });
 
   useEffect(() => {
     if (you != null) rememberOpenedGame(gameId, you as PlayerId, token);
