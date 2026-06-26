@@ -184,7 +184,7 @@ export const DEFAULT_WEIGHTS: HeuristicWeights = {
   recruitCostWeight: 2,
   recruitAuxStackBonus: 0,
   recruitPerInfluenceBlend: 0,
-  recruitTacticalBonus: 0,
+  recruitTacticalBonus: 4,
 
   useLookahead: 1,
   useCardOrdering: 1,
