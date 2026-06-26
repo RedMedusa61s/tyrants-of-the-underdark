@@ -241,6 +241,9 @@ export const SELECTABLE_COLORS: Color[] = [
   ...COLORS, 'purple', 'green', 'teal', 'pink', 'yellow',
 ];
 const HAND_SIZE = 5;
+// Max per-turn state snapshots kept for the hotseat "Load turn" rewind. Bounds
+// the persisted state size (each snapshot is a full state codec). See onBegin.
+const SNAPSHOT_CAP = 20;
 
 function toCardRef(deck: string, slot: number): CardRef {
   const c = lookupCard(deck, slot);
@@ -579,6 +582,16 @@ export const TyrantsGame: Game<TyrantsState> = {
         color: G.players[ctx.currentPlayer].color,
         codec: encodeSnapshot(G),
       });
+      // Bound the snapshot history. Each snapshot is a full state codec, so an
+      // uncapped array grows the persisted state every turn — in online games
+      // (where bgio's turn counter can balloon well past the real turn count)
+      // this bloated the stored state until a write exceeded platform limits and
+      // the game locked up. Keep only the most recent SNAPSHOT_CAP turns; that's
+      // ample for the hotseat "Load turn" rewind, and online never uses
+      // snapshots at all (loadState is a no-op there).
+      if (G.snapshots.length > SNAPSHOT_CAP) {
+        G.snapshots.splice(0, G.snapshots.length - SNAPSHOT_CAP);
+      }
     },
     onEnd: ({ G, ctx, random }) => {
       // Capture this turn's log slice for the per-turn summary modal. We do this for
