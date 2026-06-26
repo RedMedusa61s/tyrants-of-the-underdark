@@ -59,7 +59,9 @@ export async function claimSeat(gameId: string, token: string, identityToken: st
 }
 
 // Per-(game, token) client the useGame hook consumes.
-export function makeClient(gameId: string, token: string): GameClientApi<BgioState, TyrantsAction> {
+export function makeClient(
+  gameId: string, token: string, getIdentityToken?: () => string | undefined,
+): GameClientApi<BgioState, TyrantsAction> {
   const base = `/api/games/${gameId}`;
   const q = `?as=${encodeURIComponent(token)}`;
   const json = async (r: Response): Promise<any> => {
@@ -80,7 +82,7 @@ export function makeClient(gameId: string, token: string): GameClientApi<BgioSta
       fetch(`${base}/submit${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, identityToken: getIdentityToken?.() }),
       }).then(json),
     legalActions: () => fetch(`${base}/legal${q}`).then(json),
     report: (body) =>

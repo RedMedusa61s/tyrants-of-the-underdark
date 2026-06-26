@@ -87,7 +87,12 @@ export async function handleApi(
       }
       // POST /api/games/:id/submit
       if (segs[3] === 'submit' && method === 'POST') {
-        const action = (body as { action: TyrantsAction }).action;
+        const { action, identityToken } = body as { action: TyrantsAction; identityToken?: string };
+        // Attribute this seat from the move's identity (idempotent, race-free —
+        // turns are sequential). Best-effort: never block the move.
+        if (typeof identityToken === 'string' && identityToken) {
+          try { await server.claimSeat(gameId, token, identityToken); } catch { /* attribution optional */ }
+        }
         return { status: 200, body: await server.submit(gameId, token, action) };
       }
       // POST /api/games/:id/claim  → attach a hub identity to this seat (ranked).
