@@ -1133,6 +1133,7 @@ export function recruitFromMarketFiltered(opts: {
   maxCost: number;
   includeAuxStacks?: boolean;
   quantity?: number;
+  optional?: boolean;
 }): EffectHandler {
   const count = opts.quantity ?? 1;
   return ctx => {
@@ -1199,7 +1200,7 @@ export function recruitFromMarketFiltered(opts: {
       kind: 'select-market-card',
       prompt: `Recruit a ${label} costing ≤${opts.maxCost} (free). ${quantityTag}`,
       options: eligible,
-      optional: true,
+      optional: opts?.optional,
     } as PendingChoice;
     ctx.paused = true;
     ctx.handlerState = state;
