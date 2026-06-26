@@ -46,13 +46,34 @@ export async function deleteGame(gameId: string, token: string): Promise<void> {
   if (!r.ok && r.status !== 404) throw new Error(`delete failed: ${r.status}`);
 }
 
+// Attach the player's hub identity to their seat (ranked attribution).
+// Best-effort: a failure just leaves the seat unattributed (casual play).
+export async function claimSeat(gameId: string, token: string, identityToken: string): Promise<void> {
+  try {
+    await fetch(`/api/games/${gameId}/claim?as=${encodeURIComponent(token)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identityToken }),
+    });
+  } catch { /* ignore — ranked attribution is optional */ }
+}
+
 // Per-(game, token) client the useGame hook consumes.
-export function makeClient(gameId: string, token: string): GameClientApi<BgioState, TyrantsAction> {
+export function makeClient(
+  gameId: string, token: string, getIdentityToken?: () => string | undefined,
+): GameClientApi<BgioState, TyrantsAction> {
   const base = `/api/games/${gameId}`;
   const q = `?as=${encodeURIComponent(token)}`;
   const json = async (r: Response): Promise<any> => {
-    const data: any = await r.json();
-    if (!r.ok) throw new Error((data && data.error) || `HTTP ${r.status}`);
+    // Read as text first so an HTML response (e.g. the SPA 404 page served when a
+    // request lands mid-deploy) yields a clear message instead of a cryptic
+    // "Unexpected token '<' … is not valid JSON".
+    const text = await r.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
+    if (!r.ok || data === null) {
+      throw new Error((data && data.error) || `Server error (HTTP ${r.status}). Please reload and try again.`);
+    }
     return data;
   };
   return {
@@ -61,7 +82,7 @@ export function makeClient(gameId: string, token: string): GameClientApi<BgioSta
       fetch(`${base}/submit${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, identityToken: getIdentityToken?.() }),
       }).then(json),
     legalActions: () => fetch(`${base}/legal${q}`).then(json),
     report: (body) =>
@@ -80,8 +101,15 @@ export function makeMessagingClient(gameId: string, token: string): MessagingCli
   const base = `/api/games/${gameId}/chat`;
   const q = `?as=${encodeURIComponent(token)}`;
   const json = async (r: Response): Promise<any> => {
-    const data: any = await r.json();
-    if (!r.ok) throw new Error((data && data.error) || `HTTP ${r.status}`);
+    // Read as text first so an HTML response (e.g. the SPA 404 page served when a
+    // request lands mid-deploy) yields a clear message instead of a cryptic
+    // "Unexpected token '<' … is not valid JSON".
+    const text = await r.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
+    if (!r.ok || data === null) {
+      throw new Error((data && data.error) || `Server error (HTTP ${r.status}). Please reload and try again.`);
+    }
     return data;
   };
   return {
