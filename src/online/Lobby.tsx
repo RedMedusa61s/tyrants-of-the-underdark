@@ -36,6 +36,9 @@ export function Lobby() {
         Minimal async multiplayer. Pick a player count, create a game, send one
         link per seat (or open them in separate tabs).
       </p>
+      <p style={{ marginTop: -4 }}>
+        <a href="/" style={{ color: '#6cf' }}>← Play solo / vs AI / hotseat (main game)</a>
+      </p>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
         <span>Players:</span>
