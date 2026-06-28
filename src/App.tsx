@@ -2003,10 +2003,12 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
+            // Hide ineligible cards entirely when options restrict which cards are pickable
+            if (isChoosing && opts && !eligible) return null;
             const onClick = isChoosing
-              ? (eligible ? () => moves.resolveChoice(i) : undefined)
+              ? () => moves.resolveChoice(i)
               : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
-            const label = isChoosing ? (eligible ? 'pick' : '—') : 'play';
+            const label = isChoosing ? 'pick' : 'play';
             return <Card key={i} card={c} label={label} onClick={onClick} />;
           })}
         </div>
@@ -2496,10 +2498,12 @@ function SplitPlayView(props: {
                 const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
                 const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
+                // Hide ineligible cards entirely when options restrict which cards are pickable
+                if (isChoosing && opts && !eligible) return null;
                 const onClick = isChoosing
-                  ? (eligible ? () => moves.resolveChoice(i) : undefined)
+                  ? () => moves.resolveChoice(i)
                   : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
-                const label = isChoosing ? (eligible ? 'pick' : '—') : 'play';
+                const label = isChoosing ? 'pick' : 'play';
                 return <Card key={i} card={c} label={label} onClick={onClick} />;
               })}
             </div>
