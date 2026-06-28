@@ -4,6 +4,68 @@
 
 import type { GameClientApi, MessagingClientApi } from 'digital-boardgame-framework/client';
 import type { BgioState, TyrantsAction, PlayerId } from '../adapter/tyrantsAdapter';
+import { AI_VERSION } from '../ai-version';
+
+const delay = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
+
+/** Capture an anomalous API response (HTML where JSON was expected, or a 5xx)
+ *  into a small localStorage ring buffer + the console, so a recurrence of the
+ *  "weird error message" lock (#89) is definitively recorded. The `cf-ray`
+ *  lets the maintainer correlate the exact request with Cloudflare's logs; the
+ *  build stamp shows whether the client was stale. Best-effort — never throws. */
+function logApiAnomaly(entry: Record<string, unknown>): void {
+  try {
+    const KEY = 'totu.api-anomaly-log';
+    const raw = localStorage.getItem(KEY);
+    const arr = raw ? (JSON.parse(raw) as unknown[]) : [];
+    arr.push({ ...entry, clientBuild: AI_VERSION });
+    if (arr.length > 30) arr.splice(0, arr.length - 30);
+    localStorage.setItem(KEY, JSON.stringify(arr));
+  } catch { /* localStorage full / unavailable — non-fatal */ }
+  try { console.warn('[totu api anomaly]', { ...entry, clientBuild: AI_VERSION }); } catch { /* ignore */ }
+}
+
+/** Fetch an /api endpoint expecting JSON, with two robustness behaviours aimed
+ *  at the mid-deploy window where an /api request is briefly served the static
+ *  SPA index.html (HTML) instead of reaching the Function:
+ *   1. Retry ONCE on an HTML response. An HTML body proves the request never
+ *      hit the Function (it got the SPA fallback), so it had no side effect —
+ *      safe to retry even for POST/submit. A short delay lands on the live
+ *      Function once propagation settles. (5xx is NOT retried: it may have
+ *      applied server-side, so retrying a submit could double-apply.)
+ *   2. Capture every anomaly (HTML or 5xx) via logApiAnomaly for diagnosis. */
+async function apiJson(doFetch: () => Promise<Response>): Promise<any> {
+  let lastErr: Error | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await doFetch();
+    const text = await r.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
+    if (r.ok && data !== null) return data;
+    const isHtml = data === null && /^\s*</.test(text);
+    if (isHtml || r.status >= 500) {
+      logApiAnomaly({
+        t: Date.now(),
+        status: r.status,
+        contentType: r.headers.get('content-type'),
+        cfRay: r.headers.get('cf-ray'),
+        cfCache: r.headers.get('cf-cache-status'),
+        isHtml,
+        bodySnippet: text.slice(0, 80),
+        attempt,
+      });
+      if (isHtml && attempt === 0) { await delay(800); continue; } // retry the SPA-fallback case once
+    }
+    lastErr = new Error(
+      (data && data.error)
+        || (isHtml
+          ? 'The server was briefly unavailable (likely mid-deploy). Try again in a moment.'
+          : `Server error (HTTP ${r.status}). Please reload and try again.`),
+    );
+    throw lastErr;
+  }
+  throw lastErr ?? new Error('Server error. Please reload and try again.');
+}
 
 export interface Invites {
   gameId: string;
@@ -64,33 +126,21 @@ export function makeClient(
 ): GameClientApi<BgioState, TyrantsAction> {
   const base = `/api/games/${gameId}`;
   const q = `?as=${encodeURIComponent(token)}`;
-  const json = async (r: Response): Promise<any> => {
-    // Read as text first so an HTML response (e.g. the SPA 404 page served when a
-    // request lands mid-deploy) yields a clear message instead of a cryptic
-    // "Unexpected token '<' … is not valid JSON".
-    const text = await r.text();
-    let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
-    if (!r.ok || data === null) {
-      throw new Error((data && data.error) || `Server error (HTTP ${r.status}). Please reload and try again.`);
-    }
-    return data;
-  };
   return {
-    fetch: () => fetch(`${base}${q}`).then(json),
+    fetch: () => apiJson(() => fetch(`${base}${q}`)),
     submit: (action) =>
-      fetch(`${base}/submit${q}`, {
+      apiJson(() => fetch(`${base}/submit${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, identityToken: getIdentityToken?.() }),
-      }).then(json),
-    legalActions: () => fetch(`${base}/legal${q}`).then(json),
+      })),
+    legalActions: () => apiJson(() => fetch(`${base}/legal${q}`)),
     report: (body) =>
-      fetch(`${base}/report${q}`, {
+      apiJson(() => fetch(`${base}/report${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      }).then(json),
+      })),
   };
 }
 
@@ -100,25 +150,13 @@ export function makeClient(
 export function makeMessagingClient(gameId: string, token: string): MessagingClientApi {
   const base = `/api/games/${gameId}/chat`;
   const q = `?as=${encodeURIComponent(token)}`;
-  const json = async (r: Response): Promise<any> => {
-    // Read as text first so an HTML response (e.g. the SPA 404 page served when a
-    // request lands mid-deploy) yields a clear message instead of a cryptic
-    // "Unexpected token '<' … is not valid JSON".
-    const text = await r.text();
-    let data: any = null;
-    try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
-    if (!r.ok || data === null) {
-      throw new Error((data && data.error) || `Server error (HTTP ${r.status}). Please reload and try again.`);
-    }
-    return data;
-  };
   return {
-    listMessages: () => fetch(`${base}${q}`).then(json),
+    listMessages: () => apiJson(() => fetch(`${base}${q}`)),
     postMessage: (body) =>
-      fetch(`${base}${q}`, {
+      apiJson(() => fetch(`${base}${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
-      }).then(json),
+      })),
   };
 }
