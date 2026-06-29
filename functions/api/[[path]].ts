@@ -61,6 +61,7 @@ export const onRequest: PagesFunction<Env> = async (ctx) => {
   const site = env.SITE_URL ?? url.origin;
   const relay = (env.RELAY_URL ?? DEFAULT_RELAY).replace(/\/$/, '');
   const server = new GameServer<BgioState, TyrantsAction, PlayerId>({
+    snapshotHistory: 20,   // cap per-game snapshot history (framework >=0.32)
     adapter: tyrantsAdapter,
     codec: snapshotCodec(),
     store: new SupabaseStore(_supabase),
