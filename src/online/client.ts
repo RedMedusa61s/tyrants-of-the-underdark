@@ -73,11 +73,16 @@ export interface Invites {
 }
 
 // Create a new game with a player count (2-4). Returns one invite URL per seat.
-export async function createGame(numPlayers: number): Promise<Invites> {
+// Optional `ai` maps seat ids ('0'..'3') to a difficulty key ('random' |
+// 'standard'); those seats become server-driven, rated AI opponents.
+export async function createGame(
+  numPlayers: number,
+  ai?: Partial<Record<PlayerId, string>>,
+): Promise<Invites> {
   const r = await fetch('/api/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ numPlayers }),
+    body: JSON.stringify({ numPlayers, ...(ai ? { ai } : {}) }),
   });
   if (!r.ok) {
     const data: any = await r.json().catch(() => ({}));

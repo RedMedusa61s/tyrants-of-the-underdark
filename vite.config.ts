@@ -10,6 +10,7 @@ import { tyrantsAdapter, type BgioState, type TyrantsAction, type PlayerId } fro
 import { handleApi } from './server/handlers';
 import { snapshotCodec } from './src/online/snapshotCodec';
 import { GitHubIssueForwarder } from './src/online/githubIssueForwarder';
+import { tyrantsControllers } from './src/online/aiControllers';
 
 // Dev API for online multiplayer: the same handleApi router the Cloudflare
 // Function uses, backed by FsStore + NoopNotifier so local dev needs no cloud
@@ -31,6 +32,8 @@ function onlineApiPlugin(): Plugin {
       adapter: tyrantsAdapter,
       codec: snapshotCodec(),
       store,
+      // Dev parity: same server-driven AI controllers as the Pages Function.
+      aiControllers: tyrantsControllers,
       notifier: new NoopNotifier(),
       // Dev parity: verify hub identity tokens for claimSeat. Ratings auto-report
       // is left OFF in dev (no ingest key) so local games don't hit the real

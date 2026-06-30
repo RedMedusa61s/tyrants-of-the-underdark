@@ -52,9 +52,13 @@ export async function handleApi(
   try {
     // ---- games ----
     if (segs[1] === 'games') {
-      // POST /api/games  → create. Body: { numPlayers: 2..4 }
+      // POST /api/games  → create. Body: { numPlayers: 2..4, ai?: { <seat>: difficulty } }
+      // When `ai` is present, those seats are SERVER-DRIVEN rated AI opponents
+      // (framework >=0.37). E.g. { numPlayers: 2, ai: { '1': 'random' } } makes a
+      // human-vs-AI game: seat '0' is the human, seat '1' the AI.
       if (segs.length === 2 && method === 'POST') {
-        const raw = (body as { numPlayers?: unknown })?.numPlayers;
+        const b = (body ?? {}) as { numPlayers?: unknown; ai?: Partial<Record<PlayerId, string>> };
+        const raw = b.numPlayers;
         const numPlayers = Math.trunc(Number(raw ?? 2));
         if (!Number.isFinite(numPlayers) || numPlayers < 2 || numPlayers > 4) {
           return { status: 422, body: { error: 'numPlayers must be 2, 3, or 4' } };
@@ -65,6 +69,7 @@ export async function handleApi(
             activeSections: activeSectionsFor(numPlayers),
           }),
           players,
+          ...(b.ai ? { ai: b.ai } : {}),
         });
         return { status: 200, body: r };
       }
