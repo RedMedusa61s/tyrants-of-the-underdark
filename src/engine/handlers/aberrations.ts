@@ -8,7 +8,7 @@
 // in docs/. Some printed effects are partially implemented to start
 // (TODO comments mark the gaps); iterate as we go.
 
-import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, times,
+import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
          assassinateChoice, assassinateAtLastReturnedSpySite, deployChoice, chooseOne,
          returnOwnSpyChoice, returnEnemyTroopOrSpyChoice,
          eachOpponentDiscardsIfMinHand, chooseOpponentToDiscard,
@@ -23,7 +23,7 @@ import { Mechanics } from '../mechanics';
 import { assassinateTroop, hasPresence } from '../map-state';
 import { TROOP_SPACES } from '../../data/troop-spaces';
 import { SITES } from '../../data/sites';
-import { totalTrophies, type Color } from '../../game';
+import { totalTrophies, type Color, type TyrantsState } from '../../game';
 import type { EffectContext, EffectHandler, PendingChoice } from '../types';
 
 // In registerAll({...}), replace the 'mindwitness' entry with:

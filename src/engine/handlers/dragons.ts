@@ -2,12 +2,11 @@
 
 import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll,
          assassinateChoice, deployChoice, supplantChoice, chooseOne,
-         returnOwnSpyChoice, returnEnemySpyChoice, moveEnemyTroopChoice, conditionalGrant,
+         returnOwnSpyChoice, returnEnemySpyChoice, moveEnemyTroopChoice,
          ifAnotherPlayerTroopAtLastPlacedSpySite, devourMarketChoice,
          supplantAtLastPlacedSpySite, supplantAtLastReturnedSpySite,
          returnEnemyTroopOrSpyChoice, playerHasOwnSpy, playerCanAssassinate,
          flagEotInnerCircleVp } from '../handler-helpers';
-import { totalTrophies } from '../../game';
 import type { EffectHandler } from '../types';
 import { Mechanics } from '../mechanics';
 
@@ -149,7 +148,3 @@ registerAll({
                                    grantVpPerTotalControlledSite),
   'white-dragon':         sequence(deployChoice({ count: 3 }), grantVpPerTwoSitesControlled),
 });
-
-// Suppress unused-import noise.
-void conditionalGrant;
-void totalTrophies;

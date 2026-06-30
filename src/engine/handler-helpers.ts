@@ -1588,7 +1588,7 @@ export function returnEnemyTroopOrSpyChoice(opts?: { includeWhite?: boolean; fiz
       if (!troopAvailable && !spyAvailable) {
         (ctx.G as unknown as { _playFizzledNoFood?: boolean })._playFizzledNoFood = true;
         ctx.handlerState = null;
-        Mechanics.log(ctx.G, '(return enemy troop or spy: no valid targets availiable — skipped)');
+        Mechanics.log(ctx.G, '(return enemy troop or spy: no valid targets available — skipped)');
         return true;
       }
     }
@@ -1602,19 +1602,6 @@ export function returnEnemyTroopOrSpyChoice(opts?: { includeWhite?: boolean; fiz
     )(ctx);
   };
 }
-// ! Depreciated method below:
-// export function returnEnemyTroopOrSpyChoice(opts?: { includeWhite?: boolean }): EffectHandler {
-//   const includeWhite = !!opts?.includeWhite;
-//   return chooseOne(
-//     {
-//       label: includeWhite ? 'Return a troop (white or enemy)' : 'Return an enemy troop',
-//       handler: returnEnemyTroopChoice({ includeWhite }),
-//       available: includeWhite ? playerCanReturnAnyTroop : playerCanReturnEnemyTroop,
-//     },
-//     { label: 'Return an enemy spy', handler: returnEnemySpyChoice(), available: playerCanReturnEnemySpy },
-//   );
-// }
-
 
 /** True when the player has at least one enemy player-color troop they could
  *  legally return — i.e. a troop in a space where they have presence. */
