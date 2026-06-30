@@ -1430,8 +1430,14 @@ export function returnOwnTroopChoice(opts?: { optional?: boolean }): EffectHandl
     if (!ctx.pendingChoice) {
       const me = ctx.G.players[ctx.actorId];
       const eligible = TROOP_SPACES.filter(t => ctx.G.troops[t.id] === me.color).map(t => t.id);
-      if (eligible.length === 1) {
-        Mechanics.log(ctx.G, '(return own troop: you have no valid troops on the board — skipped)');
+      // Skip at 0 troops (nothing to return) AND at 1 (the "can't return your
+      // last troop" failsafe — callers also gate the option behind a >=2 check).
+      // `<= 0` alone would let a mandatory choice surface over an empty options
+      // list, which the UI can't resolve (no targets, no decline) → softlock.
+      if (eligible.length <= 1) {
+        Mechanics.log(ctx.G, eligible.length === 0
+          ? '(return own troop: you have no troops on the board — skipped)'
+          : '(return own troop: only your last troop remains — skipped)');
         return true;
       }
       ctx.pendingChoice = {
