@@ -761,13 +761,21 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       const wrapped = { ...template, G, ctx } as { G: TyrantsState; ctx: typeof ctx };
       const next = reducer(wrapped, action('playCard', [i], me)) as { G: TyrantsState };
       if (next === wrapped) continue;        // invalid (shouldn't happen on your turn)
-      // Skip a card that would FIZZLE — e.g. Mind Flayer / Marilith played as
+      // 1. Skip a card that would FIZZLE — e.g. Mind Flayer / Marilith played as
       // your last card, where "devour a card from hand" has no food left. It
       // opens no prompt, so the naive check below would treat it as a free
       // basic and auto-play it for zero effect (#74). Leave it for the player.
       if ((next.G as unknown as { _playFizzledNoFood?: boolean })._playFizzledNoFood) continue;
-      if (!next.G.pendingChoice) return i;   // non-interactive → "basic"
-    }
+      // NEW FIX CONDITIONS:
+      // 2. Skip cards that created an immediate prompt
+      if (next.G.pendingChoice) continue;
+      // 3. Skip cards that queued up an End-of-Turn promote trigger
+      const currentEotCount = G.pendingEotPromotions?.length ?? 0;
+      const nextEotCount = next.G.pendingEotPromotions?.length ?? 0;
+      if (nextEotCount > currentEotCount) continue;
+
+      return i; // Safely confirmed as a non-interactive basic card
+      }
     return null;
   }, [isOnline, aiLookahead, myTurn, G, ctx, me]);
 
@@ -1995,10 +2003,12 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
+            // Hide ineligible cards entirely when options restrict which cards are pickable
+            if (isChoosing && opts && !eligible) return null;
             const onClick = isChoosing
-              ? (eligible ? () => moves.resolveChoice(i) : undefined)
+              ? () => moves.resolveChoice(i)
               : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
-            const label = isChoosing ? (eligible ? 'pick' : '—') : 'play';
+            const label = isChoosing ? 'pick' : 'play';
             return <Card key={i} card={c} label={label} onClick={onClick} />;
           })}
         </div>
@@ -2488,10 +2498,12 @@ function SplitPlayView(props: {
                 const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
                 const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
+                // Hide ineligible cards entirely when options restrict which cards are pickable
+                if (isChoosing && opts && !eligible) return null;
                 const onClick = isChoosing
-                  ? (eligible ? () => moves.resolveChoice(i) : undefined)
+                  ? () => moves.resolveChoice(i)
                   : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
-                const label = isChoosing ? (eligible ? 'pick' : '—') : 'play';
+                const label = isChoosing ? 'pick' : 'play';
                 return <Card key={i} card={c} label={label} onClick={onClick} />;
               })}
             </div>

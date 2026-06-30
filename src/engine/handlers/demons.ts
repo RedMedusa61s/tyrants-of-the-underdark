@@ -47,8 +47,8 @@ registerAll({
                               handler: returnAnySpiesAndSupplantAtEach(),
                               available: playerHasUsefulSpyForSupplant }),
   'demogorgon':           devourFromHandCost(sequence(
-                            supplantChoice({ whiteOnly: true, anywhere: true }),
-                            supplantChoice({ whiteOnly: true, anywhere: true }),
+                            supplantChoice({ whiteOnly: true, anywhere: false }),
+                            supplantChoice({ whiteOnly: true, anywhere: false }),
                             giveOutcastToEachOpponent({ count: 2 }))),
   'orcus':                devourFromHandCost(sequence(
                             assassinateChoice({ count: 2 }),

@@ -16,18 +16,126 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          forcePlayerOfColorToDiscardIfMinHand,
          registerOnForcedDiscard, playForeignCard,
          playerHasOwnSpy, playerCanAssassinate,
-         playerCanReturnEnemyTroop, playerCanReturnEnemySpy } from '../handler-helpers';
+         playerCanReturnEnemyTroop, playerCanReturnEnemySpy,
+         playerCanReturnAnyTroop, playerHasOwnTroopOnBoard,
+         returnEnemyTroopChoice, returnEnemySpyChoice, returnOwnTroopChoice } from '../handler-helpers';
 import { Mechanics } from '../mechanics';
 import { assassinateTroop, hasPresence } from '../map-state';
 import { TROOP_SPACES } from '../../data/troop-spaces';
 import { SITES } from '../../data/sites';
 import { totalTrophies, type Color } from '../../game';
+import type { EffectContext, EffectHandler, PendingChoice } from '../types';
+
+// In registerAll({...}), replace the 'mindwitness' entry with:
+
+/** Per Mindwitness's action:
+ * assassinate; the killed troop's OWNER discards
+ * a card if they have MORE THAN 3 cards (4+)
+ */
+const forcePlayerOfAssassinatedColorToDiscard: EffectHandler = ctx => {
+  const me = ctx.G.players[ctx.actorId];
+
+  interface S {
+    phase: 'assassinate' | 'force-discard';
+    killedColor?: Color | 'white' | null;
+    fdState?: unknown;
+  }
+  let state = (ctx.handlerState as S | null) ?? { phase: 'assassinate' };
+
+  // --- Phase 1: pick and execute the assassinate ---
+  if (state.phase === 'assassinate') {
+    if (!ctx.pendingChoice) {
+      const eligible: string[] = [];
+      for (const t of TROOP_SPACES) {
+        const occ = ctx.G.troops[t.id];
+        if (!occ || occ === me.color) continue;
+        const hasPres = t.parentSite
+          ? hasPresence(ctx.G, me.color, { site: t.parentSite })
+          : t.parentRoute
+            ? hasPresence(ctx.G, me.color, { space: t.id })
+            : false;
+        if (!hasPres) continue;
+        eligible.push(t.id);
+      }
+      if (eligible.length === 0) {
+        Mechanics.log(ctx.G, '(Mindwitness: no enemy/white targets — skipped)');
+        return true;
+      }
+      ctx.pendingChoice = {
+        kind: 'select-troop-space',
+        prompt: 'Mindwitness: assassinate a troop.',
+        options: eligible,
+        optional: false,
+      } as PendingChoice;
+      ctx.paused = true;
+      ctx.handlerState = { phase: 'assassinate' };
+      return false;
+    }
+
+    const spaceId = ctx.pendingChoice.response as string | null;
+    ctx.pendingChoice = null;
+    ctx.paused = false;
+
+    if (!spaceId) { ctx.handlerState = null; return true; }
+
+    const killedColor = ctx.G.troops[spaceId];
+    if (!killedColor || killedColor === me.color) { ctx.handlerState = null; return true; }
+
+    const killed = assassinateTroop(ctx.G, spaceId);
+    if (killed === 'white') me.trophyHall.white += 1;
+    else if (killed) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
+
+    // Transition to force-discard phase, recording the killed color
+    state = { phase: 'force-discard', killedColor: killed, fdState: null };
+    ctx.handlerState = state;
+  }
+
+  // --- Phase 2: force the owner of the killed troop to discard ---
+  if (state.phase === 'force-discard') {
+    const killedColor = state.killedColor;
+
+    // White troops have no owner — nothing to do
+    if (!killedColor || killedColor === 'white') { ctx.handlerState = null; return true; }
+
+    const forceFn = forcePlayerOfColorToDiscardIfMinHand(killedColor as Color, ctx.actorId, 4);
+    const childCtx: EffectContext = {
+      ...ctx,
+      handlerState: state.fdState ?? null,
+      pendingChoice: ctx.pendingChoice,
+      paused: ctx.paused,
+    };
+    const done = forceFn(childCtx);
+    if (!done) {
+      ctx.pendingChoice = childCtx.pendingChoice;
+      ctx.paused = childCtx.paused;
+      ctx.handlerState = { phase: 'force-discard', killedColor, fdState: childCtx.handlerState };
+      return false;
+    }
+
+    // Pop the undo snapshot that resolveChoice just pushed for this resume,
+    // so the assassinate + discard collapse into a single undoable action.
+    // The assassinate's resolveChoice already has a snapshot on the stack;
+    // this resume's snapshot would create a second entry that would let the
+    // player undo only the discard, leaving the troop dead. Removing it means
+    // undoing lands back before the assassinate pick was made.
+    if (ctx.G.undoStack && ctx.G.undoStack.length > 0) {
+      ctx.G.undoStack.pop();
+    }
+
+    ctx.handlerState = null;
+    return true;
+  }
+
+  ctx.handlerState = null;
+  return true;
+};
 
 registerAll({
-  // Cost 1 — Grimlock: deploy 2 troops; "if your opponent causes you to
+  // Cost 1 — Grimlock: deploy 1 troop; "if your opponent causes you to
   //   discard this, draw 2" — the reactive part isn't yet implemented
   //   (no engine hook for cards-discarded-by-other-player). Deploy fires.
-  'grimlock':           deployChoice({ count: 2 }),
+  'grimlock':           deployChoice({ count: 1 }),
 
   // Cost 2 — Cranium Rats: deploy 2 + choose opponent with MORE THAN 3 cards
   //   (i.e. 4+) to discard. Cards read "more than 3 cards" — a player at
@@ -55,60 +163,7 @@ registerAll({
   // Cost 3 — Mindwitness: assassinate; the killed troop's OWNER discards
   //   a card if they have MORE THAN 3 cards (4+). Hand-rolled to capture
   //   the killed troop's color BEFORE the assassinate clears the slot.
-  'mindwitness':        (ctx => {
-                          const me = ctx.G.players[ctx.actorId];
-                          // Phase 1: pick the assassinate target.
-                          if (!ctx.pendingChoice) {
-                            // Eligible: any space where you have presence
-                            // occupied by an enemy/white troop. The earlier
-                            // implementation skipped the presence check and
-                            // let Mindwitness assassinate anywhere on the
-                            // map — reported as #49. "Assassinate a troop"
-                            // on a card inherits the rulebook constraint
-                            // (p.13) unless the text says "anywhere."
-                            const eligible: string[] = [];
-                            for (const t of TROOP_SPACES) {
-                              const occ = ctx.G.troops[t.id];
-                              if (!occ || occ === me.color) continue;
-                              const hasPres = t.parentSite
-                                ? hasPresence(ctx.G, me.color, { site: t.parentSite })
-                                : t.parentRoute
-                                  ? hasPresence(ctx.G, me.color, { space: t.id })
-                                  : false;
-                              if (!hasPres) continue;
-                              eligible.push(t.id);
-                            }
-                            if (eligible.length === 0) {
-                              Mechanics.log(ctx.G, '(Mindwitness: no enemy/white targets — skipped)');
-                              return true;
-                            }
-                            ctx.pendingChoice = {
-                              kind: 'select-troop-space',
-                              prompt: 'Mindwitness: assassinate a troop.',
-                              options: eligible,
-                              optional: true,
-                            };
-                            ctx.paused = true;
-                            return false;
-                          }
-                          const spaceId = ctx.pendingChoice.response as string | null;
-                          ctx.pendingChoice = null;
-                          ctx.paused = false;
-                          if (!spaceId) return true;
-                          const killedColor = ctx.G.troops[spaceId];
-                          if (!killedColor || killedColor === me.color) return true;
-                          // Do the assassinate via map-state helper.
-                          const killed = assassinateTroop(ctx.G, spaceId);
-                          if (killed === 'white') me.trophyHall.white += 1;
-                          else if (killed) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
-                          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
-                          // Force the owner of the killed color to discard.
-                          if (killedColor !== 'white') {
-                            const forceFn = forcePlayerOfColorToDiscardIfMinHand(killedColor as Color, ctx.actorId, 4);
-                            forceFn(ctx);
-                          }
-                          return true;
-                        }),
+  'mindwitness':        forcePlayerOfAssassinatedColorToDiscard,
   // Cost 3 — Gauth: chooseOne(+2 money OR draw + force opponent with 4+ cards to discard)
   'gauth':              chooseOne(
                           { label: '+2 Influence', handler: grant({ influence: 2 }) },
@@ -126,8 +181,108 @@ registerAll({
   'intellect-devourer': chooseOne(
                           { label: '+3 Influence', handler: grant({ influence: 3 }) },
                           { label: 'Return up to 2 troops/spies',
-                            handler: times(2, returnEnemyTroopOrSpyChoice()),
-                            available: (G, actorId) => playerCanReturnEnemyTroop(G, actorId) || playerCanReturnEnemySpy(G, actorId) }),
+                            handler: (ctx => {
+                              interface S { remaining: number; childLabel?: string; childState?: unknown }
+
+                              const subHandlerFor = (label: string): EffectHandler | null => {
+                                switch (label) {
+                                  case 'Return an enemy troop':      return returnEnemyTroopChoice();
+                                  case 'Return an enemy spy':        return returnEnemySpyChoice();
+                                  case 'Return one of your troops':  return returnOwnTroopChoice({ optional: false });
+                                  case 'Return one of your spies':   return returnOwnSpyChoice({ optional: false });
+                                  default: return null;
+                                }
+                              };
+
+                              const buildOptions = (G: TyrantsState, actorId: string): string[] => {
+                                const opts: string[] = [];
+                                if (playerCanReturnEnemyTroop(G, actorId))   opts.push('Return an enemy troop');
+                                if (playerCanReturnEnemySpy(G, actorId))    opts.push('Return an enemy spy');
+                                if (playerHasOwnTroopOnBoard(G, actorId, {returnFailsafe: true }))   opts.push('Return one of your troops');
+                                if (playerHasOwnSpy(G, actorId))            opts.push('Return one of your spies');
+                                opts.push('Skip (done returning)');
+                                return opts;
+                              };
+
+                              let state = (ctx.handlerState as S | null) ?? { remaining: 2 };
+
+                              // Inner loop: keep running until we need player input or are done.
+                              while (true) {
+                                // --- Resume a suspended sub-handler ---
+                                if (state.childLabel) {
+                                  const sub = subHandlerFor(state.childLabel);
+                                  if (sub) {
+                                    const childCtx = { ...ctx, handlerState: state.childState ?? null };
+                                    const done = sub(childCtx);
+                                    ctx.pendingChoice = childCtx.pendingChoice;
+                                    ctx.paused = childCtx.paused;
+                                    if (!done) {
+                                      ctx.handlerState = { ...state, childState: childCtx.handlerState };
+                                      return false;
+                                    }
+                                    // Sub done — decrement and clear child tracking
+                                    state = { remaining: state.remaining - 1 };
+                                    ctx.pendingChoice = null;
+                                    ctx.paused = false;
+                                  } else {
+                                    state = { remaining: state.remaining - 1 };
+                                  }
+                                }
+
+                                // --- Done? ---
+                                if (state.remaining <= 0) { ctx.handlerState = null; return true; }
+
+                                // --- Show the choose-one prompt for this iteration ---
+                                if (!ctx.pendingChoice) {
+                                  const options = buildOptions(ctx.G, ctx.actorId);
+                                  ctx.pendingChoice = {
+                                    kind: 'choose-one',
+                                    prompt: `Return a troop or spy (${state.remaining} left) — optional.`,
+                                    options,
+                                    optional: false,
+                                  } as PendingChoice;
+                                  ctx.paused = true;
+                                  ctx.handlerState = { remaining: state.remaining };
+                                  return false;
+                                }
+
+                                // --- Process the choose-one response ---
+                                const idx = ctx.pendingChoice.response as number | null;
+                                ctx.pendingChoice = null;
+                                ctx.paused = false;
+                                if (idx == null) { ctx.handlerState = null; return true; }
+
+                                const options = buildOptions(ctx.G, ctx.actorId);
+                                const chosen = options[idx];
+
+                                if (!chosen || chosen === 'Skip (done returning)') {
+                                  ctx.handlerState = null;
+                                  return true;
+                                }
+
+                                // Delegate to sub-handler
+                                const sub = subHandlerFor(chosen)!;
+                                const childCtx = { ...ctx, handlerState: null };
+                                const done = sub(childCtx);
+                                ctx.pendingChoice = childCtx.pendingChoice;
+                                ctx.paused = childCtx.paused;
+                                if (!done) {
+                                  ctx.handlerState = { remaining: state.remaining, childLabel: chosen, childState: childCtx.handlerState };
+                                  return false;
+                                }
+                                // Sub completed synchronously — loop to next iteration
+                                state = { remaining: state.remaining - 1 };
+                                ctx.pendingChoice = null;
+                                ctx.paused = false;
+                                // continue while loop
+                              }
+                            }),
+                            available: (G, actorId) =>
+                              playerCanReturnAnyTroop(G, actorId) ||
+                              playerCanReturnEnemySpy(G, actorId) ||
+                              playerHasOwnTroopOnBoard(G, actorId, {returnFailsafe: true }) ||
+                              playerHasOwnSpy(G, actorId) }),
+
   // Cost 4 — Umber Hulk: deploy 3 + reactive (if-discarded). Deploy fires;
   //   reactive deferred.
   'umber-hulk':         deployChoice({ count: 3 }),
@@ -195,12 +350,37 @@ registerAll({
   // Cost 7 — Neogi: deploy 4 + eot each-opp-discard (here we just discard
   //   immediately rather than queueing for end of turn; outcome is the
   //   same since no card-play happens between deploy and end-of-turn).
-  'neogi':              sequence(deployChoice({ count: 4 }), eachOpponentDiscardsIfMinHand(4)),
+  'neogi':              sequence(deployChoice({ count: 4 }), eachOpponentDiscardsIfMinHand(1)),
   // Cost 7 — Death Tyrant: assassinate up to 3 troops at a single site +1
   //   money each. Approximate as 3 normal assassinates (the "at single
   //   site" restriction is a strategic narrowing; engine-wise the player
-  //   can still pick targets independently). Money-per-kill TODO.
-  'death-tyrant':       assassinateChoice({ count: 3, sameSite: true }),
+  //   can still pick targets independently).
+  'death-tyrant':       (ctx => {
+                          interface S { phase: 'assassinate'; sub?: unknown; kills: number }
+                          const state = (ctx.handlerState as S | null) ?? { phase: 'assassinate', sub: null, kills: 0 };
+                          // Snapshot before THIS call so we count only kills made in this step.
+                          const me = ctx.G.players[ctx.actorId];
+                          const trophiesAtEntry = totalTrophies(me);
+                          const childCtx = { ...ctx, handlerState: state.sub ?? null };
+                          const done = assassinateChoice({ count: 3, sameSite: true, optional: true })(childCtx);
+                          ctx.pendingChoice = childCtx.pendingChoice;
+                          ctx.paused = childCtx.paused;
+                          // Accumulate kills across all re-entries.
+                          const killsThisStep = totalTrophies(me) - trophiesAtEntry;
+                          const totalKills = state.kills + killsThisStep;
+                          if (!done) {
+                            ctx.handlerState = { phase: 'assassinate', sub: childCtx.handlerState, kills: totalKills };
+                            return false;
+                          }
+
+                          // Loop complete or declined — grant 1 influence per total kills.
+                          if (totalKills > 0) {
+                            me.influence += totalKills;
+                            ctx.G.log.push(`P${Number(ctx.actorId) + 1} +${totalKills} Influence from Death Tyrant (${totalKills} troop${totalKills === 1 ? '' : 's'} assassinated)`);
+                          }
+                          ctx.handlerState = null;
+                          return true;
+                        }),
 
   // Cost 7 — Elder Brain: promote your top card + play a card from
   //   inner-circle as if it were in hand (it stays in inner circle).
@@ -269,3 +449,5 @@ registerOnForcedDiscard('ambassador', (G, ownerPid) => {
 
 // Suppress unused-import warning if any helper isn't yet referenced.
 void playerCanAssassinate;
+void returnEnemyTroopOrSpyChoice;
+void playerCanReturnEnemyTroop

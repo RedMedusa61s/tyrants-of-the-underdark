@@ -25,11 +25,13 @@ import { totalTrophies } from '../../game';
 registerAll({
   // Cost 2 — Vampire Spawn: +1 money + return another player's troop/spy
   'vampire-spawn':       sequence(grant({ influence: 1 }), returnEnemyTroopOrSpyChoice()),
+
   // Cost 2 — Skeletal Horde: deploy 2; optional devour-self → deploy 3
   'skeletal-horde':      sequence(
                            deployChoice({ count: 2 }),
                            optionalDevourSelfThen(deployChoice({ count: 3 }),
                                                   'Devour Skeletal Horde for 3 more deploys?')),
+
   // Cost 2 — Cultist of Myrkul: chooseOne(+2 money, devour-self → eot promote x2)
   'cultist-of-myrkul':   chooseOne(
                            { label: '+2 Influence', handler: grant({ influence: 2 }) },
@@ -38,9 +40,11 @@ registerAll({
                              // makes the promote count player-choosable; flip to optional
                              // so the player can decline each prompt.
                              handler: devourSelfThen(flagEotPromote({ count: 2, optional: true })) }),
+
   // Cost 2 — Carrion Crawler: +3 power + replace a market card with self
   //   (the card-being-played enters the market in place of a devoured one)
   'carrion-crawler':     sequence(grant({ power: 3 }), marketDevourReplaceWithSelf()),
+
   // Cost 2 — Wraith: spy; optional devour-self → assassinate at the spy site
   'wraith':              sequence(
                            placeSpyAtChosenSite(),
@@ -53,6 +57,7 @@ registerAll({
                            { label: 'Devour a hand card → supplant a troop',
                              handler: devourFromHandCost(supplantChoice()),
                              available: (G, a) => G.players[a].hand.length > 0 }),
+
   // Cost 3 — Ghost: chooseOne(place spy, return spy → recruit top of
   //   devoured pile as if from market). Devoured pile is tracked
   //   server-side in G.devouredPile (Mechanics.devour pushes to it).
@@ -61,12 +66,14 @@ registerAll({
                            { label: 'Return a spy → recruit top of devoured pile',
                              handler: sequence(returnOwnSpyChoice(), recruitFromDevouredPile()),
                              available: playerHasOwnSpy }),
+
   // Cost 3 — Flesh Golem: +2 power; optional devour-self → assassinate
   'flesh-golem':         sequence(
                            grant({ power: 2 }),
                            optionalDevourSelfThen(assassinateChoice(),
                                                   'Devour Flesh Golem to assassinate?',
                                                   )),
+
   // Cost 3 — Ravenous Zombies: +1 power + assassinate a white troop
   'ravenous-zombies':    sequence(grant({ power: 1 }), assassinateChoice({ whiteOnly: true })),
   // Cost 3 — Minotaur Skeleton: chooseOne(deploy 3, devour-self → assassinate up to 3 whites at one site)
@@ -74,7 +81,8 @@ registerAll({
   'minotaur-skeleton':   chooseOne(
                            { label: 'Deploy 3 troops', handler: deployChoice({ count: 3 }) },
                            { label: 'Devour this → assassinate up to 3 white troops at one site',
-                             handler: devourSelfThen(assassinateChoice({ count: 3, whiteOnly: true })),
+                             handler: optionalDevourSelfThen(assassinateChoice({ count: 3, whiteOnly: true, sameSite: true }),
+                                                              'Devour Minotaur Skeleton?'),
                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) }),
 
   // Cost 4 — Banshee: spy + "if there is another spy there, +3 attack."
@@ -94,6 +102,7 @@ registerAll({
                              }
                              return true;
                            })),
+
   // Cost 4 — Ogre Zombie: supplant a white troop anywhere
   'ogre-zombie':         supplantChoice({ whiteOnly: true, anywhere: true }),
   // Cost 4 — Revenant: assassinate 2 troops; if you have 8+ trophies,
@@ -146,9 +155,7 @@ registerAll({
                            { label: 'Return a spy → free-recruit up to 2 cards (cost ≤3)',
                              handler: sequence(
                                returnOwnSpyChoice(),
-                               recruitFromMarketFiltered({ maxCost: 3, includeAuxStacks: true }),
-                               recruitFromMarketFiltered({ maxCost: 3, includeAuxStacks: true }),
-                             ),
+                               recruitFromMarketFiltered({ maxCost: 3, includeAuxStacks: true, quantity: 2, optional: true })),
                              available: playerHasOwnSpy }),
   // Cost 5 — Necromancer: chooseOne over four branches per the printed
   //   text — "+3 money OR promote this card OR promote a card from your
@@ -156,9 +163,9 @@ registerAll({
   'necromancer':         chooseOne(
                            { label: '+3 Influence', handler: grant({ influence: 3 }) },
                            { label: 'Promote this card (Necromancer → inner circle)', handler: promoteSelf() },
-                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice({ optional: true }),
+                           { label: 'Promote a card from your hand', handler: promoteFromHandChoice(),
                              available: (G, a) => G.players[a].hand.length > 0 },
-                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice({ optional: true }),
+                           { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice(),
                              available: (G, a) => G.players[a].discard.length > 0 }),
 
   // Cost 6 — Death Knight: supplant a troop + 1 VP per 5 player trophies
@@ -194,7 +201,7 @@ registerAll({
                            { label: 'Assassinate a white troop', handler: assassinateChoice({ whiteOnly: true }),
                              available: (G, a) => playerCanAssassinate(G, a, { whiteOnly: true }) },
                            { label: 'Take a white trophy from any hall and place it',
-                             handler: takeTrophyAndPlace({ count: 1, whiteOnly: true }),
+                             handler: takeTrophyAndPlace({ count: 1, whiteOnly: true, optional: false }),
                              available: (G) => {
                                // Any player's trophy hall (including the actor's own).
                                for (const p of Object.values(G.players)) {
@@ -202,6 +209,7 @@ registerAll({
                                }
                                return false;
                              } })),
+
   // Cost 6 — High Priest of Myrkul: return another player's troop or spy
   //   + eot promote (Undead aspect filter — but Undead aspect varies on
   //   cards in this deck so we leave unrestricted for now).
@@ -215,8 +223,12 @@ registerAll({
   //   - "any number" should chain prompts as long as eligibles remain
   //     AND the player keeps picking. We don't model that — we queue 1.
   //     Worth a follow-up but doesn't break correctness of single uses.
-  'high-priest-of-myrkul': sequence(returnEnemyTroopOrSpyChoice(),
-                                    flagEotPromote({ optional: true })),
+
+  'high-priest-of-myrkul': sequence(
+                            // fizzleIfNoTargets: true - prevents card from being played when there are
+                            //                            no targets and "Play all basic" is selected.
+                            returnEnemyTroopOrSpyChoice({ fizzleIfNoTargets: true }),
+                            flagEotPromote({ optional: true, typeFilter: 'Undead' })),
 
   // Cost 7 — Vampire: chooseOne(supplant a troop, promote a card from
   //   discard then +1 VP per 3 promoted cards in inner circle).
@@ -235,6 +247,7 @@ registerAll({
                                  }
                                  return true;
                                })) }),
+
   // Cost 7 — Lich: place a spy. "If another player has a troop there,
   //   take 2 trophies from their trophy hall and deploy them."
   //   Restricted to THE qualifying opponent(s). If multiple opponents
