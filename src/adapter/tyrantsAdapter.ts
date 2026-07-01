@@ -430,7 +430,19 @@ export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
       return { state, ok: false, reason: String((e as Error)?.message ?? e) };
     }
     if (next === input || next.G === input.G) {
-      return { state, ok: false, reason: 'INVALID_MOVE (engine rejected)' };
+      // Most player-facing rejections are "you tried to do something else while a
+      // required choice is still open" (e.g. a card's mandatory assassinate).
+      // Surface the pending prompt instead of a cryptic "INVALID_MOVE".
+      const pc = state.G.pendingChoice;
+      if (pc && action.kind !== 'resolveChoice') {
+        return {
+          state, ok: false,
+          reason: pc.prompt
+            ? `Finish the current required action first: "${pc.prompt}"`
+            : 'Finish the current required action first.',
+        };
+      }
+      return { state, ok: false, reason: 'That move isn’t legal right now.' };
     }
     return { state: next, ok: true };
   },

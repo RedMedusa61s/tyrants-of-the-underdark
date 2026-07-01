@@ -626,7 +626,18 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
   // Per-AI-turn summary modal. The user clicks through each AI's completed turn to
   // see what they did before play continues to the next seat.
-  const [shownTurnLogCount, setShownTurnLogCount] = useState(0);
+  //
+  // On (re)load, start PAST the backlog: only surface opponent turns that
+  // completed since our own last turn (usually just the one, in a 2-player game),
+  // not the entire game's history. Reloading a mid-game — which happens a lot,
+  // especially while something's misbehaving — otherwise forces the player to
+  // click through a modal for every opponent turn from the start. New opponent
+  // turns that complete while we're actually playing still surface normally.
+  const [shownTurnLogCount, setShownTurnLogCount] = useState(() => {
+    let lastMine = -1;
+    for (let i = 0; i < G.turnLogs.length; i++) if (G.turnLogs[i].playerId === me) lastMine = i;
+    return lastMine + 1;
+  });
   // Find the next AI-turn log we haven't shown yet. We track the absolute index so
   // OK can jump the counter past it (skipping any interleaved human turns), instead
   // of just incrementing by 1 and forcing the user to click through the gap.
