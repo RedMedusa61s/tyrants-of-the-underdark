@@ -22,7 +22,7 @@
     "snapshot-size": "vite-node scripts/snapshot-size.ts",
     "test:ai-drive": "vite-node scripts/test-ai-drive.ts",
     "ci": "tsc --noEmit && npm run test:ai-drive",
-    "ship": "npm run test:ai-drive && npm run build && wrangler pages deploy dist --project-name tyrants-online --branch main"
+    "ship": "npm run test:ai-drive && npm run build && npx wrangler pages deploy dist --project-name tyrants-online --branch main"
   },
   "keywords": [],
   "author": "",
