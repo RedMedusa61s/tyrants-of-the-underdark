@@ -100,10 +100,10 @@ export function initialBgioState(
 }
 
 /** Translate a TyrantsAction into the bgio MAKE_MOVE dispatch shape. */
-function toBgioAction(action: TyrantsAction, actor: PlayerId): unknown {
-  const mk = (type: string, args: unknown[]) => ({
+function toBgioAction(action: TyrantsAction, actor: PlayerId, currentPlayer: string): unknown {
+  const mk = (type: string, args: unknown[], pid: string = actor) => ({
     type: 'MAKE_MOVE',
-    payload: { type, args, playerID: actor },
+    payload: { type, args, playerID: pid },
   });
   switch (action.kind) {
     case 'deployStartingTroop': return mk('deployStartingTroop', [action.siteId]);
@@ -113,7 +113,13 @@ function toBgioAction(action: TyrantsAction, actor: PlayerId): unknown {
     case 'deployTroop':         return mk('deployTroop', [action.spaceId]);
     case 'assassinateTroop':    return mk('assassinateTroop', [action.spaceId]);
     case 'returnEnemySpy':      return mk('returnEnemySpy', [action.siteId, action.targetColor]);
-    case 'resolveChoice':       return mk('resolveChoice', [action.response]);
+    // A pendingChoice may belong to a player who is NOT the current player (a
+    // cross-player forced discard: an aberrations card makes the OPPONENT
+    // discard). boardgame.io only permits the current player to submit a move,
+    // so stamp resolveChoice with `currentPlayer`. The resolveChoice move
+    // resolves `G.pendingChoice` (which carries its own `playerId`) regardless
+    // of who submitted it, so this is safe and fixes the cross-player lock (#91).
+    case 'resolveChoice':       return mk('resolveChoice', [action.response], currentPlayer);
     case 'endTurn':             return mk('endTurn', []);
   }
 }
@@ -233,7 +239,22 @@ function enumerateChoiceResponses(G: TyrantsState): TyrantsAction[] {
       for (let i = 0; i < opts.length; i++) out.push({ kind: 'resolveChoice', response: i });
       break;
     }
-    case 'select-card-in-hand':
+    case 'select-card-in-hand': {
+      // Forced-discard prompts (aberrations cards: force-a-discard, troop-killed,
+      // spied-on) don't populate `options` — the discard is "any card in the
+      // prompted player's hand". Enumerate that hand's indices so the engine gets
+      // a valid response. Without this, enumeration falls through to a bogus
+      // `null`, which the AI dutifully submits and the engine rejects as
+      // INVALID_MOVE — wedging the whole turn (the "Red is taking their turn"
+      // lock; PR #88 introduced these cards).
+      const handOpts = pc.options as number[] | undefined;
+      const idxs = (handOpts && handOpts.length > 0)
+        ? handOpts
+        : (G.players[pc.playerId]?.hand.map((_, i) => i) ?? []);
+      for (const i of idxs) out.push({ kind: 'resolveChoice', response: i });
+      if (out.length === 0) out.push({ kind: 'resolveChoice', response: null });
+      break;
+    }
     case 'select-card-in-discard':
     case 'select-card-in-inner-circle':
     case 'select-played-card':
@@ -246,7 +267,7 @@ function enumerateChoiceResponses(G: TyrantsState): TyrantsAction[] {
       // response is the option value itself.
       const opts = (pc.options as unknown[] | undefined) ?? [];
       for (const o of opts) out.push({ kind: 'resolveChoice', response: o });
-      // Some self-targeted hand prompts expose no options array; fall back to
+      // Some self-targeted prompts expose no options array; fall back to
       // null (decline / no-op) so the actor is never stuck with zero actions.
       if (out.length === 0) out.push({ kind: 'resolveChoice', response: null });
       break;
@@ -392,7 +413,7 @@ export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
     // bgio's reducer is pure given (state, action) and clones internally, but
     // we structuredClone defensively so callers never observe shared mutation.
     const input = structuredClone(state);
-    const next = reducer()(input, toBgioAction(action, actor));
+    const next = reducer()(input, toBgioAction(action, actor, input.ctx.currentPlayer));
     if (next === input || next.G === input.G) {
       // bgio returns the same top-level reference on INVALID_MOVE.
       throw new Error(`applyAction: illegal ${action.kind} for ${actor}`);
@@ -404,7 +425,7 @@ export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
     const input = structuredClone(state);
     let next: BgioState;
     try {
-      next = reducer()(input, toBgioAction(action, actor));
+      next = reducer()(input, toBgioAction(action, actor, input.ctx.currentPlayer));
     } catch (e) {
       return { state, ok: false, reason: String((e as Error)?.message ?? e) };
     }
