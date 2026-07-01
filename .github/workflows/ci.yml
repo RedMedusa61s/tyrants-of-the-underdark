@@ -40,5 +40,8 @@ jobs:
       - name: AI-drive sweep (no wedging bug may ship)
         run: npm run test:ai-drive
 
+      - name: Online-path integration (serialize→store→decode; no deadlock/loop/bloat)
+        run: npm run test:online-path
+
       - name: Build
         run: npx vite build

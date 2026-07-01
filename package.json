@@ -21,8 +21,9 @@
     "adapter-rollout": "vite-node scripts/adapter-rollout.ts",
     "snapshot-size": "vite-node scripts/snapshot-size.ts",
     "test:ai-drive": "vite-node scripts/test-ai-drive.ts",
-    "ci": "tsc --noEmit && npm run test:ai-drive",
-    "ship": "npm run test:ai-drive && npm run build && npx wrangler pages deploy dist --project-name tyrants-online --branch main"
+    "test:online-path": "vite-node scripts/test-online-path.ts",
+    "ci": "tsc --noEmit && npm run test:ai-drive && npm run test:online-path",
+    "ship": "npm run test:ai-drive && npm run test:online-path && npm run build && npx wrangler pages deploy dist --project-name tyrants-online --branch main"
   },
   "keywords": [],
   "author": "",
