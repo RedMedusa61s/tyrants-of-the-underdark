@@ -1,0 +1,44 @@
+# The safety gate: nothing ships until the server-side AI can drive a full turn
+# — and a full game — for every card in every deck without getting wedged.
+#
+# This is the check that would have caught the aberrations forced-discard crash
+# that locked live online vs-AI games at "Red is taking their turn". It mirrors
+# the framework's driveAi loop exactly, so a wedging bug dies here in the
+# pipeline instead of stranding a real player's game. Runs typecheck, the
+# AI-drive sweep, and the production build on every push/PR to main.
+#
+# The canonical deploy (npm run ship) runs the same AI-drive sweep locally
+# BEFORE pushing to Cloudflare, so a red build can't reach players even though
+# deploys are manual.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: AI-drive sweep (no wedging bug may ship)
+        run: npm run test:ai-drive
+
+      - name: Build
+        run: npx vite build
