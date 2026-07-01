@@ -71,7 +71,14 @@ async function apiJson(
     if (r.ok && data !== null) return data;
 
     const isHtml = data === null && /^\s*</.test(text);
-    const transient = isHtml || r.status >= 500;
+    // An empty/whitespace body ("Unexpected end of JSON input") means the
+    // Function returned nothing — a cold-start / mid-deploy artifact where the
+    // request never produced a real response. Like the HTML SPA-fallback case,
+    // it proves no complete server-side result, so it's safe to retry even for
+    // a write (worst case on a create is one unused game, not a double-apply).
+    const isEmpty = data === null && text.trim() === '';
+    const noServerResult = isHtml || isEmpty;
+    const transient = noServerResult || r.status >= 500;
     if (transient) {
       logApiAnomaly({
         t: Date.now(),
@@ -80,18 +87,19 @@ async function apiJson(
         cfRay: r.headers.get('cf-ray'),
         cfCache: r.headers.get('cf-cache-status'),
         isHtml,
+        isEmpty,
         bodySnippet: text.slice(0, 80),
         attempt,
       });
-      // Reads retry on any transient; writes retry only the side-effect-free
-      // HTML (SPA-fallback) case.
-      const mayRetry = opts.idempotent ? true : isHtml;
+      // Reads retry on any transient; writes retry only the cases that prove no
+      // complete server-side result (HTML SPA-fallback or an empty body).
+      const mayRetry = opts.idempotent ? true : noServerResult;
       if (mayRetry && attempt < backoff.length) { await delay(backoff[attempt]); continue; }
     }
 
     lastErr = new Error(
       (data && data.error)
-        || (isHtml
+        || (noServerResult
           ? 'The server was briefly unavailable. Reconnecting…'
           : `Server error (HTTP ${r.status}). Please reload and try again.`),
     );
@@ -112,16 +120,16 @@ export async function createGame(
   numPlayers: number,
   ai?: Partial<Record<PlayerId, string>>,
 ): Promise<Invites> {
-  const r = await fetch('/api/games', {
+  // Routed through apiJson so a transient blip (empty body / SPA-fallback HTML
+  // during a cold-start or mid-deploy) is retried instead of failing instantly
+  // with a cryptic "Unexpected end of JSON input". Not marked idempotent — a
+  // create has a side effect — but apiJson still retries the no-server-result
+  // cases (empty/HTML), which are the ones that didn't reach the Function.
+  return apiJson(() => fetch('/api/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ numPlayers, ...(ai ? { ai } : {}) }),
-  });
-  if (!r.ok) {
-    const data: any = await r.json().catch(() => ({}));
-    throw new Error(data?.error || `createGame failed: ${r.status}`);
-  }
-  return r.json();
+  }));
 }
 
 // Lightweight status read for the lobby's "games in progress" list. Returns
