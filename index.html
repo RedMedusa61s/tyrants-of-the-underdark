@@ -3,10 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light">
     <title>Tyrants of the Underdark</title>
   </head>
   <body style="margin:0;background:#0c0814;color:#e6e1f2;font-family:system-ui,sans-serif">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
+  <style>
+    html, body {
+      overflow-x: hidden;
+      width: 100%;
+    }
+    :root {
+      color-scheme: light;
+    }
+    /* Extra insurance against Samsung Internet / Chrome Android's "Website dark
+      mode" repainting troop tokens, control markers, and other game-state
+      colors that must stay exactly as authored. */
+    html {
+      forced-color-adjust: none;
+    }
+  </style>
 </html>

@@ -1220,7 +1220,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         <div
           onClick={() => setPileView(null)}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            width: '100vw', height: '100dvh', background: 'rgba(0,0,0,0.7)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000, padding: 20,
           }}>
@@ -1278,7 +1279,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       <div
         onClick={() => setPileView(null)}
         style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          width: '100vw', height: '100dvh', background: 'rgba(0,0,0,0.7)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000, padding: 20,
         }}>
@@ -1418,7 +1420,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     <div style={{ padding: 16, maxWidth: 1280, margin: '0 auto' }}>
       {pendingAiSummary && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          width: '100vw', height: '100dvh', background: 'rgba(0,0,0,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000,
         }}>
@@ -1447,7 +1450,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'auto', alignItems: 'center', gap: 12 }}>
         <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark</h1>
         <button onClick={() => {
           // Flip in React state — NO page reload (reload triggered the
@@ -1724,7 +1727,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </div>
       )}
 
-      <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ marginTop: 16, display: 'auto', gap: 8, alignItems: 'center' }}>
         {(() => {
           // Tab list. In normal mode: game, map, log (+ dev tabs). In split-
           // view mode: 'play' replaces game + map (everything is on one
@@ -2119,8 +2122,8 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   while (trimmedStyles.length < opponentCount) trimmedStyles.push('heuristic');
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#1a1228', color: '#e6e1f2', border: '2px solid #3a2055', borderRadius: 8, padding: 32, minWidth: 420, maxWidth: 560 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 12px' }}>
+      <div style={{ background: '#1a1228', color: '#e6e1f2', border: '2px solid #3a2055', borderRadius: 8, padding: 32, width: '100%', minWidth: 'min(420px, 100%)', maxWidth: 560, boxSizing: 'border-box' }}>
         <h1 style={{ marginTop: 0, marginBottom: 8 }}>Tyrants of the Underdark</h1>
         <GamesPlayedCount />
         {hasSave && (
