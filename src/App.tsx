@@ -1450,7 +1450,10 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </div>
         </div>
       )}
-      <div style={{ display: 'auto', alignItems: 'center', gap: 12 }}>
+      {/* flexWrap (not display:'auto', which is invalid CSS and silently drops
+          the flex layout): keeps the desktop single-row header, lets the
+          buttons wrap below the title on narrow mobile viewports. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
         <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark</h1>
         <button onClick={() => {
           // Flip in React state — NO page reload (reload triggered the
@@ -1727,7 +1730,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </div>
       )}
 
-      <div style={{ marginTop: 16, display: 'auto', gap: 8, alignItems: 'center' }}>
+      <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         {(() => {
           // Tab list. In normal mode: game, map, log (+ dev tabs). In split-
           // view mode: 'play' replaces game + map (everything is on one
