@@ -200,11 +200,23 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
   }, []);
   // Scale factor relative to the design baseline (1200px wide). All fixed
   // pixel sizes below are multiplied by this so they shrink on smaller
-  // viewports. Clamped to [0.5, 1.0] so the overlays never become
-  // illegibly tiny on very narrow screens, and never grow past their
-  // design size on monitors that exceed the maxWidth cap.
-  const scale = Math.max(0.5, Math.min(1.0, boardWidth / 1200));
+  // viewports. Clamped to [0.3, 1.0]: the 0.3 floor lets overlays keep
+  // shrinking proportionally on phone-width boards (the old 0.5 floor made
+  // troops/pips oversized relative to a ~330px board), while the 1.0 cap
+  // keeps full-width desktop boards at exact design size — mobile tuning
+  // must lower the floor, not the ceiling.
+  const scale = Math.max(0.3, Math.min(1.0, boardWidth / 1200));
   const px = (n: number) => Math.round(n * scale);
+  // Control markers use their own width-proportional size instead of the
+  // shared troop/pip `scale`. Their 110px desktop baseline is ~9% of a
+  // 1200px board, but routing it through the shared floor(0.5) scale left
+  // it at ~55px — ~17% of a phone-width (~330px) board, roughly double its
+  // intended proportion (confirmed against a mobile screenshot: marker
+  // diameter measured 155px against a 995px board image = 15.6%). Deriving
+  // straight from boardWidth reproduces the desktop size (108px at 1200px)
+  // while scaling smoothly down to phone widths; the 28px floor keeps it
+  // legible/tappable on extreme narrow viewports (e.g. split-screen).
+  const markerSizePx = Math.max(28, Math.round(boardWidth * 0.09));
   // Rulebook p.5: hide sites/routes outside this game's active sections. Calibrate
   // / editRoutes modes ignore this so all sites stay reachable for setup work.
   const activeSites = (G && !calibrate && !editRoutes)
@@ -581,7 +593,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
               controlInfluence={m.controlInfluence}
               totalControlInfluence={m.totalControlInfluence}
               totalControlVp={m.totalControlVp}
-              sizePx={px(110)} />
+              sizePx={markerSizePx} />
           );
         });
       })()}
