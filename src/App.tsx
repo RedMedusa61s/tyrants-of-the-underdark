@@ -90,7 +90,10 @@ function ColorSwatch({ color, size = 11 }: { color: string; size?: number }) {
   return (
     <span style={{
       display: 'inline-block', width: size, height: size, borderRadius: 2,
-      background: color, border: '1px solid rgba(255,255,255,0.6)',
+      // Flat gradient (a background-IMAGE) instead of a solid background-color so
+      // Samsung Internet / Chrome Android "Website dark mode" can't repaint this
+      // player-colour swatch. Looks identical to a solid fill everywhere else.
+      background: `linear-gradient(${color}, ${color})`, border: '1px solid rgba(255,255,255,0.6)',
       marginRight: 6, verticalAlign: 'middle', flexShrink: 0,
     }} />
   );
@@ -1379,7 +1382,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                           }}>
                           <span style={{
                             width: 8, height: 8, borderRadius: '50%',
-                            background: COLOR_HEX[c] ?? '#888',
+                            // Flat gradient so Samsung/Chrome forced dark mode
+                            // leaves this colour-coded trophy dot as authored.
+                            background: `linear-gradient(${COLOR_HEX[c] ?? '#888'}, ${COLOR_HEX[c] ?? '#888'})`,
                             border: c === 'black' ? '1px solid #555' : 'none',
                           }} />
                           {n}

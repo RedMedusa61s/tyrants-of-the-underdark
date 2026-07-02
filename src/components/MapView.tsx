@@ -27,6 +27,14 @@ const COLOR_HEX: Record<Color, string> = {
 // White tokens darkened toward light grey so they stand out on white-bordered site boxes.
 const WHITE_TOKEN = '#d0d0d0';
 
+// Samsung Internet / Chrome Android "Website dark mode" repaints solid
+// background-COLORS but leaves background-IMAGES (gradients) alone. Painting a
+// game-state token colour as a flat gradient keeps it exactly as authored even
+// when the user forces the browser's dark mode on — otherwise black tokens get
+// inverted to white and neutral tokens go grey/white inconsistently. Renders
+// pixel-identical to a solid fill in every normal browser.
+const flat = (c: string) => `linear-gradient(${c}, ${c})`;
+
 const STORAGE_KEY = 'totu.site-positions';
 const SLOTS_STORAGE_KEY = 'totu.slot-positions';
 
@@ -387,8 +395,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                         title={`${s.name} — slot ${i + 1}${occ ? ` · ${occ}` : ''}`}
                         style={{
                           width: sz, height: sz, borderRadius: '50%',
-                          background: occ === 'white' ? WHITE_TOKEN
-                            : occ ? COLOR_HEX[occ]
+                          background: occ === 'white' ? flat(WHITE_TOKEN)
+                            : occ ? flat(COLOR_HEX[occ])
                             : 'transparent',
                           border: spClick ? '2px solid #ffcc44'
                             : occ === 'black' ? '2px solid #e6e1f2'
@@ -553,7 +561,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 position: 'absolute', left: `${x * 100}%`, top: `${y * 100}%`,
                 width: size, height: size, marginLeft: -size/2, marginTop: -size/2,
                 borderRadius: '50%',
-                background: occ === 'white' ? '#ddd' : occ ? COLOR_HEX[occ] : 'rgba(20, 14, 40, 0.7)',
+                background: occ === 'white' ? flat(WHITE_TOKEN) : occ ? flat(COLOR_HEX[occ]) : 'rgba(20, 14, 40, 0.7)',
                 border: pickable ? '2px solid #ffcc44' : occ ? '1px solid #fff' : '1px solid rgba(255,255,255,0.3)',
                 boxShadow: pickable ? '0 0 6px #ffcc44' : undefined,
                 cursor: pickable ? 'pointer' : 'default',
@@ -677,8 +685,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 width: size, height: size,
                 marginLeft: -size/2, marginTop: -size/2,
                 borderRadius: '50%',
-                background: occ === 'white' ? WHITE_TOKEN
-                  : occ ? COLOR_HEX[occ]
+                background: occ === 'white' ? flat(WHITE_TOKEN)
+                  : occ ? flat(COLOR_HEX[occ])
                   : 'transparent',
                 border: pickable ? '2px solid #ffcc44'
                   : occ === 'black' ? '2px solid #e6e1f2'
