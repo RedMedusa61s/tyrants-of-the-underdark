@@ -25,7 +25,6 @@ export type Color =
  *  the heuristic AI's `powerThresholdForAssassinate` below this — the
  *  engine will reject the move as INVALID and the AI will burn a turn. */
 export const BASE_ACTION_POWER_COST = 3;
-export const HOBGOBLIN_WARLORD_BRIBE_ASSASSINATE_COST = 2;
 
 export interface CardRef {
   deck: string;
