@@ -174,13 +174,13 @@ export function isSplitViewMode(): boolean {
 // ~2/3 of games to a competent human; truly hard would need deeper
 // lookahead or opponent-reply modeling.
 type AiStyle = 'random' | 'easy' | 'heuristic';
-type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead';
-const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead'];
+type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead' | 'mercenaries';
+const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'mercenaries'];
 // Half-decks introduced in the Aberrations & Undead expansion. The new-game
 // dialog separates these from the base half-decks under an "Expansion" header
 // so unfamiliar players see clearly which decks are base-game and which need
 // the expansion. Game logic treats all six identically.
-const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead']);
+const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead', 'mercenaries']);
 type ThirdPlayerSide = 'left' | 'right';
 interface GameConfig {
   numPlayers: number;

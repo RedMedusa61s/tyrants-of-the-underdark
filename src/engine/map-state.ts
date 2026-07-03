@@ -167,6 +167,9 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
       : (leader as Color);
     G.siteControl[siteId] = newController;
 
+    // --- NEW: Check if this marker is currently stolen ---
+    const isStolen = (G as any).stolenMarkers?.some((stolen: any) => stolen.siteId === siteId);
+
     // Site-control marker bookkeeping per the revised rulebook:
     //   "When you take control of a site that has a control marker, take
     //    that marker from the game map or from the site's previous
@@ -175,7 +178,7 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
     // Transfer the chit immediately on every control change. If we now
     // have no controller, the chit returns to the map (holder = null).
     const m = G.controlMarkers[siteId];
-    if (m && m.holder !== newController) {
+    if (m && !isStolen && m.holder !== newController) {
       const previous = m.holder;
       m.holder = newController;
       if (newController) {
@@ -191,7 +194,7 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
     // a-previous-turn markers are paid at turn.onBegin; the same ledger
     // (markerInfluenceGrantedThisTurn) guards against double-paying when a
     // player flips control on/off mid-turn.
-    if (m && newController === G.activeTurnColor && newController != null) {
+    if (m && !isStolen && newController === G.activeTurnColor && newController != null) {
       payMarkerEffect(G, m, newController);
     }
   }

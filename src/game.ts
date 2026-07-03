@@ -8,7 +8,8 @@ import type { EffectContext, PendingChoice } from './engine/types';
 import { SITES } from './data/sites';
 import { TROOP_SPACES, sitesSpaces } from './data/troop-spaces';
 import { ROUTES } from './data/routes';
-import { deployTroop, assassinateTroop, hasPresence, returnSpy, payHeldMarkerEffectsAtTurnStart } from './engine/map-state';
+import { deployTroop, assassinateTroop, hasPresence,
+         returnSpy, payHeldMarkerEffectsAtTurnStart, recomputeSiteControl } from './engine/map-state';
 import { ensureSpiesLeftInitialized, applyEotInnerCircleVp } from './engine/handler-helpers';
 
 // The four canonical seat colours from the printed game, plus extras we offer
@@ -24,6 +25,7 @@ export type Color =
  *  the heuristic AI's `powerThresholdForAssassinate` below this — the
  *  engine will reject the move as INVALID and the AI will burn a turn. */
 export const BASE_ACTION_POWER_COST = 3;
+export const HOBGOBLIN_WARLORD_BRIBE_ASSASSINATE_COST = 2;
 
 export interface CardRef {
   deck: string;
@@ -90,6 +92,14 @@ export interface ControlMarker {
    *  from the scripted TTS mod (2745860709). */
   totalControlInfluence: number;
   totalControlVp: number;
+}
+
+export interface StolenMarker {
+  siteId: string;
+  thief: Color;
+  originalController: Color | null;
+  hasTotalControl: boolean;
+  expiresAtTurnStartOf: Color;
 }
 
 /** Printed per-site values for both faces of each control marker. Sourced
@@ -231,6 +241,9 @@ export interface TyrantsState {
 
   /** Which sections are in play this game ('left' | 'center' | 'right'). */
   activeSections: string[];
+
+  /** Track markers temporarily stolen by effects like Bregan D'aerthe Spy */
+  stolenMarkers?: StolenMarker[];
 
   /** Active override for the power cost of the assassinate board action. */
   assassinateCostOverride?: number;
@@ -546,6 +559,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       snapshots: [],
       undoStack: [],
       endGameTriggeredAtTurn: null,
+      stolenMarkers: [],
     };
   },
 
@@ -595,6 +609,25 @@ export const TyrantsGame: Game<TyrantsState> = {
       // Backfill on legacy saves loaded before this field existed.
       G.markerTcGrantedThisTurn = [];
       if (!G.devouredPile) G.devouredPile = [];
+
+      G.markerInfluenceGrantedThisTurn = [];
+      G.markerTcGrantedThisTurn = [];
+      if (!G.devouredPile) G.devouredPile = [];
+
+      // --- NEW: Process Stolen Marker Expirations ---
+      if (G.stolenMarkers && G.stolenMarkers.length > 0) {
+        const activeColor = G.players[ctx.currentPlayer].color;
+        const expiring = G.stolenMarkers.filter(m => m.expiresAtTurnStartOf === activeColor);
+        if (expiring.length > 0) {
+          // Remove them from the active stolen array
+          G.stolenMarkers = G.stolenMarkers.filter(m => m.expiresAtTurnStartOf !== activeColor);
+          for (const m of expiring) {
+            Mechanics.log(G, `Stolen control marker at ${m.siteId} expires and returns to the map/owner`);
+            // Force a recompute so the marker snaps back to its rightful controller
+            recomputeSiteControl(G, [m.siteId]);
+          }
+        }
+      }
 
       // Per-turn marker effect for chits the active player held coming into
       // this turn. Pays both the influence (cobweb) and any VP printed on

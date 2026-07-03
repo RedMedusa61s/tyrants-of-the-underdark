@@ -207,6 +207,29 @@ const TABLE: Record<string, CardCategory> = {
   'olhydra':                 'tactical',
   'vanifer':                 'tactical',
   'yan-c-bin':               'tactical',
+
+  // ---- Mercenaries half-deck ----
+  // Steal and Bribe mechanics to manipulate VP
+  'goblinoid-ambushers':       'tactical',    // Contains Steal/Bribe interactions
+  'hobgoblin-warlord':         'tactical',    // Combat / assassination advantage
+  'dragonborn-hireling':       'tactical',    // Direct assassinate target action
+  'artemis-entreri':           'tactical',    // Multi-assassinate wipe
+  'goblin-swarm':              'tactical',    // Troop deployment
+  'bugbear':                   'tactical',    // Deployment + assassination combo
+  'security-guard':            'tactical',    // Adjacency checking deploy
+  'bregan-daerthe-agents':     'tactical',    // Choose-one deployment chains
+  'nihiloor':                  'tactical',    // Movement + assassination combo
+  'goblin-thief':              'tactical',    // Spy placement + steal
+  'bazaar-trader':             'hand',        // Hand-mutating discard mechanism
+  'bregan-daerthe-spy':        'tactical',    // Control marker manipulation
+  'narl-xibrindas':            'tactical',    // Discard pile swapping
+  'jarlaxle':                  'power',       // Power / influence grants
+  'xanathar-smuggler':         'tactical',    // Queues up EoT promotion triggers
+  'xanathar-surveillance':     'hand',        // Multi-draw and choose-discard mechanics
+  'shady-merchant':            'tactical',    // Return troop mechanics
+  'sylgar':                    'influence',   // Resource generator
+  'ahmaergo':                  'tactical',    // Bribe-swap operations
+  'xanathar-zushaxx':          'influence',   // Income engine + trigger mechanic
 };
 
 export function categoryOf(effectKey: string): CardCategory {

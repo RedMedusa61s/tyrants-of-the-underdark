@@ -3778,5 +3778,740 @@
     ],
     "effectKey": "soldier",
     "_matchedSheet": true
+  },
+
+
+
+"mercenaries::0": {
+    "deck": "mercenaries",
+    "slot": 0,
+    "name": "Goblinoid Ambushers",
+    "image": "assets/cards/mercenaries/00-goblinoid-ambushers.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Goblinoid",
+    "rarity": 4,
+    "benefits": [
+      "or +1 Influence",
+      "or Steal 1 VP",
+      "or Bribe -> +3 Power"
+    ],
+    "effectKey": "goblinoid-ambushers",
+    "_matchedSheet": true
+  },
+  "mercenaries::1": {
+    "deck": "mercenaries",
+    "slot": 1,
+    "name": "Goblinoid Ambushers",
+    "image": "assets/cards/mercenaries/01-goblinoid-ambushers.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Goblinoid",
+    "rarity": 4,
+    "benefits": [
+      "or +1 Influence",
+      "or Steal 1 VP",
+      "or Bribe -> +3 Power"
+    ],
+    "effectKey": "goblinoid-ambushers",
+    "_matchedSheet": true
+  },
+  "mercenaries::2": {
+    "deck": "mercenaries",
+    "slot": 2,
+    "name": "Goblinoid Ambushers",
+    "image": "assets/cards/mercenaries/02-goblinoid-ambushers.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Goblinoid",
+    "rarity": 4,
+    "benefits": [
+      "or +1 Influence",
+      "or Steal 1 VP",
+      "or Bribe -> +3 Power"
+    ],
+    "effectKey": "goblinoid-ambushers",
+    "_matchedSheet": true
+  },
+  "mercenaries::3": {
+    "deck": "mercenaries",
+    "slot": 3,
+    "name": "Goblinoid Ambushers",
+    "image": "assets/cards/mercenaries/03-goblinoid-ambushers.jpg",
+    "cost": 2,
+    "deckVp": 1,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Goblinoid",
+    "rarity": 4,
+    "benefits": [
+      "or +1 Influence",
+      "or Steal 1 VP",
+      "or Bribe -> +3 Power"
+    ],
+    "effectKey": "goblinoid-ambushers",
+    "_matchedSheet": true
+  },
+  "mercenaries::4": {
+    "deck": "mercenaries",
+    "slot": 4,
+    "name": "Hobgoblin Warlord",
+    "image": "assets/cards/mercenaries/04-hobgoblin-warlord.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Goblinoid",
+    "rarity": 2,
+    "benefits": [
+      "+3 Influence",
+      "Bribe -> Expend 2 Power to assassinate"
+    ],
+    "effectKey": "hobgoblin-warlord",
+    "_matchedSheet": true
+  },
+  "mercenaries::5": {
+    "deck": "mercenaries",
+    "slot": 5,
+    "name": "Hobgoblin Warlord",
+    "image": "assets/cards/mercenaries/05-hobgoblin-warlord.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Malice",
+    "type": "Goblinoid",
+    "rarity": 2,
+    "benefits": [
+      "+3 Influence",
+      "Bribe -> Expend 2 Power to assassinate"
+    ],
+    "effectKey": "hobgoblin-warlord",
+    "_matchedSheet": true
+  },
+  "mercenaries::6": {
+    "deck": "mercenaries",
+    "slot": 6,
+    "name": "Dragonborn Hireling",
+    "image": "assets/cards/mercenaries/06-dragonborn-hireling.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Humanoid",
+    "rarity": 3,
+    "benefits": [
+      "Assassinate a troop",
+      "If you have 3+ player trophies, gain 1 VP"
+    ],
+    "effectKey": "dragonborn-hireling",
+    "_matchedSheet": true
+  },
+  "mercenaries::7": {
+    "deck": "mercenaries",
+    "slot": 7,
+    "name": "Dragonborn Hireling",
+    "image": "assets/cards/mercenaries/07-dragonborn-hireling.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Humanoid",
+    "rarity": 3,
+    "benefits": [
+      "Assassinate a troop",
+      "If you have 3+ player trophies, gain 1 VP"
+    ],
+    "effectKey": "dragonborn-hireling",
+    "_matchedSheet": true
+  },
+  "mercenaries::8": {
+    "deck": "mercenaries",
+    "slot": 8,
+    "name": "Dragonborn Hireling",
+    "image": "assets/cards/mercenaries/08-dragonborn-hireling.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Malice",
+    "type": "Humanoid",
+    "rarity": 3,
+    "benefits": [
+      "Assassinate a troop",
+      "If you have 3+ player trophies, gain 1 VP"
+    ],
+    "effectKey": "dragonborn-hireling",
+    "_matchedSheet": true
+  },
+  "mercenaries::9": {
+    "deck": "mercenaries",
+    "slot": 9,
+    "name": "Artemis Entreri",
+    "image": "assets/cards/mercenaries/09-artemis-entreri.jpg",
+    "cost": 8,
+    "deckVp": 4,
+    "innerCircleVp": 8,
+    "aspect": "Malice",
+    "type": "Human",
+    "rarity": 1,
+    "benefits": [
+      "Assassinate 3 troops at a single site",
+      "If that site is empty, gain 1 VP"
+    ],
+    "effectKey": "artemis-entreri",
+    "_matchedSheet": true
+  },
+  "mercenaries::10": {
+    "deck": "mercenaries",
+    "slot": 10,
+    "name": "Goblin Swarm",
+    "image": "assets/cards/mercenaries/10-goblin-swarm.jpg",
+    "cost": 1,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Goblinoid",
+    "rarity": 2,
+    "benefits": [
+      "Deploy a troop",
+      "Bribe -> Deploy 2 troops"
+    ],
+    "effectKey": "goblin-swarm",
+    "_matchedSheet": true
+  },
+  "mercenaries::11": {
+    "deck": "mercenaries",
+    "slot": 11,
+    "name": "Goblin Swarm",
+    "image": "assets/cards/mercenaries/11-goblin-swarm.jpg",
+    "cost": 1,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Conquest",
+    "type": "Goblinoid",
+    "rarity": 2,
+    "benefits": [
+      "Deploy a troop",
+      "Bribe -> Deploy 2 troops"
+    ],
+    "effectKey": "goblin-swarm",
+    "_matchedSheet": true
+  },
+  "mercenaries::12": {
+    "deck": "mercenaries",
+    "slot": 12,
+    "name": "Bugbear",
+    "image": "assets/cards/mercenaries/12-bugbear.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Goblinoid",
+    "rarity": 3,
+    "benefits": [
+      "Deploy a troop",
+      "Assassinate a white troop",
+      "Gain 1 VP"
+    ],
+    "effectKey": "bugbear",
+    "_matchedSheet": true
+  },
+  "mercenaries::13": {
+    "deck": "mercenaries",
+    "slot": 13,
+    "name": "Bugbear",
+    "image": "assets/cards/mercenaries/13-bugbear.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Goblinoid",
+    "rarity": 3,
+    "benefits": [
+      "Deploy a troop",
+      "Assassinate a white troop",
+      "Gain 1 VP"
+    ],
+    "effectKey": "bugbear",
+    "_matchedSheet": true
+  },
+  "mercenaries::14": {
+    "deck": "mercenaries",
+    "slot": 14,
+    "name": "Bugbear",
+    "image": "assets/cards/mercenaries/14-bugbear.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Conquest",
+    "type": "Goblinoid",
+    "rarity": 3,
+    "benefits": [
+      "Deploy a troop",
+      "Assassinate a white troop",
+      "Gain 1 VP"
+    ],
+    "effectKey": "bugbear",
+    "_matchedSheet": true
+  },
+  "mercenaries::15": {
+    "deck": "mercenaries",
+    "slot": 15,
+    "name": "Security Guard",
+    "image": "assets/cards/mercenaries/15-security-guard.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "Deploy 2 troops",
+      "Steal 1 VP from opponents with adjacent troops"
+    ],
+    "effectKey": "security-guard",
+    "_matchedSheet": true
+  },
+  "mercenaries::16": {
+    "deck": "mercenaries",
+    "slot": 16,
+    "name": "Security Guard",
+    "image": "assets/cards/mercenaries/16-security-guard.jpg",
+    "cost": 4,
+    "deckVp": 2,
+    "innerCircleVp": 4,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "Deploy 2 troops",
+      "Steal 1 VP from opponents with adjacent troops"
+    ],
+    "effectKey": "security-guard",
+    "_matchedSheet": true
+  },
+  "mercenaries::17": {
+    "deck": "mercenaries",
+    "slot": 17,
+    "name": "Bregan D'aerthe Agents",
+    "image": "assets/cards/mercenaries/17-bregan-daerthe-agents.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "Choose 3 times:",
+      "or Take white trophy and deploy",
+      "or Bribe -> Supplant a white troop"
+    ],
+    "effectKey": "bregan-daerthe-agents",
+    "_matchedSheet": true
+  },
+  "mercenaries::18": {
+    "deck": "mercenaries",
+    "slot": 18,
+    "name": "Bregan D'aerthe Agents",
+    "image": "assets/cards/mercenaries/18-bregan-daerthe-agents.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Conquest",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "Choose 3 times:",
+      "or Take white trophy and deploy",
+      "or Bribe -> Supplant a white troop"
+    ],
+    "effectKey": "bregan-daerthe-agents",
+    "_matchedSheet": true
+  },
+  "mercenaries::19": {
+    "deck": "mercenaries",
+    "slot": 19,
+    "name": "Nihiloor",
+    "image": "assets/cards/mercenaries/19-nihiloor.jpg",
+    "cost": 7,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Conquest",
+    "type": "Illithid",
+    "rarity": 1,
+    "benefits": [
+      "Deploy 3 troops",
+      "Bribe -> Move them and assassinate adjacent white troops"
+    ],
+    "effectKey": "nihiloor",
+    "_matchedSheet": true
+  },
+  "mercenaries::20": {
+    "deck": "mercenaries",
+    "slot": 20,
+    "name": "Goblin Thief",
+    "image": "assets/cards/mercenaries/20-goblin-thief.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Goblinoid",
+    "rarity": 3,
+    "benefits": [
+      "Place a spy",
+      "Steal 1 VP from opponent with presence at spy site"
+    ],
+    "effectKey": "goblin-thief",
+    "_matchedSheet": true
+  },
+  "mercenaries::21": {
+    "deck": "mercenaries",
+    "slot": 21,
+    "name": "Goblin Thief",
+    "image": "assets/cards/mercenaries/21-goblin-thief.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Goblinoid",
+    "rarity": 3,
+    "benefits": [
+      "Place a spy",
+      "Steal 1 VP from opponent with presence at spy site"
+    ],
+    "effectKey": "goblin-thief",
+    "_matchedSheet": true
+  },
+  "mercenaries::22": {
+    "deck": "mercenaries",
+    "slot": 22,
+    "name": "Goblin Thief",
+    "image": "assets/cards/mercenaries/22-goblin-thief.jpg",
+    "cost": 3,
+    "deckVp": 1,
+    "innerCircleVp": 2,
+    "aspect": "Guile",
+    "type": "Goblinoid",
+    "rarity": 3,
+    "benefits": [
+      "Place a spy",
+      "Steal 1 VP from opponent with presence at spy site"
+    ],
+    "effectKey": "goblin-thief",
+    "_matchedSheet": true
+  },
+  "mercenaries::23": {
+    "deck": "mercenaries",
+    "slot": 23,
+    "name": "Bazaar Trader",
+    "image": "assets/cards/mercenaries/23-bazaar-trader.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "or Discard -> Gain 1 VP and draw 1",
+      "or Bribe -> Place spy and draw 2",
+      "or Return spy -> Steal 3 VP"
+    ],
+    "effectKey": "bazaar-trader",
+    "_matchedSheet": true
+  },
+  "mercenaries::24": {
+    "deck": "mercenaries",
+    "slot": 24,
+    "name": "Bazaar Trader",
+    "image": "assets/cards/mercenaries/24-bazaar-trader.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "or Discard -> Gain 1 VP and draw 1",
+      "or Bribe -> Place spy and draw 2",
+      "or Return spy -> Steal 3 VP"
+    ],
+    "effectKey": "bazaar-trader",
+    "_matchedSheet": true
+  },
+  "mercenaries::25": {
+    "deck": "mercenaries",
+    "slot": 25,
+    "name": "Bazaar Trader",
+    "image": "assets/cards/mercenaries/25-bazaar-trader.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 3,
+    "benefits": [
+      "or Discard -> Gain 1 VP and draw 1",
+      "or Bribe -> Place spy and draw 2",
+      "or Return spy -> Steal 3 VP"
+    ],
+    "effectKey": "bazaar-trader",
+    "_matchedSheet": true
+  },
+  "mercenaries::26": {
+    "deck": "mercenaries",
+    "slot": 26,
+    "name": "Bregan D'aerthe Spy",
+    "image": "assets/cards/mercenaries/26-bregan-daerthe-spy.jpg",
+    "cost": 3,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "or Place a spy",
+      "or Return spy -> Claim its site control marker"
+    ],
+    "effectKey": "bregan-daerthe-spy",
+    "_matchedSheet": true
+  },
+  "mercenaries::27": {
+    "deck": "mercenaries",
+    "slot": 27,
+    "name": "Bregan D'aerthe Spy",
+    "image": "assets/cards/mercenaries/27-bregan-daerthe-spy.jpg",
+    "cost": 3,
+    "deckVp": 2,
+    "innerCircleVp": 3,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 2,
+    "benefits": [
+      "or Place a spy",
+      "or Return spy -> Claim its site control marker"
+    ],
+    "effectKey": "bregan-daerthe-spy",
+    "_matchedSheet": true
+  },
+  "mercenaries::28": {
+    "deck": "mercenaries",
+    "slot": 28,
+    "name": "Nar'l Xibrindas",
+    "image": "assets/cards/mercenaries/28-narl-xibrindas.jpg",
+    "cost": 4,
+    "deckVp": 3,
+    "innerCircleVp": 4,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "or Place a spy",
+      "or Return spy -> Swap cards with opponent discard pile"
+    ],
+    "effectKey": "narl-xibrindas",
+    "_matchedSheet": true
+  },
+  "mercenaries::29": {
+    "deck": "mercenaries",
+    "slot": 29,
+    "name": "Jarlaxle",
+    "image": "assets/cards/mercenaries/29-jarlaxle.jpg",
+    "cost": 6,
+    "deckVp": 3,
+    "innerCircleVp": 6,
+    "aspect": "Guile",
+    "type": "Drow",
+    "rarity": 1,
+    "benefits": [
+      "Look at opponent's hand",
+      "Bribe -> Copy that card's effect"
+    ],
+    "effectKey": "jarlaxle",
+    "_matchedSheet": true
+  },
+  "mercenaries::30": {
+    "deck": "mercenaries",
+    "slot": 30,
+    "name": "Xanathar Smuggler",
+    "image": "assets/cards/mercenaries/30-xanathar-smuggler.jpg",
+    "cost": 1,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or +1 Influence",
+      "or Bribe -> EoT promote another played card"
+    ],
+    "effectKey": "xanathar-smuggler",
+    "_matchedSheet": true
+  },
+  "mercenaries::31": {
+    "deck": "mercenaries",
+    "slot": 31,
+    "name": "Xanathar Smuggler",
+    "image": "assets/cards/mercenaries/31-xanathar-smuggler.jpg",
+    "cost": 1,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or +1 Influence",
+      "or Bribe -> EoT promote another played card"
+    ],
+    "effectKey": "xanathar-smuggler",
+    "_matchedSheet": true
+  },
+  "mercenaries::32": {
+    "deck": "mercenaries",
+    "slot": 32,
+    "name": "Xanathar Smuggler",
+    "image": "assets/cards/mercenaries/32-xanathar-smuggler.jpg",
+    "cost": 1,
+    "deckVp": 0,
+    "innerCircleVp": 1,
+    "aspect": "Ambition",
+    "type": "Human",
+    "rarity": 3,
+    "benefits": [
+      "or +1 Influence",
+      "or Bribe -> EoT promote another played card"
+    ],
+    "effectKey": "xanathar-smuggler",
+    "_matchedSheet": true
+  },
+  "mercenaries::33": {
+    "deck": "mercenaries",
+    "slot": 33,
+    "name": "Xanathar Surveillance",
+    "image": "assets/cards/mercenaries/33-xanathar-surveillance.jpg",
+    "cost": 6,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Dwarf",
+    "rarity": 2,
+    "benefits": [
+      "Draw 3 cards, then discard 2",
+      "Bribe -> Promote one of the discarded cards"
+    ],
+    "effectKey": "xanathar-surveillance",
+    "_matchedSheet": true
+  },
+  "mercenaries::34": {
+    "deck": "mercenaries",
+    "slot": 34,
+    "name": "Xanathar Surveillance",
+    "image": "assets/cards/mercenaries/34-xanathar-surveillance.jpg",
+    "cost": 6,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Dwarf",
+    "rarity": 2,
+    "benefits": [
+      "Draw 3 cards, then discard 2",
+      "Bribe -> Promote one of the discarded cards"
+    ],
+    "effectKey": "xanathar-surveillance",
+    "_matchedSheet": true
+  },
+  "mercenaries::35": {
+    "deck": "mercenaries",
+    "slot": 35,
+    "name": "Shady Merchant",
+    "image": "assets/cards/mercenaries/35-shady-merchant.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Illithid",
+    "rarity": 2,
+    "benefits": [
+      "Return opponent troop and move a spy",
+      "Bribe -> Put played card on top of opponent deck"
+    ],
+    "effectKey": "shady-merchant",
+    "_matchedSheet": true
+  },
+  "mercenaries::36": {
+    "deck": "mercenaries",
+    "slot": 36,
+    "name": "Shady Merchant",
+    "image": "assets/cards/mercenaries/36-shady-merchant.jpg",
+    "cost": 5,
+    "deckVp": 2,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Illithid",
+    "rarity": 2,
+    "benefits": [
+      "Return opponent troop and move a spy",
+      "Bribe -> Put played card on top of opponent deck"
+    ],
+    "effectKey": "shady-merchant",
+    "_matchedSheet": true
+  },
+  "mercenaries::37": {
+    "deck": "mercenaries",
+    "slot": 37,
+    "name": "Sylgar",
+    "image": "assets/cards/mercenaries/37-sylgar.jpg",
+    "cost": 1,
+    "deckVp": 4,
+    "innerCircleVp": 0,
+    "aspect": "Ambition",
+    "type": "Beast",
+    "rarity": 1,
+    "benefits": [
+      "If devoured/promoted/discarded by a card, reclaim and gain 1 VP"
+    ],
+    "effectKey": "sylgar",
+    "_matchedSheet": true
+  },
+  "mercenaries::38": {
+    "deck": "mercenaries",
+    "slot": 38,
+    "name": "Ahmaergo",
+    "image": "assets/cards/mercenaries/38-ahmaergo.jpg",
+    "cost": 5,
+    "deckVp": 3,
+    "innerCircleVp": 5,
+    "aspect": "Ambition",
+    "type": "Dwarf",
+    "rarity": 1,
+    "benefits": [
+      "Choose 2 times:",
+      "or Move own troop and gain 1 Power",
+      "or Bribe -> Swap 2 troops anywhere"
+    ],
+    "effectKey": "ahmaergo",
+    "_matchedSheet": true
+  },
+  "mercenaries::39": {
+    "deck": "mercenaries",
+    "slot": 39,
+    "name": "Xanathar Zushaxx",
+    "image": "assets/cards/mercenaries/39-xanathar-zushaxx.jpg",
+    "cost": 7,
+    "deckVp": 4,
+    "innerCircleVp": 8,
+    "aspect": "Ambition",
+    "type": "Aberration",
+    "rarity": 1,
+    "benefits": [
+      "+4 Influence",
+      "For the rest of turn, each recruit steals 1 VP"
+    ],
+    "effectKey": "xanathar-zushaxx",
+    "_matchedSheet": true
   }
 }
