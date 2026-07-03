@@ -39,6 +39,7 @@ export interface PlayerData {
   hand: CardRef[];
   discard: CardRef[];
   innerCircle: CardRef[];
+  cardsPlayed: CardRef[];
   /** Per-color count of captured tokens. Orcus moves specific colored tokens out,
    *  so we keep the source color around (we don't aggregate non-white into one
    *  "enemy" bucket). Black Dragon's scoring rider reads `.white`. */
@@ -487,6 +488,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         hand,
         discard: [],
         innerCircle: [],
+        cardsPlayed: [],
         trophyHall: { black: 0, red: 0, orange: 0, blue: 0, white: 0 },
         barracksLeft: 40,
         spiesLeft: 5,
@@ -685,6 +687,7 @@ export const TyrantsGame: Game<TyrantsState> = {
 
       p.discard.push(...p.hand);
       p.hand = [];
+      p.cardsPlayed = [];
       p.power = 0;
       p.influence = 0;
       G.turnAspectsPlayed = {};
@@ -807,6 +810,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         G.pausedHandlerState = ctx2.handlerState;
         p.discard.push(card);
         G.cardsPlayedThisTurn.push(card);
+        p.cardsPlayed.push(card);
         return;
       }
 
@@ -815,6 +819,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (!returnedToSupply) {
         p.discard.push(card);
         G.cardsPlayedThisTurn.push(card);
+        p.cardsPlayed.push(card);
       }
     },
 
@@ -841,7 +846,13 @@ export const TyrantsGame: Game<TyrantsState> = {
               // no longer touches cardsPlayedThisTurn, so this is the sole
               // removal for the EOT path.
               G.cardsPlayedThisTurn.splice(idx, 1);
-              const di = G.players[playerId].discard.findIndex(
+              // Remove card played from PlayerData
+            const pPlayedIdx = G.players[playerId].cardsPlayed.findIndex(
+              c => c.deck === card.deck && c.slot === card.slot
+            );
+            if (pPlayedIdx >= 0) G.players[playerId].cardsPlayed.splice(pPlayedIdx, 1);
+
+            const di = G.players[playerId].discard.findIndex(
                 c => c.deck === card.deck && c.slot === card.slot
               );
               if (di >= 0) G.players[playerId].discard.splice(di, 1);
@@ -949,6 +960,11 @@ export const TyrantsGame: Game<TyrantsState> = {
           c => c.deck === card.deck && c.slot === card.slot
         );
         if (playedIdx >= 0) G.cardsPlayedThisTurn.splice(playedIdx, 1);
+        // Remove cards played from PlayerData
+        const pPlayedIdx = p.cardsPlayed.findIndex(
+          c => c.deck === card.deck && c.slot === card.slot
+        );
+        if (pPlayedIdx >= 0) p.cardsPlayed.splice(pPlayedIdx, 1);
       }
       // suppress unused-var noise
       void ctx;
