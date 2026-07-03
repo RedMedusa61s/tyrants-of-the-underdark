@@ -19,7 +19,11 @@
     "recruit-divergence": "vite-node scripts/recruit-divergence.ts --",
     "roundtrip-check": "vite-node scripts/roundtrip-check.ts",
     "adapter-rollout": "vite-node scripts/adapter-rollout.ts",
-    "snapshot-size": "vite-node scripts/snapshot-size.ts"
+    "snapshot-size": "vite-node scripts/snapshot-size.ts",
+    "test:ai-drive": "vite-node scripts/test-ai-drive.ts",
+    "test:online-path": "vite-node scripts/test-online-path.ts",
+    "ci": "tsc --noEmit && npm run test:ai-drive && npm run test:online-path",
+    "ship": "npm run test:ai-drive && npm run test:online-path && npm run build && npx wrangler pages deploy dist --project-name tyrants-online --branch main"
   },
   "keywords": [],
   "author": "",
@@ -31,7 +35,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "boardgame.io": "^0.50.2",
-    "digital-boardgame-framework": "^0.31.1",
+    "digital-boardgame-framework": "^0.39.0",
     "html2canvas": "^1.4.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",

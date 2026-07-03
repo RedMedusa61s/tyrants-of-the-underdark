@@ -64,8 +64,28 @@ export const Mechanics = {
         // shuffle so a freshly-played draw card can't be reshuffled and drawn
         // again and again on the same turn (#76). They return to the
         // reshuffle pool next turn, once cardsPlayedThisTurn is cleared.
-        const inPlay = new Set(G.cardsPlayedThisTurn ?? []);
-        const reshufflable = pl.discard.filter(c => !inPlay.has(c));
+        // Exclude by VALUE (deck+slot), count-matched for duplicates — NOT by
+        // object reference. Online play serializes the state to the store and
+        // back on every move (JSON), which does not preserve shared references:
+        // the played card in `discard` becomes a different object than the one
+        // in `cardsPlayedThisTurn`, so a reference Set silently fails to exclude
+        // it and the card gets reshuffled + redrawn on the same turn — an
+        // infinite loop (e.g. Information Broker "return a spy → draw 3" replayed
+        // forever). Reference identity held in hotseat/tests, which is why this
+        // only ever surfaced online (#76 regression).
+        const playedCounts = new Map<string, number>();
+        for (const c of G.cardsPlayedThisTurn ?? []) {
+          const k = `${c.deck}:${c.slot}`;
+          playedCounts.set(k, (playedCounts.get(k) ?? 0) + 1);
+        }
+        const reshufflable: typeof pl.discard = [];
+        const stayInPlay: typeof pl.discard = [];
+        for (const c of pl.discard) {
+          const k = `${c.deck}:${c.slot}`;
+          const n = playedCounts.get(k) ?? 0;
+          if (n > 0) { playedCounts.set(k, n - 1); stayInPlay.push(c); }
+          else reshufflable.push(c);
+        }
         if (reshufflable.length === 0) return;
         // Reshuffle + draw exposes hidden card order — close the undo door.
         Mechanics.markInfoRevealed(G);
@@ -78,8 +98,9 @@ export const Mechanics = {
           [deck[k], deck[j]] = [deck[j], deck[k]];
         }
         pl.deck = deck;
-        // Keep the in-play cards in discard; everything else moved to the deck.
-        pl.discard = pl.discard.filter(c => inPlay.has(c));
+        // Keep the in-play (played-this-turn) cards in discard; everything else
+        // moved to the deck. `stayInPlay` was partitioned by value above.
+        pl.discard = stayInPlay;
       }
       const c = pl.deck.shift();
       if (c) {

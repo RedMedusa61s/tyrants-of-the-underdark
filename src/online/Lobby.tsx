@@ -28,6 +28,21 @@ export function Lobby() {
     }
   }
 
+  // Human (seat 0) vs a server-driven AI (seat 1). The AI is a rated leaderboard
+  // opponent, so a signed-in win/loss counts. We jump straight into seat 0.
+  async function onCreateVsAi(difficulty: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      const g = await createGame(2, { '1': difficulty });
+      rememberCreatedGame(g.gameId, g.invites);
+      window.location.href = g.invites['0'];
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  }
+
   return (
     <div style={{ maxWidth: 700 }}>
       <h1>Tyrants of the Underdark — Online</h1>
@@ -53,9 +68,17 @@ export function Lobby() {
         ))}
       </div>
 
-      <button onClick={onCreate} disabled={busy} style={btn}>
-        {busy ? 'Creating…' : `New ${numPlayers}-player game`}
-      </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button onClick={onCreate} disabled={busy} style={btn}>
+          {busy ? 'Creating…' : `New ${numPlayers}-player game`}
+        </button>
+        <button onClick={() => onCreateVsAi('random')} disabled={busy} style={btn}>vs AI · easy</button>
+        <button onClick={() => onCreateVsAi('standard')} disabled={busy} style={btn}>vs AI · standard</button>
+      </div>
+      <p style={{ color: '#778', fontSize: 12 }}>
+        Playing vs AI is a 2-player game (you vs the bot). Sign in first so your
+        result counts on the leaderboard.
+      </p>
       {err && <p style={{ color: '#f66' }}>{err}</p>}
 
       {game && (

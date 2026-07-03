@@ -27,6 +27,14 @@ const COLOR_HEX: Record<Color, string> = {
 // White tokens darkened toward light grey so they stand out on white-bordered site boxes.
 const WHITE_TOKEN = '#d0d0d0';
 
+// Samsung Internet / Chrome Android "Website dark mode" repaints solid
+// background-COLORS but leaves background-IMAGES (gradients) alone. Painting a
+// game-state token colour as a flat gradient keeps it exactly as authored even
+// when the user forces the browser's dark mode on — otherwise black tokens get
+// inverted to white and neutral tokens go grey/white inconsistently. Renders
+// pixel-identical to a solid fill in every normal browser.
+const flat = (c: string) => `linear-gradient(${c}, ${c})`;
+
 const STORAGE_KEY = 'totu.site-positions';
 const SLOTS_STORAGE_KEY = 'totu.slot-positions';
 
@@ -200,11 +208,23 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
   }, []);
   // Scale factor relative to the design baseline (1200px wide). All fixed
   // pixel sizes below are multiplied by this so they shrink on smaller
-  // viewports. Clamped to [0.5, 1.0] so the overlays never become
-  // illegibly tiny on very narrow screens, and never grow past their
-  // design size on monitors that exceed the maxWidth cap.
-  const scale = Math.max(0.5, Math.min(1.0, boardWidth / 1200));
+  // viewports. Clamped to [0.3, 1.0]: the 0.3 floor lets overlays keep
+  // shrinking proportionally on phone-width boards (the old 0.5 floor made
+  // troops/pips oversized relative to a ~330px board), while the 1.0 cap
+  // keeps full-width desktop boards at exact design size — mobile tuning
+  // must lower the floor, not the ceiling.
+  const scale = Math.max(0.3, Math.min(1.0, boardWidth / 1200));
   const px = (n: number) => Math.round(n * scale);
+  // Control markers use their own width-proportional size instead of the
+  // shared troop/pip `scale`. Their 110px desktop baseline is ~9% of a
+  // 1200px board, but routing it through the shared floor(0.5) scale left
+  // it at ~55px — ~17% of a phone-width (~330px) board, roughly double its
+  // intended proportion (confirmed against a mobile screenshot: marker
+  // diameter measured 155px against a 995px board image = 15.6%). Deriving
+  // straight from boardWidth reproduces the desktop size (108px at 1200px)
+  // while scaling smoothly down to phone widths; the 28px floor keeps it
+  // legible/tappable on extreme narrow viewports (e.g. split-screen).
+  const markerSizePx = Math.max(28, Math.round(boardWidth * 0.09));
   // Rulebook p.5: hide sites/routes outside this game's active sections. Calibrate
   // / editRoutes modes ignore this so all sites stay reachable for setup work.
   const activeSites = (G && !calibrate && !editRoutes)
@@ -375,8 +395,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                         title={`${s.name} — slot ${i + 1}${occ ? ` · ${occ}` : ''}`}
                         style={{
                           width: sz, height: sz, borderRadius: '50%',
-                          background: occ === 'white' ? WHITE_TOKEN
-                            : occ ? COLOR_HEX[occ]
+                          background: occ === 'white' ? flat(WHITE_TOKEN)
+                            : occ ? flat(COLOR_HEX[occ])
                             : 'transparent',
                           border: spClick ? '2px solid #ffcc44'
                             : occ === 'black' ? '2px solid #e6e1f2'
@@ -541,7 +561,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 position: 'absolute', left: `${x * 100}%`, top: `${y * 100}%`,
                 width: size, height: size, marginLeft: -size/2, marginTop: -size/2,
                 borderRadius: '50%',
-                background: occ === 'white' ? '#ddd' : occ ? COLOR_HEX[occ] : 'rgba(20, 14, 40, 0.7)',
+                background: occ === 'white' ? flat(WHITE_TOKEN) : occ ? flat(COLOR_HEX[occ]) : 'rgba(20, 14, 40, 0.7)',
                 border: pickable ? '2px solid #ffcc44' : occ ? '1px solid #fff' : '1px solid rgba(255,255,255,0.3)',
                 boxShadow: pickable ? '0 0 6px #ffcc44' : undefined,
                 cursor: pickable ? 'pointer' : 'default',
@@ -581,7 +601,7 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
               controlInfluence={m.controlInfluence}
               totalControlInfluence={m.totalControlInfluence}
               totalControlVp={m.totalControlVp}
-              sizePx={px(110)} />
+              sizePx={markerSizePx} />
           );
         });
       })()}
@@ -665,8 +685,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 width: size, height: size,
                 marginLeft: -size/2, marginTop: -size/2,
                 borderRadius: '50%',
-                background: occ === 'white' ? WHITE_TOKEN
-                  : occ ? COLOR_HEX[occ]
+                background: occ === 'white' ? flat(WHITE_TOKEN)
+                  : occ ? flat(COLOR_HEX[occ])
                   : 'transparent',
                 border: pickable ? '2px solid #ffcc44'
                   : occ === 'black' ? '2px solid #e6e1f2'

@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { UpdateBanner } from 'digital-boardgame-framework/client';
+import { UpdateBanner, SplashScreen } from 'digital-boardgame-framework/client';
 import { App } from './App';
 import { Lobby } from './online/Lobby';
 import { OnlinePlay } from './online/OnlinePlay';
@@ -27,6 +27,7 @@ function Root() {
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
+    <SplashScreen title="Tyrants of the Underdark" appId="tyrants" />
     <Root />
     {/* Shows a "new version — Reload" bar (only) when a newer build is deployed,
         so long-open tabs don't keep running stale code. Covers all routes. */}

@@ -26,12 +26,28 @@ It serves the static client *and* the online-multiplayer lobby backend, which
 runs as Cloudflare Pages Functions under `functions/api/*` (GitHub Pages is
 static-only and can't host that — hence the move).
 
-The project is **not** git-connected, so deploys are manual:
+The project is **not** git-connected, so deploys are manual. Use the gated
+deploy path, which runs the **AI-drive sweep first** and refuses to ship if it
+finds a bug that would wedge a live game:
+
+```sh
+npm run ship
+```
+
+That is exactly `npm run test:ai-drive && npm run build && npx wrangler pages
+deploy dist --project-name tyrants-online --branch main`. If you ever need the
+raw steps:
 
 ```sh
 npm run build
 npx wrangler pages deploy dist --project-name tyrants-online --branch main
 ```
+
+> **Don't skip the sweep.** The `test:ai-drive` gate is what caught (and now
+> guards against) the forced-discard crash that locked online vs-AI games at
+> "Red is taking their turn". CI (`.github/workflows/ci.yml`) runs the same
+> sweep on every push/PR, so a wedging bug dies in the pipeline — `npm run ship`
+> is the local mirror of that gate for the manual deploy.
 
 `--branch` must match the branch set as **Production** in the Cloudflare
 dashboard (Workers & Pages → tyrants-online → Settings → Builds & deployments),

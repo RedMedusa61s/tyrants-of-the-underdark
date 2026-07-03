@@ -90,7 +90,10 @@ function ColorSwatch({ color, size = 11 }: { color: string; size?: number }) {
   return (
     <span style={{
       display: 'inline-block', width: size, height: size, borderRadius: 2,
-      background: color, border: '1px solid rgba(255,255,255,0.6)',
+      // Flat gradient (a background-IMAGE) instead of a solid background-color so
+      // Samsung Internet / Chrome Android "Website dark mode" can't repaint this
+      // player-colour swatch. Looks identical to a solid fill everywhere else.
+      background: `linear-gradient(${color}, ${color})`, border: '1px solid rgba(255,255,255,0.6)',
       marginRight: 6, verticalAlign: 'middle', flexShrink: 0,
     }} />
   );
@@ -626,7 +629,18 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
   // Per-AI-turn summary modal. The user clicks through each AI's completed turn to
   // see what they did before play continues to the next seat.
-  const [shownTurnLogCount, setShownTurnLogCount] = useState(0);
+  //
+  // On (re)load, start PAST the backlog: only surface opponent turns that
+  // completed since our own last turn (usually just the one, in a 2-player game),
+  // not the entire game's history. Reloading a mid-game — which happens a lot,
+  // especially while something's misbehaving — otherwise forces the player to
+  // click through a modal for every opponent turn from the start. New opponent
+  // turns that complete while we're actually playing still surface normally.
+  const [shownTurnLogCount, setShownTurnLogCount] = useState(() => {
+    let lastMine = -1;
+    for (let i = 0; i < G.turnLogs.length; i++) if (G.turnLogs[i].playerId === me) lastMine = i;
+    return lastMine + 1;
+  });
   // Find the next AI-turn log we haven't shown yet. We track the absolute index so
   // OK can jump the counter past it (skipping any interleaved human turns), instead
   // of just incrementing by 1 and forcing the user to click through the gap.
@@ -1209,7 +1223,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         <div
           onClick={() => setPileView(null)}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            width: '100vw', height: '100dvh', background: 'rgba(0,0,0,0.7)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000, padding: 20,
           }}>
@@ -1267,7 +1282,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       <div
         onClick={() => setPileView(null)}
         style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          width: '100vw', height: '100dvh', background: 'rgba(0,0,0,0.7)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000, padding: 20,
         }}>
@@ -1366,7 +1382,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                           }}>
                           <span style={{
                             width: 8, height: 8, borderRadius: '50%',
-                            background: COLOR_HEX[c] ?? '#888',
+                            // Flat gradient so Samsung/Chrome forced dark mode
+                            // leaves this colour-coded trophy dot as authored.
+                            background: `linear-gradient(${COLOR_HEX[c] ?? '#888'}, ${COLOR_HEX[c] ?? '#888'})`,
                             border: c === 'black' ? '1px solid #555' : 'none',
                           }} />
                           {n}
@@ -1407,7 +1425,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     <div style={{ padding: 16, maxWidth: 1280, margin: '0 auto' }}>
       {pendingAiSummary && (
         <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          width: '100vw', height: '100dvh', background: 'rgba(0,0,0,0.6)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1000,
         }}>
@@ -1436,7 +1455,10 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* flexWrap (not display:'auto', which is invalid CSS and silently drops
+          the flex layout): keeps the desktop single-row header, lets the
+          buttons wrap below the title on narrow mobile viewports. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
         <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark</h1>
         <button onClick={() => {
           // Flip in React state — NO page reload (reload triggered the
@@ -1713,7 +1735,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </div>
       )}
 
-      <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         {(() => {
           // Tab list. In normal mode: game, map, log (+ dev tabs). In split-
           // view mode: 'play' replaces game + map (everything is on one
@@ -2108,8 +2130,8 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   while (trimmedStyles.length < opponentCount) trimmedStyles.push('heuristic');
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div style={{ background: '#1a1228', color: '#e6e1f2', border: '2px solid #3a2055', borderRadius: 8, padding: 32, minWidth: 420, maxWidth: 560 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 12px' }}>
+      <div style={{ background: '#1a1228', color: '#e6e1f2', border: '2px solid #3a2055', borderRadius: 8, padding: 32, width: '100%', minWidth: 'min(420px, 100%)', maxWidth: 560, boxSizing: 'border-box' }}>
         <h1 style={{ marginTop: 0, marginBottom: 8 }}>Tyrants of the Underdark</h1>
         <GamesPlayedCount />
         {hasSave && (

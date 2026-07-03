@@ -25,25 +25,61 @@ function logApiAnomaly(entry: Record<string, unknown>): void {
   try { console.warn('[totu api anomaly]', { ...entry, clientBuild: AI_VERSION }); } catch { /* ignore */ }
 }
 
-/** Fetch an /api endpoint expecting JSON, with two robustness behaviours aimed
- *  at the mid-deploy window where an /api request is briefly served the static
- *  SPA index.html (HTML) instead of reaching the Function:
- *   1. Retry ONCE on an HTML response. An HTML body proves the request never
- *      hit the Function (it got the SPA fallback), so it had no side effect —
- *      safe to retry even for POST/submit. A short delay lands on the live
- *      Function once propagation settles. (5xx is NOT retried: it may have
- *      applied server-side, so retrying a submit could double-apply.)
- *   2. Capture every anomaly (HTML or 5xx) via logApiAnomaly for diagnosis. */
-async function apiJson(doFetch: () => Promise<Response>): Promise<any> {
+/** Fetch an /api endpoint expecting JSON, resilient to the transient windows
+ *  (a mid-deploy SPA-fallback, a Cloudflare Function cold-start, a Supabase
+ *  blip) where a request briefly gets HTML / a 5xx / a dropped connection
+ *  instead of reaching a healthy Function. Two failure classes, handled
+ *  differently by side-effect safety:
+ *
+ *   - IDEMPOTENT reads (state poll, legal actions, chat list) have no side
+ *     effect, so a transient failure of ANY kind — HTML, 5xx, or a network
+ *     throw — is safe to retry hard. We back off across several attempts so a
+ *     blip is absorbed inside the single call and the player never sees a
+ *     scary banner for a hiccup that self-heals a second later.
+ *   - NON-IDEMPOTENT writes (submit, report, claim) might have applied
+ *     server-side before failing, so a blind retry could double-apply. We only
+ *     retry the HTML case — an HTML body proves the request got the SPA
+ *     fallback and never hit the Function, so it had no side effect.
+ *
+ *  Every anomaly (HTML or 5xx) is captured via logApiAnomaly for diagnosis. */
+async function apiJson(
+  doFetch: () => Promise<Response>,
+  opts: { idempotent?: boolean } = {},
+): Promise<any> {
+  // Idempotent reads get a backoff ladder (~0/0.4/0.9/1.6/2.6s ≈ 5.5s total),
+  // long enough to ride out a deploy or cold-start window. Writes get the
+  // single cautious HTML retry only.
+  const backoff = opts.idempotent ? [400, 500, 700, 1000] : [800];
   let lastErr: Error | null = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await doFetch();
+
+  for (let attempt = 0; attempt <= backoff.length; attempt++) {
+    let r: Response;
+    try {
+      r = await doFetch();
+    } catch (netErr: any) {
+      // Network-level failure (connection dropped, DNS, offline). No response
+      // reached us, so a read definitely had no side effect — retry it.
+      logApiAnomaly({ t: Date.now(), networkError: String(netErr?.message ?? netErr), attempt });
+      lastErr = new Error('Lost connection to the server. Reconnecting…');
+      if (opts.idempotent && attempt < backoff.length) { await delay(backoff[attempt]); continue; }
+      throw lastErr;
+    }
+
     const text = await r.text();
     let data: any = null;
     try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
     if (r.ok && data !== null) return data;
+
     const isHtml = data === null && /^\s*</.test(text);
-    if (isHtml || r.status >= 500) {
+    // An empty/whitespace body ("Unexpected end of JSON input") means the
+    // Function returned nothing — a cold-start / mid-deploy artifact where the
+    // request never produced a real response. Like the HTML SPA-fallback case,
+    // it proves no complete server-side result, so it's safe to retry even for
+    // a write (worst case on a create is one unused game, not a double-apply).
+    const isEmpty = data === null && text.trim() === '';
+    const noServerResult = isHtml || isEmpty;
+    const transient = noServerResult || r.status >= 500;
+    if (transient) {
       logApiAnomaly({
         t: Date.now(),
         status: r.status,
@@ -51,15 +87,20 @@ async function apiJson(doFetch: () => Promise<Response>): Promise<any> {
         cfRay: r.headers.get('cf-ray'),
         cfCache: r.headers.get('cf-cache-status'),
         isHtml,
+        isEmpty,
         bodySnippet: text.slice(0, 80),
         attempt,
       });
-      if (isHtml && attempt === 0) { await delay(800); continue; } // retry the SPA-fallback case once
+      // Reads retry on any transient; writes retry only the cases that prove no
+      // complete server-side result (HTML SPA-fallback or an empty body).
+      const mayRetry = opts.idempotent ? true : noServerResult;
+      if (mayRetry && attempt < backoff.length) { await delay(backoff[attempt]); continue; }
     }
+
     lastErr = new Error(
       (data && data.error)
-        || (isHtml
-          ? 'The server was briefly unavailable (likely mid-deploy). Try again in a moment.'
+        || (noServerResult
+          ? 'The server was briefly unavailable. Reconnecting…'
           : `Server error (HTTP ${r.status}). Please reload and try again.`),
     );
     throw lastErr;
@@ -73,17 +114,22 @@ export interface Invites {
 }
 
 // Create a new game with a player count (2-4). Returns one invite URL per seat.
-export async function createGame(numPlayers: number): Promise<Invites> {
-  const r = await fetch('/api/games', {
+// Optional `ai` maps seat ids ('0'..'3') to a difficulty key ('random' |
+// 'standard'); those seats become server-driven, rated AI opponents.
+export async function createGame(
+  numPlayers: number,
+  ai?: Partial<Record<PlayerId, string>>,
+): Promise<Invites> {
+  // Routed through apiJson so a transient blip (empty body / SPA-fallback HTML
+  // during a cold-start or mid-deploy) is retried instead of failing instantly
+  // with a cryptic "Unexpected end of JSON input". Not marked idempotent — a
+  // create has a side effect — but apiJson still retries the no-server-result
+  // cases (empty/HTML), which are the ones that didn't reach the Function.
+  return apiJson(() => fetch('/api/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ numPlayers }),
-  });
-  if (!r.ok) {
-    const data: any = await r.json().catch(() => ({}));
-    throw new Error(data?.error || `createGame failed: ${r.status}`);
-  }
-  return r.json();
+    body: JSON.stringify({ numPlayers, ...(ai ? { ai } : {}) }),
+  }));
 }
 
 // Lightweight status read for the lobby's "games in progress" list. Returns
@@ -127,14 +173,14 @@ export function makeClient(
   const base = `/api/games/${gameId}`;
   const q = `?as=${encodeURIComponent(token)}`;
   return {
-    fetch: () => apiJson(() => fetch(`${base}${q}`)),
+    fetch: () => apiJson(() => fetch(`${base}${q}`), { idempotent: true }),
     submit: (action) =>
       apiJson(() => fetch(`${base}/submit${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, identityToken: getIdentityToken?.() }),
       })),
-    legalActions: () => apiJson(() => fetch(`${base}/legal${q}`)),
+    legalActions: () => apiJson(() => fetch(`${base}/legal${q}`), { idempotent: true }),
     report: (body) =>
       apiJson(() => fetch(`${base}/report${q}`, {
         method: 'POST',
@@ -151,7 +197,7 @@ export function makeMessagingClient(gameId: string, token: string): MessagingCli
   const base = `/api/games/${gameId}/chat`;
   const q = `?as=${encodeURIComponent(token)}`;
   return {
-    listMessages: () => apiJson(() => fetch(`${base}${q}`)),
+    listMessages: () => apiJson(() => fetch(`${base}${q}`), { idempotent: true }),
     postMessage: (body) =>
       apiJson(() => fetch(`${base}${q}`, {
         method: 'POST',

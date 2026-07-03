@@ -261,6 +261,25 @@ export type EotPromoteTrigger = CardRef & {
   optional?: boolean;
 };
 
+/** Order the queued end-of-turn promote triggers so the player is offered them
+ *  in a sensible sequence: mandatory first, then mandatory-with-aspect
+ *  (Obedience), then optional-with-type (Undead), then plain optional. Lets the
+ *  player selectively decline the lower-priority optional ones if desired. */
+function sortPendingEotPromotions(G: TyrantsState): void {
+  const getPriority = (item: EotPromoteTrigger): number => {
+    // Bucket 1: Not optional and NO aspect
+    if (!item.optional && item.aspectFilter !== 'Obedience') return 1;
+    // Bucket 2: Not optional WITH aspect
+    if (!item.optional && item.aspectFilter === 'Obedience') return 2;
+    // Bucket 3: Optional WITH type
+    if (item.optional && item.typeFilter === 'Undead') return 3;
+    // Bucket 4: Optional with NO type and NO aspect
+    return 4;
+  };
+  // Sort ascending by priority score (1 comes before 2, etc.)
+  G.pendingEotPromotions.sort((a, b) => getPriority(a) - getPriority(b));
+}
+
 // Two of four half-decks make the market for a game (rulebook "first game" suggests Drow + Dragons).
 // Each half-deck has 40 cards total (one entry per slot in card-data covers the printed
 // physical copies — Advance Scout has 3 slots because there are 3 physical Advance
@@ -811,23 +830,9 @@ export const TyrantsGame: Game<TyrantsState> = {
           }
         }
 
-        // Sort: Mandatory promotes are offered first, 
-        // followed by aspect=Obedience, then type=Undead, then optional.
-        // This allows the player to selectively reduce promotes, if desired.
-        G.pendingEotPromotions.sort((a, b) => {
-          const getPriority = (item) => {
-            // Bucket 1: Not optional and NO aspect
-            if (!item.optional && item.aspectFilter !== 'Obedience') return 1;
-            // Bucket 2: Not optional WITH aspect
-            if (!item.optional && item.aspectFilter === 'Obedience') return 2;
-            // Bucket 3: Optional WITH type
-            if (item.optional && item.typeFilter === 'Undead') return 3;
-            // Bucket 4: Optional with NO type and NO aspect
-            return 4;
-          };
-          // Sort ascending by priority score (1 comes before 2, etc.)
-          return getPriority(a) - getPriority(b);
-        });
+        // Order the queue: mandatory first, then Obedience, then Undead, then
+        // optional — so the player can selectively decline lower-priority ones.
+        sortPendingEotPromotions(G);
 
         // Skip any subsequent triggers that have no other cards to promote,
         // logging each one that is silently dropped.
@@ -1105,23 +1110,9 @@ export const TyrantsGame: Game<TyrantsState> = {
       // If end-of-turn promotions are queued, surface a picker over cards played this turn
       // before actually ending the turn. resolveChoice handles the special '__eot__' kind.
       if (G.pendingEotPromotions.length > 0) {
-        // Sort: Mandatory promotes are offered first, 
-        // followed by aspect=Obedience, then type=Undead, then optional.
-        // This allows the player to selectively reduce promotes, if desired.
-        G.pendingEotPromotions.sort((a, b) => {
-          const getPriority = (item) => {
-            // Bucket 1: Not optional and NO aspect
-            if (!item.optional && item.aspectFilter !== 'Obedience') return 1;
-            // Bucket 2: Not optional WITH aspect
-            if (!item.optional && item.aspectFilter === 'Obedience') return 2;
-            // Bucket 3: Optional WITH type
-            if (item.optional && item.typeFilter === 'Undead') return 3;
-            // Bucket 4: Optional with NO type and NO aspect
-            return 4;
-          };
-          // Sort ascending by priority score (1 comes before 2, etc.)
-          return getPriority(a) - getPriority(b);
-        });
+        // Order the queue: mandatory first, then Obedience, then Undead, then
+        // optional — so the player can selectively decline lower-priority ones.
+        sortPendingEotPromotions(G);
 
         const trigger = G.pendingEotPromotions[0];
         const eligible = eotEligibleIndices(G, trigger);
