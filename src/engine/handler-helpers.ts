@@ -371,9 +371,12 @@ export function devourFromHandCost(thenEffect: EffectHandler, opts?: { promptLab
       const me = ctx.G.players[ctx.actorId];
       const card = me.hand[idx];
       if (!card) { ctx.handlerState = null; return true; }
-      me.hand.splice(idx, 1);
-      Mechanics.devour(ctx.G, card);
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} devoured ${card.name} from hand`);
+      // ONLY splice and devour if Sylgar didn't intercept it
+      if (!Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+        me.hand.splice(idx, 1);
+        Mechanics.devour(ctx.G, card);
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} devoured ${card.name} from hand`);
+      }
       state = { paid: true, childState: null };
     }
     // Run the gated follow-up.
@@ -1106,7 +1109,11 @@ export function promoteTopOfDeck(opts?: { count?: number }): EffectHandler {
       if (!card) break;
       // Promoting the top of the deck reveals a previously-hidden card — bars undo.
       Mechanics.markInfoRevealed(ctx.G);
-      Mechanics.promote(ctx.G, ctx.actorId, card);
+      if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+        me.deck.unshift(card); // It was already shifted, so put it right back on top
+      } else {
+        Mechanics.promote(ctx.G, ctx.actorId, card);
+      }
     }
     return true;
   };
@@ -1333,8 +1340,10 @@ export function promoteFromDiscardChoice(opts?: { optional?: boolean }): EffectH
     const me = ctx.G.players[ctx.actorId];
     const card = me.discard[idx];
     if (!card) return true;
-    me.discard.splice(idx, 1);
-    Mechanics.promote(ctx.G, ctx.actorId, card);
+    if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+      me.discard.splice(idx, 1);
+      Mechanics.promote(ctx.G, ctx.actorId, card);
+    }
     return true;
   };
 }
@@ -1751,7 +1760,9 @@ export function devourMarketChoice(opts?: { optional?: boolean }): EffectHandler
     if (idx == null) return true;
     const card = ctx.G.market.row[idx];
     if (!card) return true;
-    Mechanics.devour(ctx.G, card);
+    if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+      Mechanics.devour(ctx.G, card);
+    }
     const refill = ctx.G.market.deck.shift() ?? null;
     if (refill) Mechanics.markInfoRevealed(ctx.G);
     ctx.G.market.row[idx] = refill;
@@ -2229,10 +2240,13 @@ function applyForcedDiscard(
   const target = G.players[targetPid];
   const card = target.hand[idx];
   if (!card) return;
-  target.hand.splice(idx, 1);
-  target.discard.push(card);
-  Mechanics.log(G, `P${Number(targetPid) + 1} discarded ${card.name} (forced)`);
-  fireForcedDiscardReactive(G, card, targetPid, offenderPid);
+  // Intercept before forcing the discard
+  if (!Mechanics.trySylgarReact(G, targetPid, card)) {
+    target.hand.splice(idx, 1);
+    target.discard.push(card);
+    Mechanics.log(G, `P${Number(targetPid) + 1} discarded ${card.name} (forced)`);
+    fireForcedDiscardReactive(G, card, targetPid, offenderPid);
+  }
 }
 
 /** Force EACH opponent (excluding ctx.actorId) with at least `minHand`
@@ -2588,8 +2602,10 @@ export function promoteFromHandChoice(opts?: { optional?: boolean }): EffectHand
     const me = ctx.G.players[ctx.actorId];
     const card = me.hand[idx];
     if (!card) return true;
-    me.hand.splice(idx, 1);
-    Mechanics.promote(ctx.G, ctx.actorId, card);
+    if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+      me.hand.splice(idx, 1);
+      Mechanics.promote(ctx.G, ctx.actorId, card);
+    }
     return true;
   };
 }

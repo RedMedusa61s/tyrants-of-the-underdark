@@ -50,3 +50,7 @@ worker/node_modules/
 weights/_smoke-*.json
 weights/tuned.json
 weights/tune-log.json
+
+# --- App files ---
+android
+capacitor.config.ts

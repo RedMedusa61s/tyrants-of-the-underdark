@@ -231,6 +231,9 @@ export interface TyrantsState {
 
   /** Which sections are in play this game ('left' | 'center' | 'right'). */
   activeSections: string[];
+
+  /** Active override for the power cost of the assassinate board action. */
+  assassinateCostOverride?: number;
 }
 
 // Canonical seat order — AI seats always draw from these four, and a game with
@@ -679,6 +682,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       // any state mutation in between turns (saves, replays) doesn't
       // accidentally grant influence to a player who isn't currently active.
       G.activeTurnColor = null;
+      // Return Assassinate cost to normal
+      G.assassinateCostOverride = undefined;
     },
   },
 
@@ -798,16 +803,18 @@ export const TyrantsGame: Game<TyrantsState> = {
           const playerId = pc.playerId;
           const card = G.cardsPlayedThisTurn[idx];
           if (card) {
-            // Remove from the played list by EXACT index (unambiguous even
-            // with duplicate same-type cards — #47 / #48). Mechanics.promote
-            // no longer touches cardsPlayedThisTurn, so this is the sole
-            // removal for the EOT path.
-            G.cardsPlayedThisTurn.splice(idx, 1);
-            const di = G.players[playerId].discard.findIndex(
-              c => c.deck === card.deck && c.slot === card.slot
-            );
-            if (di >= 0) G.players[playerId].discard.splice(di, 1);
-            Mechanics.promote(G, playerId, card);
+            if (!Mechanics.trySylgarReact(G, playerId, card)) {
+              // Remove from the played list by EXACT index (unambiguous even
+              // with duplicate same-type cards — #47 / #48). Mechanics.promote
+              // no longer touches cardsPlayedThisTurn, so this is the sole
+              // removal for the EOT path.
+              G.cardsPlayedThisTurn.splice(idx, 1);
+              const di = G.players[playerId].discard.findIndex(
+                c => c.deck === card.deck && c.slot === card.slot
+              );
+              if (di >= 0) G.players[playerId].discard.splice(di, 1);
+              Mechanics.promote(G, playerId, card);
+            }
           }
         }
         // Consume the trigger we were responding to.
@@ -1015,7 +1022,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       const presenceOk = hasPresence(G, color, { site: target.parentSite, space: target.parentRoute ? spaceId : undefined });
       if (!presenceOk) return INVALID_MOVE;
 
-      if (!Mechanics.expendPower(G, pid, BASE_ACTION_POWER_COST)) return INVALID_MOVE;
+      const cost = G.assassinateCostOverride ?? BASE_ACTION_POWER_COST;
+      if (!Mechanics.expendPower(G, pid, cost)) return INVALID_MOVE;
       const killed = assassinateTroop(G, spaceId);
       if (killed === 'white') p.trophyHall.white += 1;
       else if (killed) p.trophyHall[killed] = (p.trophyHall[killed] ?? 0) + 1;

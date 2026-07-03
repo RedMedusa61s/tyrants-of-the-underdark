@@ -586,7 +586,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   // never lower it past what the engine will accept — otherwise the AI
   // proposes an unaffordable move, the reducer returns INVALID_MOVE, and
   // the tournament harness burns the turn via fallback endTurn.
-  const assassinateThreshold = Math.max(WEIGHTS.powerThresholdForAssassinate, BASE_ACTION_POWER_COST);
+  const currentCost = G.assassinateCostOverride ?? BASE_ACTION_POWER_COST;
+  const assassinateThreshold = Math.max(WEIGHTS.powerThresholdForAssassinate, currentCost);
 
   // Decide ordering of (assassinate, deploy):
   //   - ahead+late → deploy first (accelerate end)
