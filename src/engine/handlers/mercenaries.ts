@@ -1,8 +1,7 @@
 import { grant, sequence, registerAll, chooseOne, times,
          assassinateChoice, deployChoice, supplantChoice,
-         moveEnemyTroopChoice, returnOwnSpyChoice,
-         placeSpyAtChosenSite, returnEnemyTroopChoice,
-         playerHasOwnSpy, playerCanAssassinate, 
+         returnOwnSpyChoice, placeSpyAtChosenSite,
+         returnEnemyTroopChoice, playerHasOwnSpy,
          takeTrophyAndPlace, ensureSpiesLeftInitialized} from '../handler-helpers';
 import { Mechanics } from '../mechanics';
 import type { EffectContext, EffectHandler, PendingChoice } from '../types';

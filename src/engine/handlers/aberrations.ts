@@ -451,4 +451,3 @@ registerOnForcedDiscard('ambassador', (G, ownerPid) => {
 void playerCanAssassinate;
 void returnEnemyTroopOrSpyChoice;
 void playerCanReturnEnemyTroop;
-void times
