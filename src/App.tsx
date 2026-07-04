@@ -1983,12 +1983,14 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
-            // Hide ineligible cards entirely when options restrict which cards are pickable
-            // if (isChoosing && opts && !eligible) return null;
+            // Ineligible cards during a choice are shown dimmed (not hidden) but
+            // must NOT be clickable — clicking one would submit resolveChoice with
+            // an index the engine rejects. Gate onClick + the 'pick' label on
+            // eligibility, matching the promote-played-card section above.
             const onClick = isChoosing
-              ? () => moves.resolveChoice(i)
+              ? (eligible ? () => moves.resolveChoice(i) : undefined)
               : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
-            const label = isChoosing ? 'pick' : 'play';
+            const label = isChoosing ? (eligible ? 'pick' : undefined) : 'play';
             return <Card key={i} card={c} label={label} onClick={onClick} dim={isChoosing && !eligible}/>;
           })}
         </div>
