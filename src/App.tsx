@@ -230,7 +230,7 @@ const HOVER_CAPABLE =
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(hover: hover)').matches;
 
-function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; label?: string }) {
+function Card({ card, onClick, label, dim }: { card: CardRef; onClick?: () => void; label?: string; dim?: boolean }) {
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
   // transformOrigin is recomputed on each hover-enter so the 2.5x enlarge
@@ -329,6 +329,9 @@ function Card({ card, onClick, label }: { card: CardRef; onClick?: () => void; l
         cursor: onClick ? 'pointer' : 'default',
         background: '#1a1228',
         position: 'relative',
+        opacity: dim ? 0.35 : 1,
+        filter: dim ? 'grayscale(1)' : undefined,
+        transition: 'opacity 120ms ease, filter 120ms ease',
       }}
       title={card.name}
     >
@@ -401,7 +404,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // if any. Lets a player review what's in their deck / discard / inner
   // circle for planning (#68). The deck is shown UNORDERED (sorted by
   // deck+slot) so it isn't a peek at draw order.
-  const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | 'trophy' | null>(null);
+  const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | 'trophy' | 'played' | null>(null);
   // Which player's pile the overlay is showing. null = the local viewer (me).
   // Opponents' discard / inner circle / trophy hall are public info, so any
   // player can be inspected from the scoreboard (#82, Drew W.). Deck and hand
@@ -896,6 +899,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     const cardPileKinds = [
       'select-played-card', 'select-card-in-discard',
       'select-card-in-inner-circle', 'select-card-in-hand',
+      'select-market-card',
     ];
     if (!cardPileKinds.includes(pc.kind)) return;
     if (splitView) {
@@ -1271,13 +1275,15 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     }
     const cards = pileView === 'deck' ? pp.deck
       : pileView === 'discard' ? pp.discard
+      : pileView === 'played' ? pp.cardsPlayed
       : pp.innerCircle;
     const title = pileView === 'deck' ? `${who} Deck`
       : pileView === 'discard' ? `${who} Discard Pile`
+      : pileView === 'played' ? `${who} Cards Played This Turn`
       : `${who} Inner Circle`;
-    const sorted = [...cards].sort(
-      (a, b) => a.deck.localeCompare(b.deck) || a.slot - b.slot || a.name.localeCompare(b.name)
-    );
+    const displayCards = pileView === 'played' 
+      ? cards 
+      : [...cards].sort((a, b) => a.deck.localeCompare(b.deck) || a.slot - b.slot || a.name.localeCompare(b.name));
     return (
       <div
         onClick={() => setPileView(null)}
@@ -1312,7 +1318,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             <div style={{ opacity: 0.6, padding: '24px 8px' }}>This pile is empty.</div>
           ) : (
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {sorted.map((c, i) => <Card key={i} card={c} />)}
+              {displayCards.map((c, i) => <Card key={i} card={c} />)}
             </div>
           )}
         </div>
@@ -1903,60 +1909,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
-        <h2 style={{ marginTop: 24 }}>
-          Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck</span>
-        </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {/* Rotating market row (6 slots from the chosen half-decks). */}
-          {G.market.row.map((c, i) => {
-            if (!c) return <div key={i} style={{ width: 120, height: 168, margin: 4, border: '1px dashed #444', borderRadius: 8 }} />;
-            const inPickMode = !!clickableMarketSlots;
-            const slotPickable = inPickMode && clickableMarketSlots!.has(i);
-            const cost = lookupCard(c.deck, c.slot)?.cost ?? '?';
-            const label = inPickMode
-              ? (slotPickable ? 'pick' : '—')
-              : `recruit (${cost} Inf)`;
-            const onClick = inPickMode
-              ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
-              : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
-            return <Card key={i} card={c} label={label} onClick={onClick} />;
-          })}
-          {/* Permanent stacks (House Guards, Priestesses of Lolth) — always
-              recruitable while non-empty; once empty, greyed out and the
-              button is disabled. Recruiting these doesn't trigger end-of-
-              game (only the rotating deck emptying does). */}
-          {(['houseGuards', 'priestesses'] as const).map(stack => {
-            const ref = stack === 'houseGuards'
-              ? { deck: 'house-guards', slot: 40 }
-              : { deck: 'priestesses',  slot: 43 };
-            const data = lookupCard(ref.deck, ref.slot);
-            if (!data) return null;
-            const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
-            const remaining = G.auxStacks?.[stack] ?? 0;
-            const cost = data.cost ?? 999;
-            // Sentinel picks from a free-recruit prompt (e.g. Conjurer):
-            //  -1 = House Guard, -2 = Priestess.  When the picker offers
-            //  these, clicking the aux-stack card resolves the choice.
-            const sentinel = stack === 'houseGuards' ? -1 : -2;
-            const freeRecruitPickable = !!clickableMarketSlots && clickableMarketSlots.has(sentinel);
-            const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
-            const label = remaining === 0
-              ? `empty · ${data.name}`
-              : freeRecruitPickable
-                ? `pick (free) · ${remaining} left`
-                : `recruit (${cost} Inf) · ${remaining} left`;
-            const onClick = freeRecruitPickable
-              ? () => moves.resolveChoice(sentinel)
-              : canRecruit
-                ? () => moves.recruitFromAuxStack(stack)
-                : undefined;
-            return (
-              <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
-                <Card card={card} label={label} onClick={onClick} />
-              </div>
-            );
-          })}
-        </div>
+        {actionBar}
 
         {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
           <>
@@ -1993,27 +1946,32 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           <>
             <h2 style={{ marginTop: 24 }}>Played this turn — pick one to promote</h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-              {/* Only show cards that are actually promotable. The engine's
-                  options list excludes the trigger card itself and (for
-                  aspect-filtered triggers like the Myrmidons) mismatched
-                  aspects. Ineligible cards are hidden entirely rather than
-                  shown greyed-out. The original index is preserved for
-                  resolveChoice. */}
-              {G.cardsPlayedThisTurn
-                .map((c, i) => ({ c, i }))
-                .filter(({ i }) => {
-                  const eligibleIdxs = G.pendingChoice!.options as number[] | undefined;
-                  return !eligibleIdxs || eligibleIdxs.includes(i);
-                })
-                .map(({ c, i }) => (
-                  <Card key={i} card={c} label="promote"
-                    onClick={() => moves.resolveChoice(i)} />
-                ))}
+              {/* Show all cards played this turn, dimming ineligible ones (the trigger
+                  card itself or aspect-filtered mismatches). The original index is
+                  preserved for resolveChoice. */}
+              {G.cardsPlayedThisTurn.map((c, i) => {
+                const eligibleIdxs = G.pendingChoice!.options as number[] | undefined;
+                const eligible = !eligibleIdxs || eligibleIdxs.includes(i);
+                return (
+                  <Card key={i} card={c} label={eligible ? "promote" : undefined} onClick={eligible ? () => moves.resolveChoice(i) : undefined} dim={!eligible} />
+                );
+              })}
             </div>
           </>
         )}
 
-        <h2 style={{ marginTop: 24 }}>Your Hand</h2>
+        <h2 style={{ marginTop: 24, display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          Your Hand
+          <button onClick={() => { setPilePlayer(null); setPileView('played'); }}
+            title="View cards you played this turn"
+            style={{
+              background: 'none', border: 'none', padding: 0, font: 'inherit',
+              color: '#a9c6ff', cursor: 'pointer', textDecoration: 'underline',
+              textUnderlineOffset: 2, fontSize: 14, fontWeight: 'normal'
+            }}>
+            Played this turn: {p.cardsPlayed.length}
+          </button>
+        </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
           {p.hand.map((c, i) => {
             // The discard/devour-from-hand prompt is always answered by the
@@ -2025,17 +1983,72 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
-            // Hide ineligible cards entirely when options restrict which cards are pickable
-            if (isChoosing && opts && !eligible) return null;
+            // Ineligible cards during a choice are shown dimmed (not hidden) but
+            // must NOT be clickable — clicking one would submit resolveChoice with
+            // an index the engine rejects. Gate onClick + the 'pick' label on
+            // eligibility, matching the promote-played-card section above.
             const onClick = isChoosing
-              ? () => moves.resolveChoice(i)
+              ? (eligible ? () => moves.resolveChoice(i) : undefined)
               : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
-            const label = isChoosing ? 'pick' : 'play';
-            return <Card key={i} card={c} label={label} onClick={onClick} />;
+            const label = isChoosing ? (eligible ? 'pick' : undefined) : 'play';
+            return <Card key={i} card={c} label={label} onClick={onClick} dim={isChoosing && !eligible}/>;
           })}
         </div>
 
-        {actionBar}
+        <h2 style={{ marginTop: 24 }}>
+          Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck</span>
+        </h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {/* Rotating market row (6 slots from the chosen half-decks). */}
+          {G.market.row.map((c, i) => {
+            if (!c) return <div key={i} style={{ width: 120, height: 168, margin: 4, border: '1px dashed #444', borderRadius: 8 }} />;
+            const inPickMode = !!clickableMarketSlots;
+            const slotPickable = inPickMode && clickableMarketSlots!.has(i);
+            const cost = lookupCard(c.deck, c.slot)?.cost ?? '?';
+            const label = inPickMode
+              ? (slotPickable ? 'pick' : '—')
+              : `recruit (${cost} Inf)`;
+            const onClick = inPickMode
+              ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
+              : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
+            return <Card key={i} card={c} label={label} onClick={onClick} dim={inPickMode && !slotPickable} />;
+          })}
+          {/* Permanent stacks (House Guards, Priestesses of Lolth) — always
+              recruitable while non-empty; once empty, greyed out and the
+              button is disabled. Recruiting these doesn't trigger end-of-
+              game (only the rotating deck emptying does). */}
+          {(['houseGuards', 'priestesses'] as const).map(stack => {
+            const ref = stack === 'houseGuards'
+              ? { deck: 'house-guards', slot: 40 }
+              : { deck: 'priestesses',  slot: 43 };
+            const data = lookupCard(ref.deck, ref.slot);
+            if (!data) return null;
+            const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
+            const remaining = G.auxStacks?.[stack] ?? 0;
+            const cost = data.cost ?? 999;
+            // Sentinel picks from a free-recruit prompt (e.g. Conjurer):
+            //  -1 = House Guard, -2 = Priestess.  When the picker offers
+            //  these, clicking the aux-stack card resolves the choice.
+            const sentinel = stack === 'houseGuards' ? -1 : -2;
+            const freeRecruitPickable = !!clickableMarketSlots && clickableMarketSlots.has(sentinel);
+            const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
+            const label = remaining === 0
+              ? `empty · ${data.name}`
+              : freeRecruitPickable
+                ? `pick (free) · ${remaining} left`
+                : `recruit (${cost} Inf) · ${remaining} left`;
+            const onClick = freeRecruitPickable
+              ? () => moves.resolveChoice(sentinel)
+              : canRecruit
+                ? () => moves.recruitFromAuxStack(stack)
+                : undefined;
+            return (
+              <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
+                <Card card={card} label={label} onClick={onClick} dim={!!clickableMarketSlots && !freeRecruitPickable} />
+              </div>
+            );
+          })}
+        </div>
 
         <details style={{ marginTop: 24 }}>
           <summary style={{ cursor: 'pointer', opacity: 0.7 }}>Log ({G.log.length})</summary>
@@ -2379,7 +2392,7 @@ function SplitPlayView(props: {
    *  online. Used to gate which side's pendingChoice prompts render. */
   mySeat: string;
   /** Open the pile inspector overlay for one of the player's own piles (#68). */
-  onViewPile: (pile: 'deck' | 'discard' | 'inner' | 'trophy') => void;
+  onViewPile: (pile: 'deck' | 'discard' | 'inner' | 'trophy' | 'played') => void;
 }) {
   const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
@@ -2460,18 +2473,15 @@ function SplitPlayView(props: {
         <div>
           <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Played this turn — pick one to promote</h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-            {/* Hide ineligible cards entirely (trigger card itself,
-                aspect-filtered mismatches); keep original index for resolveChoice. */}
-            {G.cardsPlayedThisTurn
-              .map((c, i) => ({ c, i }))
-              .filter(({ i }) => {
-                const eligibleIdxs = (G.pendingChoice!.options as number[] | undefined);
-                return !eligibleIdxs || eligibleIdxs.includes(i);
-              })
-              .map(({ c, i }) => (
-                <Card key={i} card={c} label="promote"
-                  onClick={() => moves.resolveChoice(i)} />
-              ))}
+            {/* Show all cards played this turn, dimming ineligible ones (the trigger
+                card itself or aspect-filtered mismatches); keep original index for resolveChoice. */}
+            {G.cardsPlayedThisTurn.map((c, i) => {
+              const eligibleIdxs = G.pendingChoice!.options as number[] | undefined;
+              const eligible = !eligibleIdxs || eligibleIdxs.includes(i);
+              return (
+                <Card key={i} card={c} label={eligible ? "promote" : undefined} onClick={eligible ? () => moves.resolveChoice(i) : undefined} dim={!eligible} />
+              );
+            })}
           </div>
         </div>
       )}
@@ -2511,7 +2521,18 @@ function SplitPlayView(props: {
       <div onMouseEnter={enterCards} onMouseLeave={leaveCards} style={sectionBox('cards')}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
           <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-            <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85 }}>Your Hand ({p.hand.length})</h3>
+            <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85, display: 'flex', alignItems: 'baseline', gap: 12 }}>
+              Your Hand ({p.hand.length})
+              <button onClick={() => onViewPile('played')}
+                title="View cards you played this turn"
+                style={{
+                  background: 'none', border: 'none', padding: 0, font: 'inherit',
+                  color: '#a9c6ff', cursor: 'pointer', textDecoration: 'underline',
+                  textUnderlineOffset: 2, fontSize: 12, fontWeight: 'normal'
+                }}>
+                Played: {p.cardsPlayed.length}
+              </button>
+            </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
               {p.hand.map((c, i) => {
                 // See same-named check in the play tab above — the
@@ -2521,12 +2542,12 @@ function SplitPlayView(props: {
                 const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
                 // Hide ineligible cards entirely when options restrict which cards are pickable
-                if (isChoosing && opts && !eligible) return null;
+                // if (isChoosing && opts && !eligible) return null;
                 const onClick = isChoosing
                   ? () => moves.resolveChoice(i)
                   : (myTurn && !G.pendingChoice ? () => playCardSafe(i) : undefined);
                 const label = isChoosing ? 'pick' : 'play';
-                return <Card key={i} card={c} label={label} onClick={onClick} />;
+                return <Card key={i} card={c} label={label} onClick={onClick} dim={isChoosing && !eligible}/>;
               })}
             </div>
           </div>
@@ -2546,7 +2567,7 @@ function SplitPlayView(props: {
                 const onClick = inPickMode
                   ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
                   : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
-                return <Card key={i} card={c} label={label} onClick={onClick} />;
+                return <Card key={i} card={c} label={label} onClick={onClick} dim={inPickMode && !slotPickable} />;
               })}
               {(['houseGuards', 'priestesses'] as const).map(stack => {
                 const ref = stack === 'houseGuards'
@@ -2574,7 +2595,7 @@ function SplitPlayView(props: {
                     : undefined;
                 return (
                   <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
-                    <Card card={card} label={label} onClick={onClick} />
+                    <Card card={card} label={label} onClick={onClick} dim={!!clickableMarketSlots && !freeRecruitPickable} />
                   </div>
                 );
               })}
