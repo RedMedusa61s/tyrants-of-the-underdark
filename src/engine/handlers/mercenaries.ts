@@ -2,7 +2,8 @@ import { grant, sequence, registerAll, chooseOne, times,
          assassinateChoice, deployChoice, supplantChoice,
          returnOwnSpyChoice, placeSpyAtChosenSite,
          returnEnemyTroopChoice, playerHasOwnSpy,
-         takeTrophyAndPlace, ensureSpiesLeftInitialized} from '../handler-helpers';
+         takeTrophyAndPlace, ensureSpiesLeftInitialized,
+         flagEotPromote} from '../handler-helpers';
 import { Mechanics } from '../mechanics';
 import type { EffectContext, EffectHandler, PendingChoice } from '../types';
 import { sitesSpaces, TROOP_SPACES } from '../../data/troop-spaces';
@@ -12,7 +13,7 @@ import { assassinateTroop, moveTroop, hasPresence,
          placeSpy, returnSpy, hasTotalControl,
          siteOf, recomputeSiteControl } from '../map-state';
 import { CardRegistry } from '../registry';
-import type { Color, CardRef } from '../../game';
+import type { Color, CardRef, TyrantsState} from '../../game';
 import { lookupCard } from '../../card-data';
 
 
@@ -24,14 +25,20 @@ registerAll({
   // --- Slots 1, 2, 3, 4: Goblinoid Ambushers (Cost 2) ---
   // "Choose one: +1 Influence OR Steal 1 VP OR Bribe -> +3 Power"
   'goblinoid-ambushers': chooseOne(
-                           { label: '+1 Influence',       handler: grant({ influence: 1 }) },
-                           { label: 'Steal 1 VP',          handler: stealVpChoice({ count: 1 }) },
-                           { label: 'Bribe -> +3 Power',  handler: bribeCost(grant({ power: 3 })) }),
+                           { label: '+1 Power', handler: grant({ power: 1 }) },
+                           { label: 'Steal 1 VP',         
+                            handler: stealVpChoice({ count: 1 }),},
+                            //available: anyOpponentHasVp},
+                           { label: 'Bribe -> +3 Power',
+                            handler: bribeCost(grant({ power: 3 })),}
+                            //available: playerHasVp}
+                          ),
 
   // --- Slots 5, 6: Hobgoblin Warlord (Cost 5) ---
   // "+3 Influence. Bribe -> For the rest of your turn, you can expend 2 Power to assassinate a troop."
   // Approximated as a direct bonus choice effect action when paid.
-  // TODO: Fix bribe so that it reduces assassination cost until eot.
+  // * Implemented
+  // TODO: Check
   'hobgoblin-warlord':   sequence(
                            grant({ influence: 3 }),
                            bribeCost(reduceAssassinateCostToTwo)
@@ -74,24 +81,38 @@ registerAll({
   // "Deploy a troop. Bribe -> Deploy 2 troops."
   'goblin-swarm':        sequence(
                            deployChoice({ count: 1 }),
-                           bribeCost(deployChoice({ count: 2 }))),
+                           bribeCost(deployChoice({ count: 2 }))
+                          ),
 
   // --- Slots 13, 14, 15: Bugbear (Cost 4) ---
   // "Deploy a troop. Assassinate a white troop. Gain 1 VP."
   'bugbear':             sequence(
                            deployChoice({ count: 1 }),
                            assassinateChoice({ count: 1, whiteOnly: true }),
-                           ctx => { ctx.G.players[ctx.actorId].vp += 1; return true; }),
+                           ctx => { ctx.G.players[ctx.actorId].vp += 1; return true; }
+                          ),
 
   // --- Slots 16, 17: Security Guard (Cost 4) ---
   // "Deploy 2 troops, then steal 1 VP from each opponent with a troop adjacent to at least 1 of them."
+  // TODO: Check
   'security-guard':      securityGuardHandler,
 
   // --- Slots 18, 19: Bregan D'aerthe Agents (Cost 5) ---
   // "Choose 3 times: Take a white troop from any trophy hall and deploy it OR Bribe -> Supplant a white troop."
+  // TODO: Check
   'bregan-daerthe-agents': times(3, chooseOne(
-                             { label: 'Take white trophy and deploy',   handler: takeTrophyAndPlace({ count: 1, whiteOnly: true, restrictToPresence: true })},
-                             { label: 'Bribe -> Supplant a white troop', handler: bribeCost(supplantChoice({ whiteOnly: true })) })),
+                             { label: 'Take a white trophy from any hall and place it',
+                             handler: takeTrophyAndPlace({ count: 1, whiteOnly: true, optional: false, restrictToPresence: true }),
+                             available: (G) => {
+                               // Any player's trophy hall (including the actor's own).
+                               for (const p of Object.values(G.players)) {
+                                 if ((p.trophyHall.white ?? 0) > 0) return true;
+                               }
+                               return false;
+                             }},
+                             { label: 'Bribe -> Supplant a white troop',
+                              handler: bribeCost(supplantChoice({ whiteOnly: true })) }
+                            )),
 
   // --- Slot 20: Nihiloor (Cost 7) ---
   // "Deploy 3 troops. Bribe -> Move the deployed troops. Assassinate a white troop adjacent to each one."
@@ -145,8 +166,12 @@ registerAll({
                              // Gated check: only available if actor has cards to discard
                              available: (G, a) => G.players[a].hand.length > 0
                            },
-                           { label: 'Bribe -> Place spy and draw 2', handler: bribeCost(sequence(placeSpyAtChosenSite(), grant({ draw: 2 }))) },
-                           { label: 'Return spy -> Steal 3 VP',      handler: sequence(returnOwnSpyChoice(), stealVpChoice({ count: 3 })), available: playerHasOwnSpy }),
+                           { label: 'Bribe -> Place spy and draw 2',
+                            handler: bribeCost(sequence(placeSpyAtChosenSite(), grant({ draw: 2 }))) },
+                           { label: 'Return spy -> Steal 3 VP',
+                            handler: sequence(returnOwnSpyChoice(), stealVpChoice({ count: 3 })),
+                            available: playerHasOwnSpy }
+                          ),
 
   // --- Slots 27, 28: Bregan D'aerthe Spy (Cost 3) ---
   // "Choose one: Place a spy OR Return one of your spies -> Steal that spy's site control marker."
@@ -156,8 +181,8 @@ registerAll({
                            { label: 'Place a spy', handler: placeSpyAtChosenSite() },
                            { label: 'Return a spy -> Claim site control marker',
                              handler: stealControlMarkerChoice(),
-                             available: playerHasOwnSpy
-                           }),
+                             available: playerHasOwnSpy }
+                          ),
 
   // --- Slot 29: Nar'l Xibrindas (Cost 4) ---
   // "Choose one: Place a spy OR Return one of your spies -> Choose a card in the discard pile of an opponent at that site. Swap this card with it."
@@ -216,12 +241,12 @@ registerAll({
   // "+1 Influence. Bribe -> At end of turn, promote another card played this turn."
   'xanathar-smuggler':   sequence(
                            grant({ influence: 1 }),
-                           bribeCost(ctx => { ctx.G.pendingEotPromotions.push({ ...ctx.card, optional: true }); return true; })),
+                           bribeCost(flagEotPromote())
+                          ),
 
   // --- Slots 34, 35: Xanathar Surveillance (Cost 6) ---
   // "Draw 3 cards, then discard 2 of them. Bribe -> Promote one of the discarded cards."
-  // * Implemented
-  // TODO: Check
+  // * Implemented. Seems good.
   'xanathar-surveillance': xanatharSurveillanceHandler,
 
   // --- Slots 36, 37: Shady Merchant (Cost 5) ---
@@ -230,10 +255,12 @@ registerAll({
   'shady-merchant':      sequence(
                            returnEnemyTroopChoice(),
                            moveSpyChoice(),
-                           bribeCost(grant({ influence: 2 }))),
+                           bribeCost(recyclePlayedCardToDeckChoice())
+                          ),
 
   // --- Slot 38: Sylgar (Cost 1) ---
   // "If this is devoured, promoted or discarded by a card, put it back where it was and gain 1 VP."
+  // Checks are implemented in game.ts and App, when promoting or discarding
   // * Implemented
   // TODO: Check
   'sylgar':              grant({ influence: 0 }), // Had to put something here.
@@ -243,8 +270,11 @@ registerAll({
   // * Implemented
   // TODO: Check
   'ahmaergo':            times(2, chooseOne(
-                           { label: 'Move own troop and gain +1 Power', handler: sequence(grant({ power: 1 })) },
-                           { label: 'Bribe -> Swap 2 troops anywhere',   handler: bribeCost(swapAnyTwoTroopsChoice()) })),
+                           { label: 'Move own troop and gain +1 Power',
+                            handler: sequence(moveOwnTroopChoice(), grant({ power: 1 })) },
+                           { label: 'Bribe -> Swap 2 troops anywhere',
+                            handler: bribeCost(swapAnyTwoTroopsChoice()) }
+                          )),
 
   // --- Slot 40: Xanathar Zushaxx (Cost 7) ---
   // "+4 Influence. For the rest of your turn, each time you recruit a card, steal 1 VP."
@@ -309,13 +339,13 @@ export function stealVpChoice(opts?: { count?: number; targetPid?: string }): Ef
     const targetPlayer = G.players[targetId];
     const actorPlayer = G.players[ctx.actorId];
 
-    if (targetPlayer.vp >= 1) {
-      targetPlayer.vp -= 1;
-      actorPlayer.vp += 1;
-      Mechanics.log(G, `P${Number(ctx.actorId) + 1} stole 1 VP from P${Number(targetId) + 1}`);
+    if (targetPlayer.vp >= count) {
+      targetPlayer.vp -= count;
+      actorPlayer.vp += count;
+      Mechanics.log(G, `P${Number(ctx.actorId) + 1} stole ${count} VP from P${Number(targetId) + 1}`);
     }
 
-    state = { remaining: state.remaining - 1, targetPid: opts?.targetPid };
+    state = { remaining: state.remaining - count, targetPid: opts?.targetPid };
     ctx.handlerState = state;
     return state.remaining <= 0;
   };
@@ -382,6 +412,26 @@ export function bribeCost(thenEffect: EffectHandler): EffectHandler {
     ctx.handlerState = null;
     return true;
   };
+}
+
+/** * True when the player has at least 1 VP token available to spend.
+ * Useful for gating options that require paying VP (e.g., Bribes).
+ */
+export function playerHasVp(G: TyrantsState, actorId: string): boolean {
+  return G.players[actorId].vp >= 1;
+}
+
+/**
+ * True when at least one opponent has 1 or more VP tokens.
+ * Useful for gating options like Steal VP.
+ */
+export function anyOpponentHasVp(G: TyrantsState, actorId: string): boolean {
+  for (const pid of Object.keys(G.players)) {
+    if (pid !== actorId && G.players[pid].vp >= 1) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -585,6 +635,138 @@ export function moveSpyChoice(opts?: { count?: number; optional?: boolean }): Ef
     return false;
   };
 }
+
+/**
+ * An EffectHandler that allows the active player to choose a card they played 
+ * this turn, then choose any player, and place that card on top of their deck.
+ */
+export function recyclePlayedCardToDeckChoice(): EffectHandler {
+  return ctx => {
+    interface RecycleCardState {
+      phase: 'pick-played-card' | 'pick-target-player';
+      pickedCardIdx?: number;
+      pickedCardRef?: CardRef;
+    }
+
+    let state = (ctx.handlerState as RecycleCardState | null) ?? { phase: 'pick-played-card' };
+
+    // --- Phase 1: Pick a card played this turn ---
+    if (state.phase === 'pick-played-card') {
+      if (!ctx.pendingChoice) {
+        // Enumerate all indices of cards played this turn.
+        // We exclude the current card itself from being picked to match standard design patterns.
+        const eligibleCardIndices: number[] = [];
+        for (let i = 0; i < ctx.G.cardsPlayedThisTurn.length; i++) {
+          const c = ctx.G.cardsPlayedThisTurn[i];
+          if (c.deck === ctx.card.deck && c.slot === ctx.card.slot) continue;
+          eligibleCardIndices.push(i);
+        }
+
+        if (eligibleCardIndices.length === 0) {
+          Mechanics.log(ctx.G, `(${ctx.card.name}: No other cards have been played this turn — skipped)`);
+          ctx.handlerState = null;
+          return true;
+        }
+
+        ctx.pendingChoice = {
+          kind: 'select-played-card',
+          prompt: `${ctx.card.name}: Choose a card you played this turn to place on a deck.`,
+          options: eligibleCardIndices,
+          optional: false,
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = state;
+        return false;
+      }
+
+      // Resume from picking the card played this turn
+      const cardIdx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+
+      if (cardIdx === null || cardIdx < 0 || cardIdx >= ctx.G.cardsPlayedThisTurn.length) {
+        ctx.handlerState = null;
+        return true;
+      }
+
+      const pickedCardRef = ctx.G.cardsPlayedThisTurn[cardIdx];
+      state = { phase: 'pick-target-player', pickedCardIdx: cardIdx, pickedCardRef };
+      ctx.handlerState = state;
+      // Fall through immediately to Phase 2 to set up the player choice prompt
+    }
+
+    // --- Phase 2: Pick the target player's deck (Excluding Active Player) ---
+    if (state.phase === 'pick-target-player' && state.pickedCardRef) {
+      if (!ctx.pendingChoice) {
+        // Gather all player IDs and filter out ctx.actorId (the active player)
+        const opponentPlayerIds = Object.keys(ctx.G.players).filter(
+          id => id !== ctx.actorId
+        );
+
+        if (opponentPlayerIds.length === 0) {
+          Mechanics.log(ctx.G, `(${ctx.card.name}: No opponents available to target — skipped)`);
+          ctx.handlerState = null;
+          return true;
+        }
+
+        ctx.pendingChoice = {
+          kind: 'select-player',
+          prompt: `Place ${state.pickedCardRef.name} on top of which opponent's deck?`,
+          options: opponentPlayerIds,
+          optional: false,
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = state;
+        return false;
+      }
+
+      // Process target player selection response
+      const targetPlayerId = ctx.pendingChoice.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      ctx.handlerState = null;
+
+      if (targetPlayerId && state.pickedCardIdx !== undefined) {
+        const targetPlayer = ctx.G.players[targetPlayerId];
+        const pickedCard = state.pickedCardRef;
+        const pid = ctx.actorId;
+        const p = ctx.G.players[pid];
+        
+        if (targetPlayer) {
+          // 1. Remove from the played list by exact index so duplicate card definitions don't collide
+          ctx.G.cardsPlayedThisTurn.splice(state.pickedCardIdx, 1);
+          p.cardsPlayed.splice(state.pickedCardIdx, 1);
+
+          // 2. Remove from the player's discard pile
+          // Because game.ts adds copies to the discard pile on the fly as they are played,
+          // we look for it and slice it out so it doesn't leave behind a ghost duplicate.
+          const discardIdx = ctx.G.players[pid].discard.findIndex(
+            c => c.deck === pickedCard.deck && c.slot === pickedCard.slot
+          );
+          if (discardIdx >= 0) {
+            ctx.G.players[pid].discard.splice(discardIdx, 1);
+          }
+
+          // 3. Close the undo boundary
+          // Moving a card to a draw deck manipulates hidden card configurations.
+          // Mechanics.markInfoRevealed(ctx.G);
+
+          // 4. Place it on top of the target player's deck pile
+          targetPlayer.deck.unshift(pickedCard);
+
+          Mechanics.log(
+            ctx.G, 
+            `P${Number(pid) + 1} placed played card ${pickedCard.name} on top of P${Number(targetPlayerId) + 1}'s deck.`
+          );
+        }
+      }
+      return true;
+    }
+
+    ctx.handlerState = null;
+    return true;
+  };
+};
 
 /**
  * Swap any 2 troops on the board.
@@ -874,154 +1056,165 @@ export function nihiloorHandler(ctx: EffectContext): boolean {
  * Draw 3 cards, then discard 2 of them. Bribe -> Promote one of the discarded cards.
  */
 export function xanatharSurveillanceHandler(ctx: EffectContext): boolean {
-  interface XSState {
-    phase: 'draw' | 'discard1' | 'discard2' | 'bribe';
+interface XSState {
+    phase: 'draw' | 'discard' | 'bribe';
+    remainingDiscards: number;
     drawnRefs: { deck: string; slot: number }[];
-    discardedRefs: { deck: string; slot: number }[];
+    discardedIndices: number[]; // Track exact positions in the discard pile
     sub?: unknown;
   }
   
-  let state = (ctx.handlerState as XSState | null) ?? { phase: 'draw', drawnRefs: [], discardedRefs: [] };
+  let state = (ctx.handlerState as XSState | null) ?? { 
+    phase: 'draw', 
+    remainingDiscards: 2, 
+    drawnRefs: [], 
+    discardedIndices: [] 
+  };
+  
   const G = ctx.G;
   const me = G.players[ctx.actorId];
 
-  // --- 1. Draw 3 Cards ---
-  if (state.phase === 'draw') {
-    const oldSize = me.hand.length;
-    Mechanics.draw(G, ctx.actorId, 3, ctx.random);
-    const newSize = me.hand.length;
-    
-    // Track the exact newly drawn cards based on hand size change
-    const newlyDrawn = me.hand.slice(oldSize, newSize).map(c => ({ deck: c.deck, slot: c.slot }));
-    
-    // Failsafe: Nothing drawn (deck and discard both empty)
-    if (newlyDrawn.length === 0) {
-      ctx.handlerState = null;
-      return true; 
-    }
-
-    state = { phase: 'discard1', drawnRefs: newlyDrawn, discardedRefs: [] };
-  }
-
-  // --- 2. Discard 2 of the drawn cards ---
-  if (state.phase === 'discard1' || state.phase === 'discard2') {
-    if (!ctx.pendingChoice) {
-      const eligibleIndices: number[] = [];
-      for (let i = 0; i < me.hand.length; i++) {
-        const c = me.hand[i];
-        if (state.drawnRefs.some(ref => ref.deck === c.deck && ref.slot === c.slot)) {
-          eligibleIndices.push(i);
-        }
+  while (true) {
+    // --- 1. Draw 3 Cards ---
+    if (state.phase === 'draw') {
+      const oldSize = me.hand.length;
+      Mechanics.draw(G, ctx.actorId, 3, ctx.random);
+      const newSize = me.hand.length;
+      
+      const newlyDrawn = me.hand.slice(oldSize, newSize).map(c => ({ deck: c.deck, slot: c.slot }));
+      
+      if (newlyDrawn.length === 0) {
+        ctx.handlerState = null;
+        return true; 
       }
 
-      // If we don't have enough cards to discard, skip to the bribe step
-      if (eligibleIndices.length === 0) {
+      state = { 
+        phase: 'discard', 
+        remainingDiscards: Math.min(2, newlyDrawn.length), 
+        drawnRefs: newlyDrawn, 
+        discardedIndices: [] 
+      };
+      continue;
+    }
+
+    // --- 2. Discard 2 of the drawn cards ---
+    if (state.phase === 'discard') {
+      if (state.remainingDiscards <= 0) {
         state = { ...state, phase: 'bribe' };
-      } else {
+        continue;
+      }
+
+      if (!ctx.pendingChoice) {
+        const eligibleIndices: number[] = [];
+        const unmatchedRefs = [...state.drawnRefs];
+        
+        // Strictly match to ensure we only offer exactly as many cards as we drew,
+        // preventing double-matches if the player already had identical cards in hand.
+        for (let i = 0; i < me.hand.length; i++) {
+          const c = me.hand[i];
+          const matchIdx = unmatchedRefs.findIndex(ref => ref.deck === c.deck && ref.slot === c.slot);
+          if (matchIdx !== -1) {
+            eligibleIndices.push(i);
+            unmatchedRefs.splice(matchIdx, 1);
+          }
+        }
+
+        if (eligibleIndices.length === 0) {
+          state = { ...state, phase: 'bribe' };
+          continue;
+        }
+
         ctx.pendingChoice = {
           kind: 'select-card-in-hand',
-          prompt: `Xanathar Surveillance: Choose the ${state.phase === 'discard1' ? 'first' : 'second'} drawn card to discard.`,
+          prompt: `Xanathar Surveillance: Choose a drawn card to discard (${state.remainingDiscards} left).`,
           options: eligibleIndices,
           optional: false
         } as PendingChoice;
         ctx.paused = true;
         ctx.handlerState = state;
-        return false;
+        return false; 
       }
-    } else {
+
       const idx = ctx.pendingChoice.response as number | null;
       ctx.pendingChoice = null;
       ctx.paused = false;
 
       if (idx != null && idx >= 0 && idx < me.hand.length) {
         const card = me.hand[idx];
-        if (!Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
-          me.hand.splice(idx, 1);
-          me.discard.push(card);
-          Mechanics.log(G, `P${Number(ctx.actorId) + 1} discarded ${card.name} via Xanathar Surveillance`);
-        }
+        me.hand.splice(idx, 1);
+        
+        // Push to discard and instantly record its exact index
+        me.discard.push(card);
+        const discardIdx = me.discard.length - 1; 
+        
+        Mechanics.log(G, `P${Number(ctx.actorId) + 1} discarded ${card.name} via Xanathar Surveillance`);
 
-        // Migrate the ref from 'drawn' track to 'discarded' track
-        const newDrawnRefs = state.drawnRefs.filter(ref => !(ref.deck === card.deck && ref.slot === card.slot));
-        const newDiscardedRefs = [...state.discardedRefs, { deck: card.deck, slot: card.slot }];
+        const newDrawnRefs = [...state.drawnRefs];
+        const refIdx = newDrawnRefs.findIndex(ref => ref.deck === card.deck && ref.slot === card.slot);
+        if (refIdx !== -1) newDrawnRefs.splice(refIdx, 1);
 
         state = {
-          phase: state.phase === 'discard1' ? 'discard2' : 'bribe',
+          ...state,
+          remainingDiscards: state.remainingDiscards - 1,
           drawnRefs: newDrawnRefs,
-          discardedRefs: newDiscardedRefs
+          discardedIndices: [...state.discardedIndices, discardIdx] // Save the exact index
         };
       } else {
         // Fallback for invalid response
-        state = { ...state, phase: state.phase === 'discard1' ? 'discard2' : 'bribe' };
+        state = { ...state, remainingDiscards: state.remainingDiscards - 1 };
       }
-    }
-  }
-
-  // --- 3. Bribe -> Promote one of the discarded cards ---
-  if (state.phase === 'bribe') {
-    if (state.discardedRefs.length === 0) {
-      ctx.handlerState = null;
-      return true; // No cards to promote
+      continue;
     }
 
-    const promoteHandler = bribeCost((childCtx) => {
-      if (!childCtx.pendingChoice) {
-        const eligibleIndices: number[] = [];
-        const actorPlayer = childCtx.G.players[childCtx.actorId];
-        
-        // Find the indices in the discard pile for our specific discarded cards
-        for (let i = 0; i < actorPlayer.discard.length; i++) {
-          const c = actorPlayer.discard[i];
-          if (state.discardedRefs.some(ref => ref.deck === c.deck && ref.slot === c.slot)) {
-            eligibleIndices.push(i);
+    // --- 3. Bribe -> Promote one of the discarded cards ---
+    if (state.phase === 'bribe') {
+      if (state.discardedIndices.length === 0) {
+        ctx.handlerState = null;
+        return true;
+      }
+
+      const promoteHandler = bribeCost((childCtx) => {
+        if (!childCtx.pendingChoice) {
+          childCtx.pendingChoice = {
+            kind: 'select-card-in-discard',
+            prompt: 'Xanathar Surveillance (Bribe): Promote one of the discarded cards.',
+            options: state.discardedIndices, // Feed the exact 2 indices directly to the prompt
+            optional: false
+          } as PendingChoice;
+          childCtx.paused = true;
+          return false;
+        }
+
+        const idx = childCtx.pendingChoice.response as number | null;
+        childCtx.pendingChoice = null;
+        childCtx.paused = false;
+
+        if (idx != null) {
+          const actorPlayer = childCtx.G.players[childCtx.actorId];
+          const card = actorPlayer.discard[idx];
+          if (card) {
+            actorPlayer.discard.splice(idx, 1);
+            Mechanics.promote(childCtx.G, childCtx.actorId, card);
           }
         }
 
-        if (eligibleIndices.length === 0) return true;
+        return true;
+      });
 
-        childCtx.pendingChoice = {
-          kind: 'select-card-in-discard',
-          prompt: 'Xanathar Surveillance (Bribe): Promote one of the discarded cards.',
-          options: eligibleIndices,
-          optional: false
-        } as PendingChoice;
-        childCtx.paused = true;
-        return false;
+      const bribeCtx = { ...ctx, handlerState: state.sub ?? null, pendingChoice: ctx.pendingChoice, paused: ctx.paused };
+      const done = promoteHandler(bribeCtx);
+
+      if (!done) {
+        ctx.pendingChoice = bribeCtx.pendingChoice;
+        ctx.paused = bribeCtx.paused;
+        ctx.handlerState = { ...state, sub: bribeCtx.handlerState };
+        return false; 
       }
 
-      const idx = childCtx.pendingChoice.response as number | null;
-      childCtx.pendingChoice = null;
-      childCtx.paused = false;
-
-      if (idx != null) {
-        const actorPlayer = childCtx.G.players[childCtx.actorId];
-        const card = actorPlayer.discard[idx];
-        if (card) {
-          actorPlayer.discard.splice(idx, 1);
-          Mechanics.promote(childCtx.G, childCtx.actorId, card);
-        }
-      }
-
+      ctx.handlerState = null;
       return true;
-    });
-
-    const bribeCtx = { ...ctx, handlerState: state.sub ?? null, pendingChoice: ctx.pendingChoice, paused: ctx.paused };
-    const done = promoteHandler(bribeCtx);
-
-    ctx.pendingChoice = bribeCtx.pendingChoice;
-    ctx.paused = bribeCtx.paused;
-
-    if (!done) {
-      ctx.handlerState = { ...state, sub: bribeCtx.handlerState };
-      return false;
     }
-
-    ctx.handlerState = null;
-    return true;
   }
-
-  ctx.handlerState = null;
-  return true;
 };
 
 /**
@@ -1286,3 +1479,4 @@ export function jarlaxleHandler(ctx: EffectContext): boolean {
   ctx.handlerState = null;
   return true;
 }
+
