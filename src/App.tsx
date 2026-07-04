@@ -1909,60 +1909,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
-        <h2 style={{ marginTop: 24 }}>
-          Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck</span>
-        </h2>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {/* Rotating market row (6 slots from the chosen half-decks). */}
-          {G.market.row.map((c, i) => {
-            if (!c) return <div key={i} style={{ width: 120, height: 168, margin: 4, border: '1px dashed #444', borderRadius: 8 }} />;
-            const inPickMode = !!clickableMarketSlots;
-            const slotPickable = inPickMode && clickableMarketSlots!.has(i);
-            const cost = lookupCard(c.deck, c.slot)?.cost ?? '?';
-            const label = inPickMode
-              ? (slotPickable ? 'pick' : '—')
-              : `recruit (${cost} Inf)`;
-            const onClick = inPickMode
-              ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
-              : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
-            return <Card key={i} card={c} label={label} onClick={onClick} dim={inPickMode && !slotPickable} />;
-          })}
-          {/* Permanent stacks (House Guards, Priestesses of Lolth) — always
-              recruitable while non-empty; once empty, greyed out and the
-              button is disabled. Recruiting these doesn't trigger end-of-
-              game (only the rotating deck emptying does). */}
-          {(['houseGuards', 'priestesses'] as const).map(stack => {
-            const ref = stack === 'houseGuards'
-              ? { deck: 'house-guards', slot: 40 }
-              : { deck: 'priestesses',  slot: 43 };
-            const data = lookupCard(ref.deck, ref.slot);
-            if (!data) return null;
-            const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
-            const remaining = G.auxStacks?.[stack] ?? 0;
-            const cost = data.cost ?? 999;
-            // Sentinel picks from a free-recruit prompt (e.g. Conjurer):
-            //  -1 = House Guard, -2 = Priestess.  When the picker offers
-            //  these, clicking the aux-stack card resolves the choice.
-            const sentinel = stack === 'houseGuards' ? -1 : -2;
-            const freeRecruitPickable = !!clickableMarketSlots && clickableMarketSlots.has(sentinel);
-            const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
-            const label = remaining === 0
-              ? `empty · ${data.name}`
-              : freeRecruitPickable
-                ? `pick (free) · ${remaining} left`
-                : `recruit (${cost} Inf) · ${remaining} left`;
-            const onClick = freeRecruitPickable
-              ? () => moves.resolveChoice(sentinel)
-              : canRecruit
-                ? () => moves.recruitFromAuxStack(stack)
-                : undefined;
-            return (
-              <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
-                <Card card={card} label={label} onClick={onClick} dim={!!clickableMarketSlots && !freeRecruitPickable} />
-              </div>
-            );
-          })}
-        </div>
+        {actionBar}
 
         {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
           <>
@@ -2046,7 +1993,60 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           })}
         </div>
 
-        {actionBar}
+        <h2 style={{ marginTop: 24 }}>
+          Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck</span>
+        </h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {/* Rotating market row (6 slots from the chosen half-decks). */}
+          {G.market.row.map((c, i) => {
+            if (!c) return <div key={i} style={{ width: 120, height: 168, margin: 4, border: '1px dashed #444', borderRadius: 8 }} />;
+            const inPickMode = !!clickableMarketSlots;
+            const slotPickable = inPickMode && clickableMarketSlots!.has(i);
+            const cost = lookupCard(c.deck, c.slot)?.cost ?? '?';
+            const label = inPickMode
+              ? (slotPickable ? 'pick' : '—')
+              : `recruit (${cost} Inf)`;
+            const onClick = inPickMode
+              ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
+              : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
+            return <Card key={i} card={c} label={label} onClick={onClick} dim={inPickMode && !slotPickable} />;
+          })}
+          {/* Permanent stacks (House Guards, Priestesses of Lolth) — always
+              recruitable while non-empty; once empty, greyed out and the
+              button is disabled. Recruiting these doesn't trigger end-of-
+              game (only the rotating deck emptying does). */}
+          {(['houseGuards', 'priestesses'] as const).map(stack => {
+            const ref = stack === 'houseGuards'
+              ? { deck: 'house-guards', slot: 40 }
+              : { deck: 'priestesses',  slot: 43 };
+            const data = lookupCard(ref.deck, ref.slot);
+            if (!data) return null;
+            const card: CardRef = { deck: ref.deck, slot: ref.slot, name: data.name, image: data.image };
+            const remaining = G.auxStacks?.[stack] ?? 0;
+            const cost = data.cost ?? 999;
+            // Sentinel picks from a free-recruit prompt (e.g. Conjurer):
+            //  -1 = House Guard, -2 = Priestess.  When the picker offers
+            //  these, clicking the aux-stack card resolves the choice.
+            const sentinel = stack === 'houseGuards' ? -1 : -2;
+            const freeRecruitPickable = !!clickableMarketSlots && clickableMarketSlots.has(sentinel);
+            const canRecruit = myTurn && remaining > 0 && p.influence >= cost && !G.pendingChoice;
+            const label = remaining === 0
+              ? `empty · ${data.name}`
+              : freeRecruitPickable
+                ? `pick (free) · ${remaining} left`
+                : `recruit (${cost} Inf) · ${remaining} left`;
+            const onClick = freeRecruitPickable
+              ? () => moves.resolveChoice(sentinel)
+              : canRecruit
+                ? () => moves.recruitFromAuxStack(stack)
+                : undefined;
+            return (
+              <div key={stack} style={{ opacity: remaining === 0 ? 0.4 : 1 }}>
+                <Card card={card} label={label} onClick={onClick} dim={!!clickableMarketSlots && !freeRecruitPickable} />
+              </div>
+            );
+          })}
+        </div>
 
         <details style={{ marginTop: 24 }}>
           <summary style={{ cursor: 'pointer', opacity: 0.7 }}>Log ({G.log.length})</summary>
