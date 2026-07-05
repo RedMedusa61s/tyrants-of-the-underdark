@@ -2627,6 +2627,11 @@ export function promoteSelf(): EffectHandler {
     if (di >= 0) me.discard.splice(di, 1);
     const pi = ctx.G.cardsPlayedThisTurn.findIndex(c => c.deck === ctx.card.deck && c.slot === ctx.card.slot);
     if (pi >= 0) ctx.G.cardsPlayedThisTurn.splice(pi, 1);
+    // Keep the per-player display list (PlayerData.cardsPlayed) in sync with the
+    // game-level cardsPlayedThisTurn, else a self-promoted card lingers in the
+    // "played this turn" display/count after it's been promoted out.
+    const ppi = me.cardsPlayed.findIndex(c => c.deck === ctx.card.deck && c.slot === ctx.card.slot);
+    if (ppi >= 0) me.cardsPlayed.splice(ppi, 1);
     Mechanics.promote(ctx.G, ctx.actorId, ctx.card);
     ctx.handlerState = { returnedToSupply: true };
     return true;
