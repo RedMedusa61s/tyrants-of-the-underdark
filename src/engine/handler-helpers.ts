@@ -10,7 +10,7 @@ import type { EffectContext, EffectHandler, PendingChoice } from './types';
 import { placeSpy, assassinateTroop, deployTroop, hasPresence, returnSpy, returnTroop, moveTroop } from './map-state';
 import { SITES } from '../data/sites';
 import { ROUTES } from '../data/routes';
-import { TROOP_SPACES } from '../data/troop-spaces';
+import { TROOP_SPACES, routeSpaces, sitesSpaces } from '../data/troop-spaces';
 import { lookupCard, cardsInDeck } from '../card-data';
 import type { CardRef, Color, TyrantsState } from '../game';
 
@@ -1774,30 +1774,88 @@ export function recruitOutcastToSelf(): EffectHandler {
 // ---------- Adjacency-aware Outcast giver (Gibbering Mouther) ----------
 //
 // After a deploy, give an Outcast to a player who has a troop "adjacent" to the just-
-// deployed space. We define adjacency as: same site (for site spaces), the spaces of any
-// route touching that site, and (for route spaces) the same route's spaces and the two
-// endpoint sites' spaces.
+// deployed space. We define adjacency as: same site (for site spaces), exactly adjacent sites,
+// the nearest space of any route touching that site, and (for route spaces) the route spaces
+// directly before and after the deployed space, plus any site spaces if the deployed space
+// is at the end of a route.
 
-function spacesAdjacentTo(spaceId: string): string[] {
+export function spacesAdjacentTo(spaceId: string): string[] {
   const s = TROOP_SPACES.find(t => t.id === spaceId);
   if (!s) return [];
   const out = new Set<string>();
+
   if (s.parentSite) {
-    for (const t of TROOP_SPACES) if (t.parentSite === s.parentSite && t.id !== spaceId) out.add(t.id);
+    // 1. Other spaces at the exact same site
+    for (const t of TROOP_SPACES) {
+      if (t.parentSite === s.parentSite && t.id !== spaceId) {
+        out.add(t.id);
+      }
+    }
+    
+    // 2. Adjacent route spaces (strictly the endmost slot) OR adjacent sites
     for (const r of ROUTES) {
       if (r.a === s.parentSite || r.b === s.parentSite) {
-        for (let i = 0; i < r.spaces; i++) out.add(`${r.id}:${i}`);
+        const rSpaces = routeSpaces(r.id);
+        
+        if (rSpaces.length === 0) {
+          // Direct site-to-site connection (0 spaces)
+          const otherSite = r.a === s.parentSite ? r.b : r.a;
+          for (const t of sitesSpaces(otherSite)) out.add(t.id);
+        } else {
+          // Only add the immediately touching endmost route slot 
+          // (0 if it touches site A, N-1 if it touches site B)
+          const targetIdx = r.a === s.parentSite ? 0 : rSpaces.length - 1;
+          out.add(`${r.id}:${targetIdx}`);
+        }
       }
     }
   } else if (s.parentRoute) {
     const r = ROUTES.find(rr => rr.id === s.parentRoute)!;
-    for (let i = 0; i < r.spaces; i++) if (i !== s.index) out.add(`${r.id}:${i}`);
-    for (const endpoint of [r.a, r.b]) {
-      for (const t of TROOP_SPACES) if (t.parentSite === endpoint) out.add(t.id);
+    const rSpaces = routeSpaces(r.id);
+    const idx = s.index;
+
+    // 1. Immediately adjacent spaces on the same route
+    if (idx > 0) out.add(`${r.id}:${idx - 1}`);
+    if (idx < rSpaces.length - 1) out.add(`${r.id}:${idx + 1}`);
+
+    // 2. Endpoint sites, strictly if this is an endmost route space
+    if (idx === 0) {
+      for (const t of sitesSpaces(r.a)) out.add(t.id);
+    }
+    if (idx === rSpaces.length - 1) {
+      for (const t of sitesSpaces(r.b)) out.add(t.id);
     }
   }
+
   return [...out];
 }
+
+// ! Depreciated Method:
+// ! Incorrect implementation of adjacency; previous logic considered (for site spaces) all
+// ! spaces on routes connected to the deployed space's site as adjacent, and (for route spaces)
+// ! all spaces on the route plus all site spaces at both endpoints as adjacent. 
+// ! This was too broad and did not match the intended adjacency rules.
+// ! Method left here for reference.
+// function spacesAdjacentTo(spaceId: string): string[] {
+//   const s = TROOP_SPACES.find(t => t.id === spaceId);
+//   if (!s) return [];
+//   const out = new Set<string>();
+//   if (s.parentSite) {
+//     for (const t of TROOP_SPACES) if (t.parentSite === s.parentSite && t.id !== spaceId) out.add(t.id);
+//     for (const r of ROUTES) {
+//       if (r.a === s.parentSite || r.b === s.parentSite) {
+//         for (let i = 0; i < r.spaces; i++) out.add(`${r.id}:${i}`);
+//       }
+//     }
+//   } else if (s.parentRoute) {
+//     const r = ROUTES.find(rr => rr.id === s.parentRoute)!;
+//     for (let i = 0; i < r.spaces; i++) if (i !== s.index) out.add(`${r.id}:${i}`);
+//     for (const endpoint of [r.a, r.b]) {
+//       for (const t of TROOP_SPACES) if (t.parentSite === endpoint) out.add(t.id);
+//     }
+//   }
+//   return [...out];
+// }
 
 export function giveOutcastToOpponentAdjacentToLastDeploy(): EffectHandler {
   return ctx => {
