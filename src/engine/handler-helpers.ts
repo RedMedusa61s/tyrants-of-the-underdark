@@ -10,7 +10,7 @@ import type { EffectContext, EffectHandler, PendingChoice } from './types';
 import { placeSpy, assassinateTroop, deployTroop, hasPresence, returnSpy, returnTroop, moveTroop } from './map-state';
 import { SITES } from '../data/sites';
 import { ROUTES } from '../data/routes';
-import { TROOP_SPACES } from '../data/troop-spaces';
+import { TROOP_SPACES, sitesSpaces, routeSpaces } from '../data/troop-spaces';
 import { lookupCard, cardsInDeck } from '../card-data';
 import type { CardRef, Color, TyrantsState } from '../game';
 
@@ -1774,28 +1774,50 @@ export function recruitOutcastToSelf(): EffectHandler {
 // ---------- Adjacency-aware Outcast giver (Gibbering Mouther) ----------
 //
 // After a deploy, give an Outcast to a player who has a troop "adjacent" to the just-
-// deployed space. We define adjacency as: same site (for site spaces), the spaces of any
-// route touching that site, and (for route spaces) the same route's spaces and the two
-// endpoint sites' spaces.
-
-function spacesAdjacentTo(spaceId: string): string[] {
+// deployed space. Adjacency follows the rulebook's space-level definition (rules p.10,
+// p.22; see docs/core-model.md "Presence") — NOT whole-route/whole-site proximity:
+//   - Two route-spaces on the same route are adjacent iff their indices are consecutive.
+//   - A route's ENDMOST space touches the site at that end (index 0 ↔ site a,
+//     index N-1 ↔ site b); interior route-spaces touch no site.
+//   - A 0-space route makes its two sites directly adjacent.
+//   - Spaces sharing a site are adjacent (a troop right beside yours).
+// The previous implementation counted EVERY space on every connected route as adjacent
+// to a site, and every space on a route plus BOTH endpoint sites as adjacent to any
+// route-space — far too broad (e.g. a troop halfway down a 3-space route was wrongly
+// treated as adjacent to both sites). Bug found by Drew W.
+export function spacesAdjacentTo(spaceId: string): string[] {
   const s = TROOP_SPACES.find(t => t.id === spaceId);
   if (!s) return [];
   const out = new Set<string>();
+
   if (s.parentSite) {
-    for (const t of TROOP_SPACES) if (t.parentSite === s.parentSite && t.id !== spaceId) out.add(t.id);
+    // Other spaces at the same site.
+    for (const t of sitesSpaces(s.parentSite)) if (t.id !== spaceId) out.add(t.id);
+    // Each connecting route contributes only the single endmost space that
+    // touches this site — or, for a 0-space route, the connected site directly.
     for (const r of ROUTES) {
-      if (r.a === s.parentSite || r.b === s.parentSite) {
-        for (let i = 0; i < r.spaces; i++) out.add(`${r.id}:${i}`);
+      if (r.a !== s.parentSite && r.b !== s.parentSite) continue;
+      const spaces = routeSpaces(r.id);
+      if (spaces.length === 0) {
+        const otherSite = r.a === s.parentSite ? r.b : r.a;
+        for (const t of sitesSpaces(otherSite)) out.add(t.id);
+      } else {
+        const endIdx = r.a === s.parentSite ? 0 : spaces.length - 1;
+        out.add(`${r.id}:${endIdx}`);
       }
     }
   } else if (s.parentRoute) {
     const r = ROUTES.find(rr => rr.id === s.parentRoute)!;
-    for (let i = 0; i < r.spaces; i++) if (i !== s.index) out.add(`${r.id}:${i}`);
-    for (const endpoint of [r.a, r.b]) {
-      for (const t of TROOP_SPACES) if (t.parentSite === endpoint) out.add(t.id);
-    }
+    const last = routeSpaces(s.parentRoute).length - 1;
+    // Consecutive spaces on the same route.
+    if (s.index > 0) out.add(`${s.parentRoute}:${s.index - 1}`);
+    if (s.index < last) out.add(`${s.parentRoute}:${s.index + 1}`);
+    // An endpoint site is adjacent only when this space is at that end of the
+    // route (a single-space route touches both ends).
+    if (s.index === 0) for (const t of sitesSpaces(r.a)) out.add(t.id);
+    if (s.index === last) for (const t of sitesSpaces(r.b)) out.add(t.id);
   }
+
   return [...out];
 }
 
