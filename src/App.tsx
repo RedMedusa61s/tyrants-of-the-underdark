@@ -1981,6 +1981,33 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
+        {G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && (G.pendingChoice as any).customHandTarget && (
+          <>
+            <h2 style={{ marginTop: 24 }}>
+              P{Number((G.pendingChoice as any).customHandTarget) + 1}'s Hand — pick a card
+            </h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {(() => {
+                const targetPid = (G.pendingChoice as any).customHandTarget;
+                const targetHand = G.players[targetPid]?.hand ?? [];
+                const opts = G.pendingChoice!.options as number[] | undefined;
+                
+                return targetHand.map((c, i) => {
+                  if (opts && !opts.includes(i)) return null;
+                  return (
+                    <Card 
+                      key={i} 
+                      card={c} 
+                      label="pick" 
+                      onClick={() => moves.resolveChoice(i)} 
+                    />
+                  );
+                });
+              })()}
+            </div>
+          </>
+        )}
+
         <h2 style={{ marginTop: 24, display: 'flex', alignItems: 'baseline', gap: 12 }}>
           Your Hand
           <button onClick={() => { setPilePlayer(null); setPileView('played'); }}
@@ -2000,7 +2027,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // discards (Mindwitness, Chuul, Neogi, …) the prompt may target
             // the human while it's an AI's turn. Gate on HUMAN_SEAT, not
             // currentPlayer.
-            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
+            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && !(G.pendingChoice as any).customHandTarget;
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
@@ -2534,6 +2561,32 @@ function SplitPlayView(props: {
           </div>
         </div>
       )}
+      {G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && (G.pendingChoice as any).customHandTarget && (
+        <div>
+          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>
+            P{Number((G.pendingChoice as any).customHandTarget) + 1}'s Hand — pick a card
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+            {(() => {
+              const targetPid = (G.pendingChoice as any).customHandTarget;
+              const targetHand = G.players[targetPid]?.hand ?? [];
+              const opts = G.pendingChoice!.options as number[] | undefined;
+              
+              return targetHand.map((c, i) => {
+                if (opts && !opts.includes(i)) return null;
+                return (
+                  <Card 
+                    key={i} 
+                    card={c} 
+                    label="pick" 
+                    onClick={() => moves.resolveChoice(i)} 
+                  />
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
       <div onMouseEnter={enterMap} onMouseLeave={leaveMap} style={sectionBox('map')}>
         <MapView G={G}
           clickableSites={startingClickable} onSiteClick={handleSiteClick}
@@ -2559,8 +2612,7 @@ function SplitPlayView(props: {
                 // See same-named check in the play tab above — the
                 // prompted player owns this choice (HUMAN_SEAT for forced
                 // discards triggered on the human's hand during an AI turn).
-                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
-                const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
+                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && !(G.pendingChoice as any).customHandTarget;                const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
                 // Hide ineligible cards entirely when options restrict which cards are pickable
                 // if (isChoosing && opts && !eligible) return null;
