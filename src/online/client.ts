@@ -8,6 +8,14 @@ import { AI_VERSION } from '../ai-version';
 
 const delay = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
 
+/** AbortSignal that fires after `ms`. Hand-rolled (vs AbortSignal.timeout) so
+ *  the caller can clear the timer once the request settles. */
+function timeoutSignal(ms: number): { signal: AbortSignal; clear: () => void } {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new DOMException('request deadline exceeded', 'TimeoutError')), ms);
+  return { signal: ctrl.signal, clear: () => clearTimeout(timer) };
+}
+
 /** Capture an anomalous API response (HTML where JSON was expected, or a 5xx)
  *  into a small localStorage ring buffer + the console, so a recurrence of the
  *  "weird error message" lock (#89) is definitively recorded. The `cf-ray`
@@ -41,31 +49,52 @@ function logApiAnomaly(entry: Record<string, unknown>): void {
  *     retry the HTML case — an HTML body proves the request got the SPA
  *     fallback and never hit the Function, so it had no side effect.
  *
- *  Every anomaly (HTML or 5xx) is captured via logApiAnomaly for diagnosis. */
+ *  Every anomaly (HTML or 5xx) is captured via logApiAnomaly for diagnosis.
+ *
+ *  Every attempt also carries a DEADLINE (#102): a request that HANGS (a
+ *  stalled connection, a Function stuck on a dead upstream) never resolves and
+ *  never rejects, which is worse than failing — useGame pauses polling while a
+ *  submit is in flight, so a hung submit froze the whole session with no error,
+ *  no retry, and no chance for the server's stranded-AI-turn self-heal to run.
+ *  The abort turns a hang into a normal rejection: reads retry, writes surface
+ *  the error and useGame re-syncs to the authoritative state (which resumes
+ *  polling → the next poll self-heals a stranded AI turn server-side). */
 async function apiJson(
-  doFetch: () => Promise<Response>,
+  doFetch: (signal: AbortSignal) => Promise<Response>,
   opts: { idempotent?: boolean } = {},
 ): Promise<any> {
   // Idempotent reads get a backoff ladder (~0/0.4/0.9/1.6/2.6s ≈ 5.5s total),
   // long enough to ride out a deploy or cold-start window. Writes get the
   // single cautious HTML retry only.
   const backoff = opts.idempotent ? [400, 500, 700, 1000] : [800];
+  // Reads are cheap and re-polled anyway; writes may legitimately take a while
+  // (a submit runs the whole AI turn server-side before responding).
+  const timeoutMs = opts.idempotent ? 20_000 : 60_000;
   let lastErr: Error | null = null;
 
   for (let attempt = 0; attempt <= backoff.length; attempt++) {
+    const t = timeoutSignal(timeoutMs);
     let r: Response;
+    let text: string;
     try {
-      r = await doFetch();
+      r = await doFetch(t.signal);
+      text = await r.text(); // body read hangs too on a stalled response — keep it under the deadline
     } catch (netErr: any) {
-      // Network-level failure (connection dropped, DNS, offline). No response
-      // reached us, so a read definitely had no side effect — retry it.
-      logApiAnomaly({ t: Date.now(), networkError: String(netErr?.message ?? netErr), attempt });
-      lastErr = new Error('Lost connection to the server. Reconnecting…');
+      // Network-level failure (connection dropped, DNS, offline) or deadline
+      // exceeded. No complete response reached us, so a read definitely had no
+      // side effect — retry it. A write might have applied server-side, so it
+      // surfaces the error instead; useGame re-syncs on submit failure.
+      const timedOut = netErr?.name === 'TimeoutError' || netErr?.name === 'AbortError';
+      logApiAnomaly({ t: Date.now(), networkError: String(netErr?.message ?? netErr), timedOut, attempt });
+      lastErr = new Error(timedOut
+        ? 'The server is taking too long to respond. Reconnecting…'
+        : 'Lost connection to the server. Reconnecting…');
       if (opts.idempotent && attempt < backoff.length) { await delay(backoff[attempt]); continue; }
       throw lastErr;
+    } finally {
+      t.clear();
     }
 
-    const text = await r.text();
     let data: any = null;
     try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body */ }
     if (r.ok && data !== null) return data;
@@ -125,10 +154,11 @@ export async function createGame(
   // with a cryptic "Unexpected end of JSON input". Not marked idempotent — a
   // create has a side effect — but apiJson still retries the no-server-result
   // cases (empty/HTML), which are the ones that didn't reach the Function.
-  return apiJson(() => fetch('/api/games', {
+  return apiJson((signal) => fetch('/api/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ numPlayers, ...(ai ? { ai } : {}) }),
+    signal,
   }));
 }
 
@@ -141,7 +171,13 @@ export async function fetchStatus(
   | { deleted: true }
   | { deleted?: false; yourTurn: boolean; gameOver: boolean; turn: number; you: PlayerId }
 > {
-  const r = await fetch(`/api/games/${gameId}?as=${encodeURIComponent(token)}`);
+  const t = timeoutSignal(20_000);
+  let r: Response;
+  try {
+    r = await fetch(`/api/games/${gameId}?as=${encodeURIComponent(token)}`, { signal: t.signal });
+  } finally {
+    t.clear();
+  }
   if (r.status === 404) return { deleted: true };
   const data: any = await r.json();
   if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
@@ -150,20 +186,29 @@ export async function fetchStatus(
 
 // End a game server-side (token-gated). 404 is treated as success (already gone).
 export async function deleteGame(gameId: string, token: string): Promise<void> {
-  const r = await fetch(`/api/games/${gameId}?as=${encodeURIComponent(token)}`, { method: 'DELETE' });
-  if (!r.ok && r.status !== 404) throw new Error(`delete failed: ${r.status}`);
+  const t = timeoutSignal(20_000);
+  try {
+    const r = await fetch(`/api/games/${gameId}?as=${encodeURIComponent(token)}`, { method: 'DELETE', signal: t.signal });
+    if (!r.ok && r.status !== 404) throw new Error(`delete failed: ${r.status}`);
+  } finally {
+    t.clear();
+  }
 }
 
 // Attach the player's hub identity to their seat (ranked attribution).
 // Best-effort: a failure just leaves the seat unattributed (casual play).
 export async function claimSeat(gameId: string, token: string, identityToken: string): Promise<void> {
+  const t = timeoutSignal(20_000);
   try {
     await fetch(`/api/games/${gameId}/claim?as=${encodeURIComponent(token)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identityToken }),
+      signal: t.signal,
     });
-  } catch { /* ignore — ranked attribution is optional */ }
+  } catch { /* ignore — ranked attribution is optional */ } finally {
+    t.clear();
+  }
 }
 
 // Per-(game, token) client the useGame hook consumes.
@@ -173,19 +218,21 @@ export function makeClient(
   const base = `/api/games/${gameId}`;
   const q = `?as=${encodeURIComponent(token)}`;
   return {
-    fetch: () => apiJson(() => fetch(`${base}${q}`), { idempotent: true }),
+    fetch: () => apiJson((signal) => fetch(`${base}${q}`, { signal }), { idempotent: true }),
     submit: (action) =>
-      apiJson(() => fetch(`${base}/submit${q}`, {
+      apiJson((signal) => fetch(`${base}/submit${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, identityToken: getIdentityToken?.() }),
+        signal,
       })),
-    legalActions: () => apiJson(() => fetch(`${base}/legal${q}`), { idempotent: true }),
+    legalActions: () => apiJson((signal) => fetch(`${base}/legal${q}`, { signal }), { idempotent: true }),
     report: (body) =>
-      apiJson(() => fetch(`${base}/report${q}`, {
+      apiJson((signal) => fetch(`${base}/report${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal,
       })),
   };
 }
@@ -197,12 +244,13 @@ export function makeMessagingClient(gameId: string, token: string): MessagingCli
   const base = `/api/games/${gameId}/chat`;
   const q = `?as=${encodeURIComponent(token)}`;
   return {
-    listMessages: () => apiJson(() => fetch(`${base}${q}`), { idempotent: true }),
+    listMessages: () => apiJson((signal) => fetch(`${base}${q}`, { signal }), { idempotent: true }),
     postMessage: (body) =>
-      apiJson(() => fetch(`${base}${q}`, {
+      apiJson((signal) => fetch(`${base}${q}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body }),
+        signal,
       })),
   };
 }
