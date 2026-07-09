@@ -8,7 +8,7 @@ import type { EffectContext, PendingChoice } from './engine/types';
 import { SITES } from './data/sites';
 import { TROOP_SPACES, sitesSpaces } from './data/troop-spaces';
 import { ROUTES } from './data/routes';
-import { deployTroop, assassinateTroop, hasPresence,
+import { deployTroop, assassinateTroop, hasPresence, hasTotalControl,
          returnSpy, payHeldMarkerEffectsAtTurnStart, recomputeSiteControl } from './engine/map-state';
 import { ensureSpiesLeftInitialized, applyEotInnerCircleVp } from './engine/handler-helpers';
 
@@ -55,6 +55,32 @@ export interface PlayerData {
   power: number;
   influence: number;
   vp: number;
+}
+
+function triggerRecruitEffects(G: TyrantsState, pid: string) {
+  const Gx = G as unknown as { _xanatharZushaxxActive?: boolean };
+  if (Gx._xanatharZushaxxActive) {
+    const opponentsWithVp = Object.keys(G.players).filter(id => id !== pid && G.players[id].vp >= 1);
+    
+    if (opponentsWithVp.length > 0) {
+      if (opponentsWithVp.length === 1) {
+        // Auto-resolve if there's only one valid opponent to steal from
+        G.players[opponentsWithVp[0]].vp -= 1;
+        G.players[pid].vp += 1;
+        Mechanics.log(G, `P${Number(pid) + 1} stole 1 VP from P${Number(opponentsWithVp[0]) + 1} (Xanathar Zushaxx)`);
+      } else {
+        // Suspend with a choice if multiple opponents have VP
+        G.pendingChoice = {
+          kind: 'select-player',
+          prompt: 'Xanathar Zushaxx: Steal 1 VP from an opponent',
+          options: opponentsWithVp,
+          optional: false,
+          playerId: pid,
+          cardKey: '__xanathar_steal__'
+        };
+      }
+    }
+  }
 }
 
 export function totalTrophies(p: PlayerData): number {
@@ -166,7 +192,7 @@ export interface TyrantsState {
    *  payMarkerEffect pays the delta and adds the marker here. Without this
    *  separate ledger, the TC VP bonus is silently skipped — the "I had TC
    *  at end of turn but got no VP" bug. Cleared each turn at onBegin. */
-  markerTcGrantedThisTurn: string[];
+  // markerTcGrantedThisTurn: string[];
 
   /** Color of the player whose turn it currently is. Mirrors
    *  G.players[ctx.currentPlayer].color so engine code that doesn't get ctx
@@ -368,6 +394,9 @@ function startingDeck(): CardRef[] {
   const nobleRef = toCardRef(noble.deck, noble.slot);
   const soldierRef = toCardRef(soldier.deck, soldier.slot);
   return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef)];
+  // const test_card5 = cardsInDeck('mercenaries').find(c => c.name === "Nihiloor")!;
+  // const test_cardRef5 = toCardRef(test_card5.deck, test_card5.slot);
+  // return [...Array(4).fill(soldierRef), test_cardRef5];
 }
 
 /** Encode the game state to a base64 JSON codec string, excluding the snapshots
@@ -553,7 +582,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       pendingEotInnerCircleVp: [],
       devouredPile: [],
       markerInfluenceGrantedThisTurn: [],
-      markerTcGrantedThisTurn: [],
+      // markerTcGrantedThisTurn: [],
       activeTurnColor: null,
       turnLogStart: 0,
       turnLogs: [],
@@ -608,11 +637,11 @@ export const TyrantsGame: Game<TyrantsState> = {
       // turn (granted live by Mechanics.claimMarkerInfluenceIfControlled).
       G.markerInfluenceGrantedThisTurn = [];
       // Backfill on legacy saves loaded before this field existed.
-      G.markerTcGrantedThisTurn = [];
+      // G.markerTcGrantedThisTurn = [];
       if (!G.devouredPile) G.devouredPile = [];
 
       G.markerInfluenceGrantedThisTurn = [];
-      G.markerTcGrantedThisTurn = [];
+      // G.markerTcGrantedThisTurn = [];
       if (!G.devouredPile) G.devouredPile = [];
 
       // --- NEW: Process Stolen Marker Expirations ---
@@ -684,6 +713,18 @@ export const TyrantsGame: Game<TyrantsState> = {
       // turn start (held-over markers) or live when the marker is taken
       // during the turn. See engine/map-state.ts → recomputeSiteControl /
       // payMarkerEffect / payHeldMarkerEffectsAtTurnStart.
+      // ! ^ Above is wrong. Site marker VP is awarded at the end of the turn, not immediately on control change.
+      // NEW: Total Control VP is awarded at the end of the turn
+      const activeColor = p.color;
+      for (const [siteId, m] of Object.entries(G.controlMarkers)) {
+        if (m.holder === activeColor && hasTotalControl(G, activeColor, siteId)) {
+          if (m.totalControlVp > 0) {
+            Mechanics.gainVpTokens(G, ctx.currentPlayer, m.totalControlVp);
+            Mechanics.log(G, `P${Number(ctx.currentPlayer) + 1} +${m.totalControlVp} VP from ${siteId} (Total Control)`);
+          }
+        }
+      }
+
 
       p.discard.push(...p.hand);
       p.hand = [];
@@ -691,6 +732,10 @@ export const TyrantsGame: Game<TyrantsState> = {
       p.power = 0;
       p.influence = 0;
       G.turnAspectsPlayed = {};
+
+      // Xanathar Zushaax cleanup
+      (G as unknown as { _xanatharZushaxxActive?: boolean })._xanatharZushaxxActive = false;
+
       // Refill hand
       for (let i = 0; i < HAND_SIZE; i++) {
         if (p.deck.length === 0) {
@@ -913,6 +958,18 @@ export const TyrantsGame: Game<TyrantsState> = {
         return;
       }
 
+      // Special handling for Xanathar Zushaxx's recruit-steal prompt
+      if (pc.cardKey === '__xanathar_steal__') {
+        const targetId = response as string | null;
+        G.pendingChoice = null;
+        if (targetId && G.players[targetId].vp >= 1) {
+          G.players[targetId].vp -= 1;
+          G.players[pc.playerId].vp += 1;
+          Mechanics.log(G, `P${Number(pc.playerId) + 1} stole 1 VP from P${Number(targetId) + 1} (Xanathar Zushaxx)`);
+        }
+        return;
+      }
+
       // The suspended handler's card lives in the ACTOR's discard, which may
       // differ from the responder (pc.playerId) for cross-player prompts
       // (forced discard etc.). Fall back to playerId for legacy self-prompts.
@@ -987,6 +1044,9 @@ export const TyrantsGame: Game<TyrantsState> = {
         Mechanics.gainInfluence(G, pid, cost);
         return INVALID_MOVE;
       }
+      // Check for Xanathar Zushaax steal VP after recuit
+      triggerRecruitEffects(G, pid);
+
       checkEndGameTriggers(G, ctx);
     },
 
@@ -1020,6 +1080,8 @@ export const TyrantsGame: Game<TyrantsState> = {
         Mechanics.gainInfluence(G, pid, cost);
         return INVALID_MOVE;
       }
+      // Check for Xanathar Zushaax steal VP after recuit
+      triggerRecruitEffects(G, pid);
     },
 
     deployTroop: ({ G, ctx }, spaceId: string) => {

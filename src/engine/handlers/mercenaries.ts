@@ -3,13 +3,13 @@ import { grant, sequence, registerAll, chooseOne, times,
          returnOwnSpyChoice, placeSpyAtChosenSite,
          returnEnemyTroopChoice, playerHasOwnSpy,
          takeTrophyAndPlace, ensureSpiesLeftInitialized,
-         flagEotPromote} from '../handler-helpers';
+         flagEotPromote, spacesAdjacentTo} from '../handler-helpers';
 import { Mechanics } from '../mechanics';
 import type { EffectContext, EffectHandler, PendingChoice } from '../types';
 import { sitesSpaces, TROOP_SPACES } from '../../data/troop-spaces';
-import { ROUTES } from '../../data/routes';
+// import { ROUTES } from '../../data/routes';
 import { SITES } from '../../data/sites';
-import { assassinateTroop, moveTroop, hasPresence,
+import { assassinateTroop, moveTroop,
          placeSpy, returnSpy, hasTotalControl,
          siteOf, recomputeSiteControl } from '../map-state';
 import { CardRegistry } from '../registry';
@@ -27,20 +27,19 @@ registerAll({
   'goblinoid-ambushers': chooseOne(
                            { label: '+1 Power', handler: grant({ power: 1 }) },
                            { label: 'Steal 1 VP',         
-                            handler: stealVpChoice({ count: 1 }),},
-                            //available: anyOpponentHasVp},
+                            handler: stealVpChoice({ count: 1 }),
+                            available: anyOpponentHasVp},
                            { label: 'Bribe -> +3 Power',
-                            handler: bribeCost(grant({ power: 3 })),}
-                            //available: playerHasVp}
+                            handler: bribeCost(grant({ power: 3 })),
+                            available: playerHasVp}
                           ),
 
   // --- Slots 5, 6: Hobgoblin Warlord (Cost 5) ---
-  // "+3 Influence. Bribe -> For the rest of your turn, you can expend 2 Power to assassinate a troop."
+  // "+3 Power. Bribe -> For the rest of your turn, you can expend 2 Power to assassinate a troop."
   // Approximated as a direct bonus choice effect action when paid.
-  // * Implemented
-  // TODO: Check
+  // * Implemented. Seems good.
   'hobgoblin-warlord':   sequence(
-                           grant({ influence: 3 }),
+                           grant({ power: 3 }),
                            bribeCost(reduceAssassinateCostToTwo)
                           ),
 
@@ -63,15 +62,24 @@ registerAll({
 
   // --- Slot 10: Artemis Entreri (Cost 8) ---
   // "Assassinate 3 troops at a single site. Then, if that site is empty, gain 1 VP."
+  // * Implemented. Seems good.
   'artemis-entreri':     sequence(
+                           // Clear any stale space tracking before we start
+                           (ctx => {
+                             (ctx.G as unknown as { _lastAssassinatedSpace?: string })._lastAssassinatedSpace = undefined;
+                             return true;
+                           }),
                            assassinateChoice({ count: 3, sameSite: true }),
                            (ctx => {
-                             const siteId = (ctx.G as unknown as { _lastPlacedSpySite?: string })._lastPlacedSpySite; 
-                             if (siteId) {
-                               const hasTroops = sitesSpaces(siteId).some(sp => ctx.G.troops[sp.id] !== null);
-                               if (!hasTroops) {
-                                 ctx.G.players[ctx.actorId].vp += 1;
-                                 Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +1 VP from Artemis Entreri (Site ${siteId} cleared)`);
+                             const spaceId = (ctx.G as unknown as { _lastAssassinatedSpace?: string })._lastAssassinatedSpace; 
+                             if (spaceId) {
+                               const siteId = TROOP_SPACES.find(t => t.id === spaceId)?.parentSite;
+                               if (siteId) {
+                                 const hasTroops = sitesSpaces(siteId).some(sp => ctx.G.troops[sp.id] !== null);
+                                 if (!hasTroops) {
+                                   ctx.G.players[ctx.actorId].vp += 1;
+                                   Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +1 VP from Artemis Entreri (Site ${siteId} cleared)`);
+                                 }
                                }
                              }
                              return true;
@@ -94,12 +102,15 @@ registerAll({
 
   // --- Slots 16, 17: Security Guard (Cost 4) ---
   // "Deploy 2 troops, then steal 1 VP from each opponent with a troop adjacent to at least 1 of them."
-  // TODO: Check
-  'security-guard':      securityGuardHandler,
+  // * Implemented. Seems good.
+  'security-guard':      sequence(
+                           deployChoice({ count: 2 }),
+                           stealVpFromOpponentsAdjacentToLastDeploy()
+                          ),
 
   // --- Slots 18, 19: Bregan D'aerthe Agents (Cost 5) ---
   // "Choose 3 times: Take a white troop from any trophy hall and deploy it OR Bribe -> Supplant a white troop."
-  // TODO: Check
+  // * Implemented. Seems good.
   'bregan-daerthe-agents': times(3, chooseOne(
                              { label: 'Take a white trophy from any hall and place it',
                              handler: takeTrophyAndPlace({ count: 1, whiteOnly: true, optional: false, restrictToPresence: true }),
@@ -111,12 +122,18 @@ registerAll({
                                return false;
                              }},
                              { label: 'Bribe -> Supplant a white troop',
-                              handler: bribeCost(supplantChoice({ whiteOnly: true })) }
+                              handler: bribeCost(supplantChoice({ whiteOnly: true })),
+                              available: playerHasVp }
                             )),
 
   // --- Slot 20: Nihiloor (Cost 7) ---
   // "Deploy 3 troops. Bribe -> Move the deployed troops. Assassinate a white troop adjacent to each one."
-  'nihiloor':            nihiloorHandler,
+  // * Implemented. Seems good.
+  'nihiloor':            sequence(
+                           deployChoice({ count: 3 }),
+                           bribeCost(moveOwnTroopChoice({ restrictToRecentDeploys: true })),
+                           assassinateWhiteAdjacentToRecentDeploys()
+                         ),
 
   // --- Slots 21, 22, 23: Goblin Thief (Cost 3) ---
   // "Place a spy, then steal 1 VP from an opponent with at least a troop at that spy's site."
@@ -167,10 +184,11 @@ registerAll({
                              available: (G, a) => G.players[a].hand.length > 0
                            },
                            { label: 'Bribe -> Place spy and draw 2',
-                            handler: bribeCost(sequence(placeSpyAtChosenSite(), grant({ draw: 2 }))) },
+                            handler: bribeCost(sequence(placeSpyAtChosenSite(), grant({ draw: 2 }))),
+                            available: playerHasVp },
                            { label: 'Return spy -> Steal 3 VP',
                             handler: sequence(returnOwnSpyChoice(), stealVpChoice({ count: 3 })),
-                            available: playerHasOwnSpy }
+                            available: (G, actorId) => playerHasOwnSpy(G, actorId) && anyOpponentHasVp(G, actorId) }
                           ),
 
   // --- Slots 27, 28: Bregan D'aerthe Spy (Cost 3) ---
@@ -191,42 +209,7 @@ registerAll({
                            { label: 'Return a spy -> Swap with opponent discard card',
                              handler: sequence(
                                returnOwnSpyChoice(),
-                               ctx => {
-                                 const siteId = (ctx.G as unknown as { _lastReturnedSpySite?: string })._lastReturnedSpySite;
-                                 if (!siteId) return true;
-                                 
-                                 const opponentsAtSite = new Set<string>();
-                                 for (const sp of sitesSpaces(siteId)) {
-                                   const color = ctx.G.troops[sp.id];
-                                   if (color && color !== 'white' && color !== ctx.G.players[ctx.actorId].color) {
-                                     const pid = Object.keys(ctx.G.players).find(id => ctx.G.players[id].color === color);
-                                     if (pid && ctx.G.players[pid].discard.length > 0) opponentsAtSite.add(pid);
-                                   }
-                                 }
-                                 
-                                 if (opponentsAtSite.size === 0) return true;
-
-                                 if (!ctx.pendingChoice) {
-                                   ctx.pendingChoice = {
-                                     kind: 'select-player',
-                                     prompt: 'Nar\'l Xibrindas: Choose an opponent at the site to swap discard cards with:',
-                                     options: [...opponentsAtSite],
-                                   } as PendingChoice;
-                                   ctx.paused = true; return false;
-                                 }
-
-                                 const targetPid = ctx.pendingChoice.response as string | null;
-                                 ctx.pendingChoice = null; ctx.paused = false;
-                                 
-                                 if (targetPid && ctx.G.players[targetPid].discard.length > 0) {
-                                  const oppCard = ctx.G.players[targetPid].discard.pop()!;
-                                  const myCard = ctx.G.players[ctx.actorId].discard.pop()!;
-                                  ctx.G.players[ctx.actorId].discard.push(oppCard);
-                                  ctx.G.players[targetPid].discard.push(myCard);
-                                  Mechanics.log(ctx.G, `Nar'l Xibrindas swapped cards between P${Number(ctx.actorId) + 1} and P${Number(targetPid) + 1} discard piles.`);
-                                 }
-                                 return true;
-                               }
+                               narlXibrindasSwapHandler()
                              ),
                              available: playerHasOwnSpy
                            }),
@@ -251,7 +234,7 @@ registerAll({
 
   // --- Slots 36, 37: Shady Merchant (Cost 5) ---
   // "Return another player's troop and move a spy. Bribe -> Put another card played this turn on top of an opponent's deck."
-  // TODO: Check
+  // * Implemented. Seems good.
   'shady-merchant':      sequence(
                            returnEnemyTroopChoice(),
                            moveSpyChoice(),
@@ -261,27 +244,32 @@ registerAll({
   // --- Slot 38: Sylgar (Cost 1) ---
   // "If this is devoured, promoted or discarded by a card, put it back where it was and gain 1 VP."
   // Checks are implemented in game.ts and App, when promoting or discarding
-  // * Implemented
-  // TODO: Check
-  'sylgar':              grant({ influence: 0 }), // Had to put something here.
+  // * Implemented. Seems good.
+  'sylgar':              fizzleAndDoNothing,
 
   // --- Slot 39: Ahmaergo (Cost 5) ---
-  // "Choose 2 times: Move one of your troops and gain 1 Power OR Bribe -> Swap 2 troops anywhere on the board."
+  // "Choose 2 times: Move one of your troops and gain 1 Infulence OR Bribe -> Swap 2 troops anywhere on the board."
   // * Implemented
   // TODO: Check
   'ahmaergo':            times(2, chooseOne(
-                           { label: 'Move own troop and gain +1 Power',
-                            handler: sequence(moveOwnTroopChoice(), grant({ power: 1 })) },
+                           { label: 'Move own troop and gain +1 Influence',
+                            handler: sequence(moveOwnTroopChoice(), grant({ influence: 1 })) },
                            { label: 'Bribe -> Swap 2 troops anywhere',
-                            handler: bribeCost(swapAnyTwoTroopsChoice()) }
+                            handler: bribeCost(swapAnyTwoTroopsChoice()),
+                            available: playerHasVp }
                           )),
 
   // --- Slot 40: Xanathar Zushaxx (Cost 7) ---
   // "+4 Influence. For the rest of your turn, each time you recruit a card, steal 1 VP."
-  // TODO: fix steal on recruit
+  // * Implemented. Seems good.
   'xanathar-zushaxx':    sequence(
                            grant({ influence: 4 }),
-                           stealVpChoice({ count: 1 })),
+                           ctx => {
+                             const Gx = ctx.G as unknown as { _xanatharZushaxxActive?: boolean };
+                             Gx._xanatharZushaxxActive = true;
+                             Mechanics.log(ctx.G, `Xanathar Zushaxx active: stealing 1 VP on each recruit for the rest of the turn.`);
+                             return true;
+                           }),
 });
 
 // ===========================================================================
@@ -289,13 +277,13 @@ registerAll({
 // ===========================================================================
 
 /**
- * Steal 1 VP from an eligible player (must have >= 1 VP) and add it to your pool.
+ * Steal `count` VP from an eligible player (must have >= 1 VP) and add it to your pool.
+ * If the target has less VP than `count`, all their remaining VP is stolen.
  * If targetPid is omitted, surfaces a prompt for the actor to choose a victim.
  */
 export function stealVpChoice(opts?: { count?: number; targetPid?: string }): EffectHandler {
   const count = opts?.count ?? 1;
-  return (ctx: EffectContext) => {
-    let state = (ctx.handlerState as { remaining: number; targetPid?: string } | null) ?? { remaining: count, targetPid: opts?.targetPid };
+  return ctx => {
     const G = ctx.G;
 
     // Helper: Enumerate all opponents who actually have VP tokens to steal
@@ -303,51 +291,55 @@ export function stealVpChoice(opts?: { count?: number; targetPid?: string }): Ef
       return Object.keys(G.players).filter(pid => pid !== ctx.actorId && G.players[pid].vp >= 1);
     };
 
+    let targetId = opts?.targetPid;
+
+    // 1. Process any pending response from a previous prompt session
     if (ctx.pendingChoice) {
       const selectedPid = ctx.pendingChoice.response as string | null;
       ctx.pendingChoice = null;
       ctx.paused = false;
       if (!selectedPid) { ctx.handlerState = null; return true; }
-      state = { remaining: state.remaining, targetPid: selectedPid };
+      targetId = selectedPid;
     }
 
-    if (state.remaining <= 0) { ctx.handlerState = null; return true; }
+    // 2. If no target is pre-locked or selected, find eligible victims
+    if (!targetId) {
+      const victims = getEligibleVictims();
+      if (victims.length === 0) {
+        Mechanics.log(G, `(Steal VP: No opponents have VP tokens to steal — skipped)`);
+        ctx.handlerState = null;
+        return true;
+      }
 
-    // If no target is pre-locked, find eligible victims
-    const victims = state.targetPid ? [state.targetPid] : getEligibleVictims();
-    if (victims.length === 0) {
-      Mechanics.log(G, `(Steal VP: No opponents have VP tokens to steal — skipped)`);
-      ctx.handlerState = null;
-      return true;
+      // Multi-victim branch: ask the actor to choose who to steal from
+      if (victims.length > 1) {
+        ctx.pendingChoice = {
+          kind: 'select-player',
+          prompt: `Steal ${count > 1 ? `up to ${count}` : '1'} VP — Choose an opponent to take from:`,
+          options: victims,
+          optional: false,
+        } as PendingChoice;
+        ctx.paused = true;
+        return false; // Suspend and wait for player choice
+      }
+
+      // Only 1 eligible victim, auto-select them
+      targetId = victims[0];
     }
 
-    // Multi-victim branch: ask the actor to choose who to steal from
-    if (victims.length > 1) {
-      ctx.pendingChoice = {
-        kind: 'select-player',
-        prompt: `Steal 1 VP (${state.remaining} left) — Choose an opponent to take from:`,
-        options: victims,
-        optional: false,
-      } as PendingChoice;
-      ctx.paused = true;
-      ctx.handlerState = state;
-      return false;
-    }
-
-    // Execute the steal transaction against the isolated single target
-    const targetId = victims[0];
+    // 3. Execute the steal transaction
     const targetPlayer = G.players[targetId];
     const actorPlayer = G.players[ctx.actorId];
 
-    if (targetPlayer.vp >= count) {
-      targetPlayer.vp -= count;
-      actorPlayer.vp += count;
-      Mechanics.log(G, `P${Number(ctx.actorId) + 1} stole ${count} VP from P${Number(targetId) + 1}`);
+    if (targetPlayer && targetPlayer.vp >= 1) {
+      const stealAmount = Math.min(targetPlayer.vp, count);
+      targetPlayer.vp -= stealAmount;
+      actorPlayer.vp += stealAmount;
+      Mechanics.log(G, `P${Number(ctx.actorId) + 1} stole ${stealAmount} VP from P${Number(targetId) + 1}`);
     }
 
-    state = { remaining: state.remaining - count, targetPid: opts?.targetPid };
-    ctx.handlerState = state;
-    return state.remaining <= 0;
+    ctx.handlerState = null;
+    return true;
   };
 }
 
@@ -443,58 +435,85 @@ export function reduceAssassinateCostToTwo(ctx: EffectContext): boolean {
   return true;
 };
 
-interface MoveOwnState { remaining: number; from: string | null }
-
 /**
  * Move `count` of your own color troops.
  * Player can only pick a troop from a space where they have Presence.
  * Destination can be any empty space on the board.
  */
-export function moveOwnTroopChoice(opts?: { count?: number; optional?: boolean }): EffectHandler {
-  const count = opts?.count ?? 1;
-  return (ctx: EffectContext) => {
-    let state = (ctx.handlerState as MoveOwnState | null) ?? { remaining: count, from: null };
+interface MoveOwnState { 
+  remaining: number; 
+  from: string | null;
+  movableDeploys?: string[];
+}
+
+export function moveOwnTroopChoice(opts?: { count?: number; optional?: boolean; restrictToRecentDeploys?: boolean }): EffectHandler {
+  const baseCount = opts?.count ?? 1;
+  return ctx => {
     const G = ctx.G;
+    const Gx = G as unknown as { _recentDeploySpaces?: string[] };
+    const deploys = Gx._recentDeploySpaces ?? [];
+    
+    // Dynamically cap count to the number of recent deploys if restricted
+    const count = opts?.restrictToRecentDeploys ? deploys.length : baseCount;
+
+    let state = (ctx.handlerState as MoveOwnState | null) ?? { 
+      remaining: count, 
+      from: null,
+      // Initialize the local pool of troops that haven't been moved yet
+      ...(opts?.restrictToRecentDeploys ? { movableDeploys: [...deploys] } : {})
+    };
+    
     const me = G.players[ctx.actorId];
     const myColor = me.color;
 
-    // 1. Process any pending response from a previous prompt session
     if (ctx.pendingChoice) {
       const picked = ctx.pendingChoice.response as string | null;
       ctx.pendingChoice = null;
       ctx.paused = false;
       
       if (state.from === null) {
-        // Source selection step completed
         if (!picked) { ctx.handlerState = null; return true; }
-        state = { remaining: state.remaining, from: picked };
+        state = { ...state, from: picked };
       } else {
-        // Destination selection step completed
         if (picked && moveTroop(G, state.from, picked)) {
           Mechanics.log(G, `P${Number(ctx.actorId) + 1} moved their own troop ${state.from} ↔ ${picked}`);
+          
+          if (opts?.restrictToRecentDeploys) {
+            // 1. Update the global tracking array so the assassinate step knows the new location
+            const idx = deploys.indexOf(state.from);
+            if (idx !== -1) deploys[idx] = picked;
+            
+            // 2. Remove this troop from the local movable pool so it can't be moved again
+            if (state.movableDeploys) {
+              const movIdx = state.movableDeploys.indexOf(state.from);
+              if (movIdx !== -1) state.movableDeploys.splice(movIdx, 1);
+            }
+          }
         }
-        state = { remaining: state.remaining - 1, from: null };
+        state = { ...state, remaining: state.remaining - 1, from: null };
       }
     }
 
-    // 2. Evaluate remaining tasks
     if (state.remaining <= 0) { ctx.handlerState = null; return true; }
 
     if (state.from === null) {
-      // Find spaces where you have a troop AND presence (presence check covers adjacent requirements)
       const eligible = TROOP_SPACES.filter(t => {
         if (!(t.id in G.troops)) return false;
+        
+        // As long as it is your troop, you can select it to move.
         const occ = G.troops[t.id];
         if (occ !== myColor) return false;
         
-        // Presence verification matches moveEnemyTroopChoice parameters
-        if (t.parentSite) return hasPresence(G, myColor, { site: t.parentSite });
-        if (t.parentRoute) return hasPresence(G, myColor, { space: t.id });
-        return false;
+        // Restrict to recently deployed troops THAT HAVEN'T BEEN MOVED YET
+        if (opts?.restrictToRecentDeploys && !state.movableDeploys?.includes(t.id)) {
+          return false;
+        }
+        
+        return true;
       }).map(t => t.id);
 
       if (eligible.length === 0) {
-        Mechanics.log(G, '(move own troop: you have no valid troops under presence conditions — skipped)');
+        Mechanics.log(G, '(move own troop: you have no valid troops under required conditions — skipped)');
         ctx.handlerState = null;
         return true;
       }
@@ -506,7 +525,6 @@ export function moveOwnTroopChoice(opts?: { count?: number; optional?: boolean }
         optional: opts?.optional,
       } as PendingChoice;
     } else {
-      // Destination lookup bounds: any empty active board slot anywhere on the board
       const empty = TROOP_SPACES.filter(t => t.id in G.troops && G.troops[t.id] === null).map(t => t.id);
       if (empty.length === 0) { ctx.handlerState = null; return true; }
 
@@ -524,12 +542,6 @@ export function moveOwnTroopChoice(opts?: { count?: number; optional?: boolean }
   };
 }
 
-interface MoveSpyState {
-  remaining: number;
-  fromSite: string | null;
-  spyColor: Color | null;
-}
-
 /**
  * Move a spy of any color from one site to another.
  * Three-phase pick: 
@@ -537,6 +549,12 @@ interface MoveSpyState {
  * 2. If multiple spies are there, pick which player's spy to move.
  * 3. Pick the destination site.
  */
+interface MoveSpyState {
+  remaining: number;
+  fromSite: string | null;
+  spyColor: Color | null;
+}
+
 export function moveSpyChoice(opts?: { count?: number; optional?: boolean }): EffectHandler {
   const count = opts?.count ?? 1;
   
@@ -844,212 +862,139 @@ export function swapAnyTwoTroopsChoice(opts?: { optional?: boolean }): EffectHan
   };
 }
 
-// ===========================================================================
-// Custom Advanced Card Actions (Multi-stage evaluation)
-// ===========================================================================
-
 /**
- * Security Guard: Deploy 2 troops, then check adjacencies. Steals 1 VP from
- * EACH opponent who controls a troop adjacent to at least 1 of those deployments.
+ * Checks for any opponent troops adjacent to the most recently deployed troop(s) and steals 1 VP from each eligible opponent.
+ * Used by Security Guard.
  */
-export function securityGuardHandler(ctx: EffectContext): boolean {
-  interface SGState { phase: 'deploy' | 'steal'; sub?: unknown; victims: string[] }
-  let state = (ctx.handlerState as SGState | null) ?? { phase: 'deploy', sub: null, victims: [] };
-  const G = ctx.G;
-
-  if (state.phase === 'deploy') {
-    const Gx = G as unknown as { _recentDeploySpaces?: string[] };
-    Gx._recentDeploySpaces = [];
-
-    const deployHandler = deployChoice({ count: 2 });
-    const childCtx = { ...ctx, handlerState: state.sub ?? null, pendingChoice: ctx.pendingChoice, paused: ctx.paused };
-    const done = deployHandler(childCtx);
+export function stealVpFromOpponentsAdjacentToLastDeploy(): EffectHandler {
+  return ctx => {
+    const Gx = ctx.G as unknown as { _lastDeploySpace?: string; _recentDeploySpaces?: string[] };
     
-    ctx.pendingChoice = childCtx.pendingChoice;
-    ctx.paused = childCtx.paused;
-
-    if (!done) {
-      ctx.handlerState = { phase: 'deploy', sub: childCtx.handlerState, victims: [] };
-      return false;
+    const deploys = (Gx._recentDeploySpaces && Gx._recentDeploySpaces.length > 0)
+      ? Gx._recentDeploySpaces
+      : (Gx._lastDeploySpace ? [Gx._lastDeploySpace] : []);
+      
+    if (deploys.length === 0) return true;
+    
+    const myColor = ctx.G.players[ctx.actorId].color;
+    const opponentColors = new Set<string>();
+    
+    // Find all enemy colors adjacent to any of the deployed troops
+    for (const deploySpace of deploys) {
+      for (const sp of spacesAdjacentTo(deploySpace)) {
+        const occ = ctx.G.troops[sp];
+        if (occ && occ !== 'white' && occ !== myColor) {
+          opponentColors.add(occ);
+        }
+      }
+    }
+    
+    // Map troop colors back to player IDs, ensuring they actually have VP to steal
+    const victimIds: string[] = [];
+    for (const pid of Object.keys(ctx.G.players)) {
+      if (pid === ctx.actorId) continue;
+      if (opponentColors.has(ctx.G.players[pid].color) && ctx.G.players[pid].vp >= 1) {
+        victimIds.push(pid);
+      }
+    }
+    
+    if (victimIds.length === 0) {
+      Mechanics.log(ctx.G, '(no eligible opponent has a troop adjacent to a deployed troop — no VP stolen)');
+      return true;
     }
 
-    // Deployments completed — calculate adjacent opponent targets geometrically
+    // Automatically steal 1 VP from EACH eligible adjacent opponent
+    for (const pid of victimIds) {
+      ctx.G.players[pid].vp -= 1;
+      ctx.G.players[ctx.actorId].vp += 1;
+      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} stole 1 VP from P${Number(pid) + 1} (adjacent to deploy)`);
+    }
+    
+    return true;
+  };
+}
+
+/**
+ * Checks for any white troops adjacent to the most recently deployed/moved troop(s) and assassinate them.
+ * Used by Nihiloor.
+ */
+export function assassinateWhiteAdjacentToRecentDeploys(): EffectHandler {
+  return ctx => {
+    const Gx = ctx.G as unknown as { _recentDeploySpaces?: string[] };
     const deploys = Gx._recentDeploySpaces ?? [];
-    const victimPids = new Set<string>();
-    const myColor = G.players[ctx.actorId].color;
+    if (deploys.length === 0) return true;
 
-    // Helper closure to lookup adjacencies matching Gibbering Mouther parameters
-    const getAdjacentSpaces = (spaceId: string) => {
-      const s = TROOP_SPACES.find(t => t.id === spaceId);
-      if (!s) return [];
-      const out = new Set<string>();
-      if (s.parentSite) {
-        for (const t of TROOP_SPACES) if (t.parentSite === s.parentSite && t.id !== spaceId) out.add(t.id);
-        for (const r of ROUTES) {
-          if (r.a === s.parentSite || r.b === s.parentSite) {
-            for (let i = 0; i < r.spaces; i++) out.add(`${r.id}:${i}`);
-          }
-        }
-      } else if (s.parentRoute) {
-        const r = ROUTES.find((rr: { id: any; }) => rr.id === s.parentRoute)!;
-        for (let i = 0; i < r.spaces; i++) if (i !== s.index) out.add(`${r.id}:${i}`);
-        for (const endpoint of [r.a, r.b]) {
-          for (const t of TROOP_SPACES) if (t.parentSite === endpoint) out.add(t.id);
+    // Track which of the deployed troops we are currently evaluating
+    interface NihiloorState { currentDeployIdx: number }
+    let state = (ctx.handlerState as NihiloorState | null) ?? { currentDeployIdx: 0 };
+
+    if (ctx.pendingChoice) {
+      const picked = ctx.pendingChoice.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+
+      if (picked) {
+        const killed = assassinateTroop(ctx.G, picked);
+        if (killed === 'white') {
+          ctx.G.players[ctx.actorId].trophyHall.white += 1;
+          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated white troop at ${picked}`);
         }
       }
-      return [...out];
-    };
 
-    for (const spaceId of deploys) {
-      for (const adjSpace of getAdjacentSpaces(spaceId)) {
-        const occColor = G.troops[adjSpace];
-        if (occColor && occColor !== 'white' && occColor !== myColor) {
-          const opponentPid = Object.keys(G.players).find(id => G.players[id].color === occColor);
-          if (opponentPid && G.players[opponentPid].vp >= 1) {
-            victimPids.add(opponentPid);
-          }
-        }
-      }
+      // We've processed the assassination for this deployment, move to the next one
+      state = { currentDeployIdx: state.currentDeployIdx + 1 };
     }
 
-    state = { phase: 'steal', victims: [...victimPids], sub: null };
-  }
-
-  if (state.phase === 'steal') {
-    while (state.victims.length > 0) {
-      const nextVictim = state.victims[0];
-      const stealHandler = stealVpChoice({ count: 1, targetPid: nextVictim });
-      const childCtx = { ...ctx, handlerState: state.sub ?? null, pendingChoice: ctx.pendingChoice, paused: ctx.paused };
-      const done = stealHandler(childCtx);
-
-      ctx.pendingChoice = childCtx.pendingChoice;
-      ctx.paused = childCtx.paused;
-
-      if (!done) {
-        ctx.handlerState = { phase: 'steal', victims: state.victims, sub: childCtx.handlerState };
-        return false;
-      }
-
-      state.victims.shift();
-      state.sub = null;
-    }
-  }
-
-  ctx.handlerState = null;
-  return true;
-};
-
-/**
- * Nihiloor: Deploy 3 troops. Then Bribe -> Move the deployed troops.
- * Finally, assassinate a white troop adjacent to each deployed troop position.
- */
-export function nihiloorHandler(ctx: EffectContext): boolean {
-  interface NState { phase: 'deploy' | 'bribe' | 'assassinate'; sub?: unknown; trackedDeplays: string[] }
-  let state = (ctx.handlerState as NState | null) ?? { phase: 'deploy', sub: null, trackedDeplays: [] };
-  const G = ctx.G;
-
-  if (state.phase === 'deploy') {
-    const Gx = G as unknown as { _recentDeploySpaces?: string[]; _playFizzledNoFood?: boolean };
-    Gx._recentDeploySpaces = [];
-
-    // --- PROTECT FROM PLAY-ALL BASIC AUTO-RUNS ---
-    // If there are no empty deployment zones, force an engine-safe fizzle marker flag
-    // to prevent the card from being automatically burned via "Play all basic"
-    //const myColor = G.players[ctx.actorId].color;
-    const emptyZoneCount = TROOP_SPACES.filter(t => t.id in G.troops && G.troops[t.id] === null).length;
-    if (emptyZoneCount === 0 && !ctx.pendingChoice) {
-      Gx._playFizzledNoFood = true;
-      ctx.handlerState = null;
-      Mechanics.log(G, `(Nihiloor: No empty board spaces available — skipped)`);
-      return true;
-    }
-
-    const deployHandler = deployChoice({ count: 3 });
-    const childCtx = { ...ctx, handlerState: state.sub ?? null, pendingChoice: ctx.pendingChoice, paused: ctx.paused };
-    const done = deployHandler(childCtx);
-    
-    ctx.pendingChoice = childCtx.pendingChoice;
-    ctx.paused = childCtx.paused;
-
-    if (!done) {
-      // FIX: Store the child context's specific handlerState without cloning parent onto itself
-      ctx.handlerState = { phase: 'deploy', trackedDeplays: [], sub: childCtx.handlerState };
-      return false;
-    }
-    state = { phase: 'bribe', trackedDeplays: Gx._recentDeploySpaces ?? [], sub: null };
-  }
-
-  if (state.phase === 'bribe') {
-    const bribeAction = bribeCost(moveOwnTroopChoice({ count: state.trackedDeplays.length, optional: true }));
-    const childCtx = { ...ctx, handlerState: state.sub ?? null, pendingChoice: ctx.pendingChoice, paused: ctx.paused };
-    const done = bribeAction(childCtx);
-    
-    ctx.pendingChoice = childCtx.pendingChoice;
-    ctx.paused = childCtx.paused;
-
-    if (!done) {
-      ctx.handlerState = { phase: 'bribe', trackedDeplays: state.trackedDeplays, sub: childCtx.handlerState };
-      return false;
-    }
-    state = { phase: 'assassinate', trackedDeplays: state.trackedDeplays, sub: null };
-  }
-
-  if (state.phase === 'assassinate') {
-    const getAdjacentWhiteTroops = (spaces: string[]) => {
+    // Loop through the deployments sequentially until we find one with valid targets
+    while (state.currentDeployIdx < deploys.length) {
+      const currentDeploySpace = deploys[state.currentDeployIdx];
       const targets = new Set<string>();
-      const getAdjacencies = (id: string) => {
-        const s = TROOP_SPACES.find(t => t.id === id);
-        if (!s) return [];
-        const out = new Set<string>();
-        
-        // Horizontal board space grid geometry calculation matching securityGuardHandler
-        if (s.parentSite) {
-          for (const t of TROOP_SPACES) if (t.parentSite === s.parentSite && t.id !== id) out.add(t.id);
-        }
-        return [...out];
-      };
-      for (const id of spaces) {
-        for (const adj of getAdjacencies(id)) {
-          if (G.troops[adj] === 'white') targets.add(adj);
-        }
+
+      for (const adj of spacesAdjacentTo(currentDeploySpace)) {
+        if (ctx.G.troops[adj] === 'white') targets.add(adj);
       }
-      return [...targets];
-    };
 
-    const eligibleWhites = getAdjacentWhiteTroops(state.trackedDeplays);
-    if (eligibleWhites.length === 0) {
-      Mechanics.log(G, `(Nihiloor: No adjacent white troops available — skipped)`);
-      ctx.handlerState = null;
-      return true;
-    }
+      // If this specific deployment has no adjacent white troops, just skip to the next one
+      if (targets.size === 0) {
+        state.currentDeployIdx++;
+        continue;
+      }
 
-    if (!ctx.pendingChoice) {
+      // We found valid targets for the current deployment. Prompt the player to pick one.
       ctx.pendingChoice = {
         kind: 'select-troop-space',
-        prompt: 'Nihiloor: Assassinate a white troop adjacent to your deployments.',
-        options: eligibleWhites,
-        optional: true,
+        prompt: `Nihiloor: Assassinate a white troop adjacent to deployment ${state.currentDeployIdx + 1} of ${deploys.length}.`,
+        options: [...targets],
+        optional: false, // Mandatory per card text
+        highlightSpaces: [currentDeploySpace],
       } as PendingChoice;
+      
       ctx.paused = true;
       ctx.handlerState = state;
       return false;
     }
 
-    const spaceId = ctx.pendingChoice.response as string | null;
-    ctx.pendingChoice = null;
-    ctx.paused = false;
+    // If we exit the loop, all deployments have been successfully evaluated
+    ctx.handlerState = null;
+    return true;
+  };
+}
 
-    if (spaceId && G.troops[spaceId] === 'white') {
-      assassinateTroop(G, spaceId);
-      G.players[ctx.actorId].trophyHall.white += 1;
-      Mechanics.log(G, `P${Number(ctx.actorId) + 1} assassinated white troop at ${spaceId} via Nihiloor`);
-    }
-  }
-
-  ctx.handlerState = null;
+/**
+ * A handler that grants nothing, opens no prompts, and explicitly flags 
+ * itself so the "Play all basic" AI/UI routine will skip over it.
+ */
+export function fizzleAndDoNothing(ctx: EffectContext): boolean {
+  // Flag the state so the "Play all basic" dry-run explicitly skips this card
+  (ctx.G as unknown as { _playFizzledNoFood?: boolean })._playFizzledNoFood = true;
+  
+  // Return true to indicate the handler is complete and has no pending prompts
   return true;
-};
+}
 
+// ===========================================================================
+// Custom Advanced Card Actions (Multi-stage evaluation)
+// ===========================================================================
 
 /**
  * Xanathar Surveillance: 
@@ -1297,9 +1242,9 @@ export function stealControlMarkerChoice(): EffectHandler {
 
         // Add to standard once-per-turn ledgers to prevent double-dipping
         ctx.G.markerInfluenceGrantedThisTurn.push(siteId);
-        if (tc) {
-          ctx.G.markerTcGrantedThisTurn.push(siteId);
-        }
+        // if (tc) {
+        //   ctx.G.markerTcGrantedThisTurn.push(siteId);
+        // }
 
         // Output final logs
         Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} stole the control marker at ${siteId} until their next turn${tc ? ' (Total Control benefits)' : ''}`);
@@ -1312,6 +1257,103 @@ export function stealControlMarkerChoice(): EffectHandler {
         }
       }
     }
+    return true;
+  };
+}
+
+/**
+ * Nar'l Xibrindas (second choice): Choose an opponent with a troop at the
+ * site where the returned spy was, then choose a specific card in that
+ * opponent's discard pile and swap it with Nar'l Xibrindas itself.
+ *
+ * Nar'l Xibrindas is already sitting in the actor's discard pile by the time
+ * this runs — game.ts pushes the played card to discard on the handler's
+ * very first suspend (see playCard), which already happened for the
+ * enclosing chooseOne/returnOwnSpyChoice prompts. We locate it by identity
+ * (deck+slot) rather than assuming it's on top, since that's not guaranteed.
+ */
+interface NarlSwapState {
+  phase: 'pick-opponent' | 'pick-card';
+  targetPid?: string;
+}
+
+export function narlXibrindasSwapHandler(): EffectHandler {
+  return ctx => {
+    let state = (ctx.handlerState as NarlSwapState | null) ?? { phase: 'pick-opponent' };
+
+    if (state.phase === 'pick-opponent') {
+      const siteId = (ctx.G as unknown as { _lastReturnedSpySite?: string })._lastReturnedSpySite;
+      if (!siteId) { ctx.handlerState = null; return true; }
+
+      if (!ctx.pendingChoice) {
+        const opponentsAtSite = new Set<string>();
+        for (const sp of sitesSpaces(siteId)) {
+          const color = ctx.G.troops[sp.id];
+          if (color && color !== 'white' && color !== ctx.G.players[ctx.actorId].color) {
+            const pid = Object.keys(ctx.G.players).find(id => ctx.G.players[id].color === color);
+            if (pid && ctx.G.players[pid].discard.length > 0) opponentsAtSite.add(pid);
+          }
+        }
+        if (opponentsAtSite.size === 0) { ctx.handlerState = null; return true; }
+
+        ctx.pendingChoice = {
+          kind: 'select-player',
+          prompt: 'Nar\'l Xibrindas: Choose an opponent at the site to swap discard cards with:',
+          options: [...opponentsAtSite],
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = state;
+        return false;
+      }
+
+      const targetPid = ctx.pendingChoice.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (!targetPid) { ctx.handlerState = null; return true; }
+      state = { phase: 'pick-card', targetPid };
+      ctx.handlerState = state;
+    }
+
+    if (state.phase === 'pick-card' && state.targetPid) {
+      const targetPid = state.targetPid;
+      const targetDiscard = ctx.G.players[targetPid]?.discard ?? [];
+
+      if (!ctx.pendingChoice) {
+        if (targetDiscard.length === 0) { ctx.handlerState = null; return true; }
+        ctx.pendingChoice = {
+          kind: 'select-card-in-discard',
+          prompt: `Nar'l Xibrindas: Choose a card from P${Number(targetPid) + 1}'s discard pile to swap for.`,
+          options: targetDiscard.map((_, i) => i),
+          optional: false,
+          discardOwnerId: targetPid,
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = state;
+        return false;
+      }
+
+      const idx = ctx.pendingChoice.response as number | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      ctx.handlerState = null;
+
+      const oppDiscard = ctx.G.players[targetPid].discard;
+      const oppCard = idx != null ? oppDiscard[idx] : undefined;
+      if (oppCard) {
+        const myDiscard = ctx.G.players[ctx.actorId].discard;
+        const myCardIdx = myDiscard.findIndex(c => c.deck === ctx.card.deck && c.slot === ctx.card.slot);
+        if (myCardIdx >= 0) {
+          const myCard = myDiscard.splice(myCardIdx, 1)[0];
+          oppDiscard.splice(idx!, 1);
+          myDiscard.push(oppCard);
+          oppDiscard.push(myCard);
+          Mechanics.log(ctx.G, `Nar'l Xibrindas swapped for ${oppCard.name} in P${Number(targetPid) + 1}'s discard pile.`);
+        }
+      }
+      return true;
+    }
+
+    ctx.handlerState = null;
     return true;
   };
 }
@@ -1377,7 +1419,12 @@ export function jarlaxleHandler(ctx: EffectContext): boolean {
         options: G.players[state.targetPid!].hand.map((_, i) => i),
         optional: false,
         playerId: me,
-        actorId: state.targetPid, 
+        // `actorId` gets forced back to the Jarlaxle player by the
+        // resolveChoice dispatcher on every resume (it always tracks whose
+        // handlerState is suspended, not whose pile is being browsed) — so
+        // it can't carry "whose hand to show". customHandTarget survives
+        // that override and is what the UI actually keys off of.
+        customHandTarget: state.targetPid,
       } as PendingChoice;
       ctx.paused = true;
       ctx.handlerState = state;
@@ -1453,12 +1500,23 @@ export function jarlaxleHandler(ctx: EffectContext): boolean {
       return true;
     }
 
-    const bribeHandler = bribeCost(handler);
-    
+    // bribeCost only invokes its wrapped effect once the bribe is actually
+    // paid (declined/unaffordable bribes never reach it), so tucking a log
+    // step in front of `handler` logs the copy exactly once, exactly when
+    // the copy actually happens.
+    const pickedName = state.pickedRef!.name;
+    const bribeHandler = bribeCost(sequence(
+      (logCtx: EffectContext) => {
+        Mechanics.log(logCtx.G, `P${Number(me) + 1} bribed to copy ${pickedName}'s effect (Jarlaxle).`);
+        return true;
+      },
+      handler
+    ));
+
     const childCtx: EffectContext = {
       ...ctx,
       card: state.pickedRef!,
-      actorId: me, 
+      actorId: me,
       pendingChoice: ctx.pendingChoice,
       handlerState: state.childState ?? null,
       paused: ctx.paused,

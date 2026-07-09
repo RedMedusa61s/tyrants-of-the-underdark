@@ -245,18 +245,25 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       //       shrink the deck. Always worth doing if any card is eligible
       //       (the Outcast itself is pure poison; even sacrificing a starter
       //       turn-resource is a good trade).
+      // (c) Jarlaxle's "look at an opponent's hand and choose a card for
+      //     them to play": customHandTarget points at whose hand this is —
+      //     NOT the acting player's own, and the cycling-deck-floor guard
+      //     (which protects the actor's own deck) doesn't apply. Reuse
+      //     trashScore as "pick their weakest card to force on them".
       const isOutcastDiscard = pc.cardKey?.startsWith('insane-outcasts::') ?? false;
+      const handOwner = pc.customHandTarget ? G.players[pc.customHandTarget] : me;
+      const sourceHand = handOwner?.hand ?? [];
       const idxs = (opts as number[]).length > 0
         ? (opts as number[])
-        : me.hand.map((_, i) => i);
+        : sourceHand.map((_, i) => i);
       if (idxs.length === 0) return { name: 'resolveChoice', args: [null] };
-      if (pc.optional && !isOutcastDiscard && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
+      if (!pc.customHandTarget && pc.optional && !isOutcastDiscard && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
       let bestIdx = idxs[0];
       let bestScore = Infinity;
       for (const i of idxs) {
-        const c = me.hand[i];
+        const c = sourceHand[i];
         if (!c) continue;
         const score = trashScore(c.deck, c.slot);
         if (score < bestScore) { bestScore = score; bestIdx = i; }
@@ -280,7 +287,9 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       if (pc.optional && !inEndgame && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
-      const pool = pc.kind === 'select-card-in-discard' ? me.discard : G.cardsPlayedThisTurn;
+      const pool = pc.kind === 'select-card-in-discard'
+        ? (pc.discardOwnerId ? (G.players[pc.discardOwnerId]?.discard ?? []) : me.discard)
+        : G.cardsPlayedThisTurn;
       let best = idxs[0], bestScore = -Infinity;
       for (const i of idxs) {
         const c = pool[i];

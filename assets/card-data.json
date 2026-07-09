@@ -3789,8 +3789,8 @@
     "image": "assets/cards/mercenaries/00-goblinoid-ambushers.jpg",
     "cost": 2,
     "deckVp": 1,
-    "innerCircleVp": 3,
-    "aspect": "Guile",
+    "innerCircleVp": 2,
+    "aspect": "Malice",
     "type": "Goblinoid",
     "rarity": 4,
     "benefits": [
@@ -3808,8 +3808,8 @@
     "image": "assets/cards/mercenaries/01-goblinoid-ambushers.jpg",
     "cost": 2,
     "deckVp": 1,
-    "innerCircleVp": 3,
-    "aspect": "Guile",
+    "innerCircleVp": 2,
+    "aspect": "Malice",
     "type": "Goblinoid",
     "rarity": 4,
     "benefits": [
@@ -3827,8 +3827,8 @@
     "image": "assets/cards/mercenaries/02-goblinoid-ambushers.jpg",
     "cost": 2,
     "deckVp": 1,
-    "innerCircleVp": 3,
-    "aspect": "Guile",
+    "innerCircleVp": 2,
+    "aspect": "Malice",
     "type": "Goblinoid",
     "rarity": 4,
     "benefits": [
@@ -3846,8 +3846,8 @@
     "image": "assets/cards/mercenaries/03-goblinoid-ambushers.jpg",
     "cost": 2,
     "deckVp": 1,
-    "innerCircleVp": 3,
-    "aspect": "Guile",
+    "innerCircleVp": 2,
+    "aspect": "Malice",
     "type": "Goblinoid",
     "rarity": 4,
     "benefits": [
@@ -3870,7 +3870,7 @@
     "type": "Goblinoid",
     "rarity": 2,
     "benefits": [
-      "+3 Influence",
+      "+3 Power",
       "Bribe -> Expend 2 Power to assassinate"
     ],
     "effectKey": "hobgoblin-warlord",
@@ -3888,7 +3888,7 @@
     "type": "Goblinoid",
     "rarity": 2,
     "benefits": [
-      "+3 Influence",
+      "+3 Power",
       "Bribe -> Expend 2 Power to assassinate"
     ],
     "effectKey": "hobgoblin-warlord",
@@ -4490,7 +4490,7 @@
     "rarity": 1,
     "benefits": [
       "Choose 2 times:",
-      "or Move own troop and gain 1 Power",
+      "or Move own troop and +1 Influence",
       "or Bribe -> Swap 2 troops anywhere"
     ],
     "effectKey": "ahmaergo",

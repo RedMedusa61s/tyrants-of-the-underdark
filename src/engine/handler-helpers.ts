@@ -1801,6 +1801,7 @@ export function spacesAdjacentTo(spaceId: string): string[] {
   if (!s) return [];
   const out = new Set<string>();
 
+
   if (s.parentSite) {
     // Other spaces at the same site.
     for (const t of sitesSpaces(s.parentSite)) if (t.id !== spaceId) out.add(t.id);
@@ -1831,6 +1832,33 @@ export function spacesAdjacentTo(spaceId: string): string[] {
 
   return [...out];
 }
+
+// ! Depreciated Method:
+// ! Incorrect implementation of adjacency; previous logic considered (for site spaces) all
+// ! spaces on routes connected to the deployed space's site as adjacent, and (for route spaces)
+// ! all spaces on the route plus all site spaces at the route's endpoints as adjacent. 
+// ! This was too broad and did not match the intended adjacency (Presence) rules.
+// ! Method left here for reference.
+// function spacesAdjacentTo(spaceId: string): string[] {
+//   const s = TROOP_SPACES.find(t => t.id === spaceId);
+//   if (!s) return [];
+//   const out = new Set<string>();
+//   if (s.parentSite) {
+//     for (const t of TROOP_SPACES) if (t.parentSite === s.parentSite && t.id !== spaceId) out.add(t.id);
+//     for (const r of ROUTES) {
+//       if (r.a === s.parentSite || r.b === s.parentSite) {
+//         for (let i = 0; i < r.spaces; i++) out.add(`${r.id}:${i}`);
+//       }
+//     }
+//   } else if (s.parentRoute) {
+//     const r = ROUTES.find(rr => rr.id === s.parentRoute)!;
+//     for (let i = 0; i < r.spaces; i++) if (i !== s.index) out.add(`${r.id}:${i}`);
+//     for (const endpoint of [r.a, r.b]) {
+//       for (const t of TROOP_SPACES) if (t.parentSite === endpoint) out.add(t.id);
+//     }
+//   }
+//   return [...out];
+// }
 
 export function giveOutcastToOpponentAdjacentToLastDeploy(): EffectHandler {
   return ctx => {
