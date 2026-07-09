@@ -35,6 +35,8 @@ import type { SimulateMoveFn, RolloutToTurnEndFn } from './ai/lookahead';
 import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { lookupCard } from './card-data';
 import { scoreAll } from './engine/scoring';
+import { HouseBar } from './components/HouseBar';
+import { HouseSelect, type HousePick } from './components/HouseSelect';
 
 const HUMAN_SEAT = '0';
 
@@ -194,6 +196,10 @@ interface GameConfig {
   /** Colour the human (seat 0) plays. Remaining colours go to the AI seats.
    *  Undefined → default seat order (black, red, orange, blue). */
   humanColor?: Color;
+  /** Drow House system config (off by default). humanHouse picks seat 0's
+   *  house ('random' or omitted while enabled → random); every other seat
+   *  always gets a random house when enabled — see HouseSelect. */
+  houses?: { enabled: boolean; humanHouse?: HousePick };
 }
 const AI_FNS: Record<AiStyle, (G: TyrantsState, pid: string) => AiMove | null> = {
   random: decideAiMove,
@@ -1147,6 +1153,13 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     );
   })();
 
+  // House Bar — the acting player's Drow House passives/actions, if any.
+  // Renders nothing when houses are off for this game. Kept as its own
+  // memo-free const (cheap to rebuild each render, same as actionBar) so it
+  // can be dropped in wherever actionBar already is.
+  const houseBar = <HouseBar G={G} pid={me} myTurn={myTurn} moves={moves} />;
+
+
   const actionBar = (
     <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
       {actionBtn(deployLabel, canDeploy, baseAction?.kind === 'deploy',
@@ -1803,6 +1816,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               (Cancel sticky base-actions, Assassinate / Deploy / Return
               Spy / End Turn). Kept inside the map-tab block so the bar
               only shows when relevant. */}
+          {houseBar}
           {actionBar}
           <MapView G={G}
             clickableSites={startingClickable} onSiteClick={handleSiteClick}
@@ -1817,6 +1831,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           clickableSpaces={clickableSpaces} handleSpaceClick={handleSpaceClick}
           clickableMarketSlots={clickableMarketSlots}
           humanMapPick={humanMapPick}
+          houseBar={houseBar}
           actionBar={actionBar}
           interactivePromptBar={interactivePromptBar}
           mySeat={me}
@@ -1909,6 +1924,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
+        {houseBar}
         {actionBar}
 
         {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
@@ -2116,6 +2132,8 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   const [humanColor, setHumanColor] = useState<Color>(
     lastConfig?.humanColor ?? COLORS[0]
   );
+  const [housesEnabled, setHousesEnabled] = useState(lastConfig?.houses?.enabled ?? false);
+  const [housePick, setHousePick] = useState<HousePick>(lastConfig?.houses?.humanHouse ?? 'random');
 
   function setStyle(i: number, s: AiStyle) {
     setStyles(prev => {
@@ -2287,9 +2305,18 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
             Random 2
           </button>
         </div>
+        <HouseSelect
+          enabled={housesEnabled}
+          onToggleEnabled={setHousesEnabled}
+          pick={housePick}
+          onPick={setHousePick}
+        />
         <button
           disabled={halfDecks.length !== 2}
-          onClick={() => onStart({ numPlayers, aiStyles: trimmedStyles, halfDecks, thirdPlayerSide: thirdSide, humanColor })}
+          onClick={() => onStart({
+            numPlayers, aiStyles: trimmedStyles, halfDecks, thirdPlayerSide: thirdSide, humanColor,
+            houses: housesEnabled ? { enabled: true, humanHouse: housePick } : { enabled: false },
+          })}
           style={{
             padding: '10px 24px', fontSize: 14, color: '#fff', border: 'none',
             borderRadius: 4,
@@ -2320,10 +2347,11 @@ function ClientHolder({ config, onNewGame }: { config: GameConfig; onNewGame: ()
           halfDecks: config.halfDecks,
           activeSections: activeSectionsFor(config),
           humanColor: config.humanColor,
+          houses: config.houses,
         }),
     };
     return Client({ game, board: Board, numPlayers: config.numPlayers, debug: false });
-  }, [config.numPlayers, config.halfDecks, config.humanColor]);
+  }, [config.numPlayers, config.halfDecks, config.humanColor, config.houses]);
   return (
     <SessionContext.Provider value={{ config, onNewGame }}>
       <ClientCmp />
@@ -2344,6 +2372,7 @@ function loadConfig(): GameConfig | null {
         numPlayers: cfg.numPlayers, aiStyles: cfg.aiStyles, halfDecks,
         thirdPlayerSide: cfg.thirdPlayerSide,
         humanColor: cfg.humanColor,
+        houses: cfg.houses,
       };
     }
   } catch { /* fall through */ }
@@ -2386,6 +2415,7 @@ function SplitPlayView(props: {
   handleSpaceClick: (spaceId: string) => void;
   clickableMarketSlots: Set<number> | null | undefined;
   humanMapPick: { prompt: string; optional?: boolean } | null;
+  houseBar: React.ReactNode;
   actionBar: React.ReactNode;
   interactivePromptBar: React.ReactNode;
   /** Seat the local human controls — '0' in hotseat, the server-assigned seat
@@ -2396,7 +2426,7 @@ function SplitPlayView(props: {
 }) {
   const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
-          clickableMarketSlots, humanMapPick, actionBar, interactivePromptBar,
+          clickableMarketSlots, humanMapPick, houseBar, actionBar, interactivePromptBar,
           mySeat: me, onViewPile } = props;
   const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
 
@@ -2453,6 +2483,7 @@ function SplitPlayView(props: {
             )}
           </div>
         )}
+      {houseBar}
       {actionBar}
       {/* Pile inspector strip (#68): split view has no full status line, so
           surface clickable Deck / Discard / Inner Circle counts here. */}
