@@ -22,8 +22,9 @@
     "snapshot-size": "vite-node scripts/snapshot-size.ts",
     "test:ai-drive": "vite-node scripts/test-ai-drive.ts",
     "test:online-path": "vite-node scripts/test-online-path.ts",
-    "ci": "tsc --noEmit && npm run test:ai-drive && npm run test:online-path",
-    "ship": "npm run test:ai-drive && npm run test:online-path && npm run build && npx wrangler pages deploy dist --project-name tyrants-online --branch main"
+    "test:repro-102": "vite-node scripts/test-repro-102.ts",
+    "ci": "tsc --noEmit && npm run test:ai-drive && npm run test:online-path && npm run test:repro-102",
+    "ship": "npm run test:ai-drive && npm run test:online-path && npm run test:repro-102 && npm run build && npx wrangler pages deploy dist --project-name tyrants-online --branch main"
   },
   "keywords": [],
   "author": "",
