@@ -450,4 +450,4 @@ registerOnForcedDiscard('ambassador', (G, ownerPid) => {
 // Suppress unused-import warning if any helper isn't yet referenced.
 void playerCanAssassinate;
 void returnEnemyTroopOrSpyChoice;
-void playerCanReturnEnemyTroop
+void playerCanReturnEnemyTroop;

@@ -108,7 +108,17 @@ function remoteUrlFor(relativePath: string): string {
   const base = (import.meta.env.VITE_TOTU_IMAGE_BASE_URL as string | undefined)?.replace(/\/$/, '');
   const trimmed = relativePath.replace(/^assets\//, '');
   if (base) return `${base}/${trimmed}`;
-  if (parseCardPath(relativePath)) return BLANK_DATA_URL;
+  
+  const parsed = parseCardPath(relativePath);
+  if (parsed) {
+    const sheet = DECK_SHEETS[parsed.deck];
+    // Pre-sliced deck (no sheet URL) — serve directly from publicDir
+    if (sheet && sheet.url === '') {
+      return `/${trimmed}`;
+    }
+    return BLANK_DATA_URL;
+  }
+
   return `/${trimmed}`;
 }
 
@@ -223,6 +233,22 @@ async function sliceTile(sheet: SheetInfo, slot: number): Promise<Blob> {
 async function fetchAndStore(relativePath: string): Promise<Blob> {
   // Card paths get sliced out of the deck's sheet.
   const parsed = parseCardPath(relativePath);
+  
+  // Pre-sliced deck: fetch the image file directly instead of slicing from a sheet
+  if (parsed && DECK_SHEETS[parsed.deck] && DECK_SHEETS[parsed.deck].url === '') {
+    const url = remoteUrlFor(relativePath);
+    if (url === BLANK_DATA_URL) {
+      // Fall back to fetching from the local path directly
+      const localUrl = `/${relativePath.replace(/^assets\//, '')}`;
+      const blob = await fetchBlob(localUrl);
+      await dbPut(relativePath, blob);
+      return blob;
+    }
+    const blob = await fetchBlob(url);
+    await dbPut(relativePath, blob);
+    return blob;
+  }
+
   if (parsed && DECK_SHEETS[parsed.deck]) {
     const sheet = DECK_SHEETS[parsed.deck];
     const blob = await sliceTile(sheet, parsed.slot);

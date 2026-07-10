@@ -82,6 +82,19 @@ export function cardWhiffReason(G: TyrantsState, pid: string, effectKey: string)
       }
       return null;
 
+    // Mercenary cards added
+    case 'dragonborn-hireling':
+      if (legalAssassinateTargets(G, color, {}).length === 0) {
+        return 'no enemy or white troops you can reach';
+      }
+      return null;
+      
+    case 'artemis-entreri':
+      if (legalAssassinateTargets(G, color, {}).length === 0) {
+        return 'no enemy or white troops you can reach';
+      }
+      return null;
+
     // Other cards we don't currently check (chooseOne cards always have a
     // fallback option; pure resource grants always work; deploy effects
     // almost always work because barracks have stock; place-spy almost

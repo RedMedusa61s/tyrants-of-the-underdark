@@ -31,6 +31,9 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@supabase/supabase-js": "^2.107.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

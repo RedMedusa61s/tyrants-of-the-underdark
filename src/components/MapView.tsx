@@ -27,6 +27,9 @@ const COLOR_HEX: Record<Color, string> = {
 // White tokens darkened toward light grey so they stand out on white-bordered site boxes.
 const WHITE_TOKEN = '#d0d0d0';
 
+// Additional highlighted spaces
+const HIGHLIGHTED_SPACE_COLOR = '#66ccff';
+
 // Samsung Internet / Chrome Android "Website dark mode" repaints solid
 // background-COLORS but leaves background-IMAGES (gradients) alone. Painting a
 // game-state token colour as a flat gradient keeps it exactly as authored even
@@ -68,6 +71,7 @@ interface MapViewProps {
   /** Troop spaces the user can click (e.g. for assassinate/deploy/supplant prompts). */
   clickableSpaces?: Set<string>;
   onSpaceClick?: (spaceId: string) => void;
+  highlightedSpaces?: Set<string>;
 }
 
 const ROUTES_STORAGE_KEY = 'totu.routes';
@@ -181,7 +185,7 @@ function ControlMarkerToken(
   );
 }
 
-export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, clickableSpaces, onSpaceClick }: MapViewProps) {
+export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, clickableSpaces, onSpaceClick, highlightedSpaces }: MapViewProps) {
   const boardUrl = useCachedImage('assets/board/map.jpg');
   const [overrides, setOverrides] = useState<PositionOverride>(loadOverrides);
   const [slotPositions] = useState<SlotPositions>(loadSlotPositions);
@@ -552,7 +556,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           }
           const occ = G.troops[spaceId];
           const pickable = clickableSpaces?.has(spaceId);
-          const size = px(pickable ? 26 : 22);
+          const highlighted = highlightedSpaces?.has(spaceId); // <-- Check highlight
+          const size = px(pickable ? 26 : highlighted ? 26 : 22); // <-- Enlarge highlighted troops slightly
           return (
             <div key={spaceId}
               onClick={() => { if (pickable) onSpaceClick?.(spaceId); }}
@@ -562,8 +567,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 width: size, height: size, marginLeft: -size/2, marginTop: -size/2,
                 borderRadius: '50%',
                 background: occ === 'white' ? flat(WHITE_TOKEN) : occ ? flat(COLOR_HEX[occ]) : 'rgba(20, 14, 40, 0.7)',
-                border: pickable ? '2px solid #ffcc44' : occ ? '1px solid #fff' : '1px solid rgba(255,255,255,0.3)',
-                boxShadow: pickable ? '0 0 6px #ffcc44' : undefined,
+                border: pickable ? '2px solid #ffcc44' : highlighted ? `2px solid ${HIGHLIGHTED_SPACE_COLOR}` : occ ? '1px solid #fff' : '1px solid rgba(255,255,255,0.3)',
+                boxShadow: pickable ? '0 0 6px #ffcc44' : highlighted ? `0 0 8px ${HIGHLIGHTED_SPACE_COLOR}` : undefined,
                 cursor: pickable ? 'pointer' : 'default',
                 zIndex: 5,
               }} />
@@ -663,13 +668,14 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           }
           const occ = G.troops[sp.id];
           const isSpacePickable = clickableSpaces?.has(sp.id);
+          const highlighted = highlightedSpaces?.has(sp.id); // <-- Check highlight
           // Slot clicks now ONLY satisfy troop-space picks. Site picks have a
           // dedicated overlay below so the user can tell which they're targeting.
           const pickable = isSpacePickable;
           const onClick = () => {
             if (isSpacePickable) onSpaceClick?.(sp.id);
           };
-          const size = px(pickable ? 26 : 22);
+          const size = px(pickable ? 26 : highlighted ? 26 : 22); // <-- Enlarge highlighted troops slightly
           // While a site-pick is active, let clicks fall through non-pickable
           // slots to the site overlay disc underneath. Otherwise the user has
           // to aim outside the slots to hit the ring.
@@ -689,10 +695,12 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                   : occ ? flat(COLOR_HEX[occ])
                   : 'transparent',
                 border: pickable ? '2px solid #ffcc44'
+                  : highlighted ? `2px solid ${HIGHLIGHTED_SPACE_COLOR}`
                   : occ === 'black' ? '2px solid #e6e1f2'
                   : occ ? '2px solid #fff'
                   : '1px dashed rgba(255,255,255,0.25)',
                 boxShadow: pickable ? '0 0 8px #ffcc44'
+                  : highlighted ? `0 0 8px ${HIGHLIGHTED_SPACE_COLOR}`
                   : occ === 'black' ? '0 0 0 1px #000, 0 1px 4px rgba(255,255,255,0.5)'
                   : occ ? '0 1px 3px rgba(0,0,0,0.6)'
                   : undefined,

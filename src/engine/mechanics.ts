@@ -206,4 +206,17 @@ export const Mechanics = {
   // -- map mutations come once we wire occupancy into TyrantsState --
   // deployTroop, assassinateTroop, moveTroop, placeSpy, returnTroop, returnSpy,
   // supplant, recomputeSiteControl
+
+  /** Mercenary card Sylgar:
+   * Once recruited, can never be promoted, devoured or forcibly discarded.
+   * Instead, the card remains in place and awards 1VP.
+   */
+  trySylgarReact(G: TyrantsState, playerId: string, card: CardRef): boolean {
+    if (card.name === 'Sylgar') {
+      G.players[playerId].vp += 1;
+      Mechanics.log(G, `P${Number(playerId) + 1} gained 1 VP and kept Sylgar in place (reactive)`);
+      return true; // Tells the caller to skip removing the card
+    }
+    return false;
+  },
 };

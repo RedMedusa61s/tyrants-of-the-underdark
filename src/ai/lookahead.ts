@@ -25,6 +25,8 @@
 
 import type { TyrantsState } from '../game';
 import { scoreAll } from '../engine/scoring';
+import { TROOP_SPACES } from '../data/troop-spaces';
+import { SITES } from '../data/sites';
 
 /** Apply one move to G and return the resulting G, or null if the move
  *  was rejected (INVALID_MOVE). The implementation lives in the harness
@@ -54,6 +56,32 @@ export type RolloutToTurnEndFn = (
   args: unknown[],
 ) => TyrantsState | null;
 
+/**
+ * Calculates a "Soft VP" score for a player's board presence.
+ * This allows the lookahead to value loose troops and spies that haven't 
+ * yet resulted in Hard VP (like site control or trophies).
+ */
+function evaluateBoardPresence(G: TyrantsState, pid: string): number {
+  const p = G.players[pid];
+  let presenceValue = 0;
+
+  // Value troops on the board (e.g., 0.3 Soft VP per troop)
+  for (const t of TROOP_SPACES) {
+    if (G.troops[t.id] === p.color) {
+      presenceValue += 0.3;
+    }
+  }
+
+  // Value spies on the board (e.g., 0.5 Soft VP per spy)
+  for (const s of SITES) {
+    if ((G.spies[s.id] ?? []).includes(p.color)) {
+      presenceValue += 0.5;
+    }
+  }
+
+  return presenceValue;
+}
+
 /** Value of a state from `pid`'s perspective: own total VP minus the
  *  MEAN of opponents' total VPs. Uses the full scoreAll so trophies,
  *  control markers, inner-circle VP, and final-scoring riders all count.
@@ -72,16 +100,25 @@ export type RolloutToTurnEndFn = (
  *  is a binary against the leader, not an expected-value calculation. */
 export function stateValue(G: TyrantsState, pid: string): number {
   const all = scoreAll(G);
-  const my = all[pid]?.total ?? 0;
+
+  // Combine Hard VP and Soft VP for the evaluating player
+  const myHardVp = all[pid]?.total ?? 0;
+  const mySoftVp = evaluateBoardPresence(G, pid);
+  const myTotalValue = myHardVp + mySoftVp;
+
   let oppSum = 0;
   let oppCount = 0;
   for (const [id, s] of Object.entries(all)) {
     if (id === pid) continue;
-    oppSum += s.total;
+
+    // Combine Hard VP and Soft VP for opponents
+    const oppSoftVp = evaluateBoardPresence(G, id);
+    oppSum += (s.total + oppSoftVp);
+
     oppCount++;
   }
-  if (oppCount === 0) return my;
-  return my - oppSum / oppCount;
+  if (oppCount === 0) return myTotalValue;
+  return myTotalValue - (oppSum / oppCount);
 }
 
 /** Pick the best candidate by 1-ply lookahead.

@@ -176,13 +176,13 @@ export function isSplitViewMode(): boolean {
 // ~2/3 of games to a competent human; truly hard would need deeper
 // lookahead or opponent-reply modeling.
 type AiStyle = 'random' | 'easy' | 'heuristic';
-type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead';
-const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead'];
+type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead' | 'mercenaries';
+const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'mercenaries'];
 // Half-decks introduced in the Aberrations & Undead expansion. The new-game
 // dialog separates these from the base half-decks under an "Expansion" header
 // so unfamiliar players see clearly which decks are base-game and which need
 // the expansion. Game logic treats all six identically.
-const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead']);
+const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead', 'mercenaries']);
 type ThirdPlayerSide = 'left' | 'right';
 interface GameConfig {
   numPlayers: number;
@@ -973,6 +973,10 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     ? new Set((humanSpacePick.options as string[] | undefined) ?? [])
     : baseActionClickableSpaces;
 
+  const highlightedSpaces = humanMapPick?.highlightSpaces
+    ? new Set(humanMapPick.highlightSpaces as string[])
+    : undefined;
+
   const handleSiteClick = (siteId: string) => {
     if (G.setupPhase && myTurn) { moves.deployStartingTroop(siteId); return; }
     if (humanSitePick) { moves.resolveChoice(siteId); return; }
@@ -1024,7 +1028,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // Auto-cancel sticky base-action mode when the player can no longer afford it.
   useEffect(() => {
     if (!baseAction) return;
-    const cost = baseAction.kind === 'deploy' ? 1 : 3;
+    // const cost = baseAction.kind === 'deploy' ? 1 : 3;
+    const cost = baseAction.kind === 'deploy' ? 1 : baseAction.kind === 'assassinate' ? (G.assassinateCostOverride ?? BASE_ACTION_POWER_COST) : 3;
     if (p.power < cost) setBaseAction(null);
   }, [baseAction, p.power]);
 
@@ -1032,7 +1037,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // game tab so the player can always Cancel sticky modes / switch actions
   // while looking at the map.
   const canDeploy = myTurn && p.power >= 1 && !G.pendingChoice;
-  const canAssassinate = myTurn && p.power >= BASE_ACTION_POWER_COST && !G.pendingChoice;
+  const assassinateCost = G.assassinateCostOverride ?? BASE_ACTION_POWER_COST;
+  const canAssassinate = myTurn && p.power >= assassinateCost && !G.pendingChoice;
   const canReturnSpy = myTurn && p.power >= BASE_ACTION_POWER_COST && !G.pendingChoice;
   const actionBtn = (label: string, enabled: boolean, active: boolean, onClick: () => void) => (
     <button onClick={onClick} disabled={!enabled}
@@ -1164,7 +1170,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
       {actionBtn(deployLabel, canDeploy, baseAction?.kind === 'deploy',
         () => setBaseAction(baseAction?.kind === 'deploy' ? null : { kind: 'deploy' }))}
-      {actionBtn('Assassinate (3 Power)', canAssassinate, baseAction?.kind === 'assassinate',
+      {actionBtn(`Assassinate (${assassinateCost} Power)`, canAssassinate, baseAction?.kind === 'assassinate',
         () => setBaseAction(baseAction?.kind === 'assassinate' ? null : { kind: 'assassinate' }))}
       {actionBtn('Return enemy spy (3 Power)', canReturnSpy, baseAction?.kind === 'return-spy',
         () => setBaseAction(baseAction?.kind === 'return-spy' ? null : { kind: 'return-spy' }))}
@@ -1435,6 +1441,27 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           ) : (
             'Reload the page to start a fresh game.'
           )}
+          <button onClick={async () => {
+          if (!confirm('Start a new game? Current progress will be lost.')) return;
+          // Archive the current playthrough before discarding it, so it
+          // doesn't get lost between sessions. The bulk Upload-logs button
+          // picks it up on the next click.
+          if (session) {
+            try {
+              await archiveGame(G, {
+                numPlayers: Object.keys(G.players).length,
+                halfDecks: session.config.halfDecks,
+                aiStyles: session.config.aiStyles,
+              });
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.warn('[archive-game] new-game archive failed:', err);
+            }
+          }
+          session?.onNewGame();
+        }} style={{ padding: '6px 14px', background: '#5a1f1f', color: '#fdd', border: '1px solid #802626', borderRadius: 4, cursor: 'pointer' }}>
+          New game
+        </button>
         </div>
       </div>
     );
@@ -1665,9 +1692,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         Player P{Number(me) + 1} ({p.color}) — Turn: P{Number(ctx.currentPlayer) + 1} {myTurn ? '(your turn)' : ''}
         {' · '}Power: {p.power} · Influence: {p.influence}
         {' · '}{pileButton('Deck', p.deck.length, () => { setPilePlayer(null); setPileView('deck'); })}
-        {' · '}{pileButton('Discard', p.discard.length, () => { setPilePlayer(null); setPileView('discard'); })}
+        {/* {' · '}{pileButton('Discard', p.discard.length, () => { setPilePlayer(null); setPileView('discard'); })}
         {' · '}{pileButton('Inner Circle', p.innerCircle.length, () => { setPilePlayer(null); setPileView('inner'); })}
-        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => { setPilePlayer(null); setPileView('trophy'); })}
+        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => { setPilePlayer(null); setPileView('trophy'); })} */}
         {' · '}Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
         {' · '}<b style={{ color: '#ffcc44' }}>VP: {p.vp}</b>
         {G.endGameTriggeredAtTurn !== null && <span style={{ color: '#ffcc44', marginLeft: 8 }}>· Final round!</span>}
@@ -1820,7 +1847,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           {actionBar}
           <MapView G={G}
             clickableSites={startingClickable} onSiteClick={handleSiteClick}
-            clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
+            clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} 
+            highlightedSpaces={highlightedSpaces}/>
         </div>
       )}
       {tab === 'play' && (
@@ -1829,6 +1857,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           playCardSafe={playCardSafe}
           startingClickable={startingClickable} handleSiteClick={handleSiteClick}
           clickableSpaces={clickableSpaces} handleSpaceClick={handleSpaceClick}
+          highlightedSpaces={highlightedSpaces}
           clickableMarketSlots={clickableMarketSlots}
           humanMapPick={humanMapPick}
           houseBar={houseBar}
@@ -1929,18 +1958,27 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
         {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
           <>
-            <h2 style={{ marginTop: 24 }}>Discard — pick one</h2>
+            <h2 style={{ marginTop: 24 }}>
+              {G.pendingChoice.discardOwnerId
+                ? `P${Number(G.pendingChoice.discardOwnerId) + 1}'s Discard — pick one`
+                : 'Discard — pick one'}
+            </h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
               {/* Only the engine-supplied option indices are valid — e.g. Matron
                   Mother excludes cards played this turn (those are in your play
-                  area, not your discard pile). Show only those. */}
+                  area, not your discard pile). Show only those. discardOwnerId
+                  (Nar'l Xibrindas) points this at an opponent's pile instead
+                  of your own. */}
               {(() => {
+                const pile = G.pendingChoice!.discardOwnerId
+                  ? (G.players[G.pendingChoice!.discardOwnerId!]?.discard ?? [])
+                  : p.discard;
                 const opts = G.pendingChoice!.options as number[] | undefined;
-                const idxs = opts ?? p.discard.map((_, i) => i);
+                const idxs = opts ?? pile.map((_, i) => i);
                 return idxs
-                  .filter(i => p.discard[i])
+                  .filter(i => pile[i])
                   .map(i => (
-                    <Card key={i} card={p.discard[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
+                    <Card key={i} card={pile[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
                   ));
               })()}
             </div>
@@ -1976,6 +2014,33 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
+        {G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && G.pendingChoice.customHandTarget && (
+          <>
+            <h2 style={{ marginTop: 24 }}>
+              P{Number(G.pendingChoice.customHandTarget) + 1}'s Hand — pick a card
+            </h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {(() => {
+                const targetPid = G.pendingChoice!.customHandTarget!;
+                const targetHand = G.players[targetPid]?.hand ?? [];
+                const opts = G.pendingChoice!.options as number[] | undefined;
+                
+                return targetHand.map((c, i) => {
+                  if (opts && !opts.includes(i)) return null;
+                  return (
+                    <Card 
+                      key={i} 
+                      card={c} 
+                      label="pick" 
+                      onClick={() => moves.resolveChoice(i)} 
+                    />
+                  );
+                });
+              })()}
+            </div>
+          </>
+        )}
+
         <h2 style={{ marginTop: 24, display: 'flex', alignItems: 'baseline', gap: 12 }}>
           Your Hand
           <button onClick={() => { setPilePlayer(null); setPileView('played'); }}
@@ -1995,7 +2060,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // discards (Mindwitness, Chuul, Neogi, …) the prompt may target
             // the human while it's an AI's turn. Gate on HUMAN_SEAT, not
             // currentPlayer.
-            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
+            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && !G.pendingChoice.customHandTarget;
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
@@ -2413,6 +2478,7 @@ function SplitPlayView(props: {
   handleSiteClick: (siteId: string) => void;
   clickableSpaces: Set<string> | undefined;
   handleSpaceClick: (spaceId: string) => void;
+  highlightedSpaces: Set<string> | undefined;
   clickableMarketSlots: Set<number> | null | undefined;
   humanMapPick: { prompt: string; optional?: boolean } | null;
   houseBar: React.ReactNode;
@@ -2426,6 +2492,7 @@ function SplitPlayView(props: {
 }) {
   const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
+          highlightedSpaces,
           clickableMarketSlots, humanMapPick, houseBar, actionBar, interactivePromptBar,
           mySeat: me, onViewPile } = props;
   const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
@@ -2518,17 +2585,26 @@ function SplitPlayView(props: {
       )}
       {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
         <div>
-          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Discard — pick one</h3>
+          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>
+            {G.pendingChoice.discardOwnerId
+              ? `P${Number(G.pendingChoice.discardOwnerId) + 1}'s Discard — pick one`
+              : 'Discard — pick one'}
+          </h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
             {/* Honor the engine's option list (Matron Mother excludes cards
-                played this turn — they're in the play area, not the discard). */}
+                played this turn — they're in the play area, not the discard).
+                discardOwnerId (Nar'l Xibrindas) points this at an opponent's
+                pile instead of your own. */}
             {(() => {
+              const pile = G.pendingChoice!.discardOwnerId
+                ? (G.players[G.pendingChoice!.discardOwnerId!]?.discard ?? [])
+                : p.discard;
               const opts = G.pendingChoice!.options as number[] | undefined;
-              const idxs = opts ?? p.discard.map((_, i) => i);
+              const idxs = opts ?? pile.map((_, i) => i);
               return idxs
-                .filter(i => p.discard[i])
+                .filter(i => pile[i])
                 .map(i => (
-                  <Card key={i} card={p.discard[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
+                  <Card key={i} card={pile[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
                 ));
             })()}
           </div>
@@ -2544,10 +2620,37 @@ function SplitPlayView(props: {
           </div>
         </div>
       )}
+      {G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && G.pendingChoice.customHandTarget && (
+        <div>
+          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>
+            P{Number(G.pendingChoice.customHandTarget) + 1}'s Hand — pick a card
+          </h3>
+          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+            {(() => {
+              const targetPid = G.pendingChoice!.customHandTarget!;
+              const targetHand = G.players[targetPid]?.hand ?? [];
+              const opts = G.pendingChoice!.options as number[] | undefined;
+              
+              return targetHand.map((c, i) => {
+                if (opts && !opts.includes(i)) return null;
+                return (
+                  <Card 
+                    key={i} 
+                    card={c} 
+                    label="pick" 
+                    onClick={() => moves.resolveChoice(i)} 
+                  />
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
       <div onMouseEnter={enterMap} onMouseLeave={leaveMap} style={sectionBox('map')}>
         <MapView G={G}
           clickableSites={startingClickable} onSiteClick={handleSiteClick}
-          clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
+          clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick}
+          highlightedSpaces={highlightedSpaces} />
       </div>
       <div onMouseEnter={enterCards} onMouseLeave={leaveCards} style={sectionBox('cards')}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -2569,7 +2672,7 @@ function SplitPlayView(props: {
                 // See same-named check in the play tab above — the
                 // prompted player owns this choice (HUMAN_SEAT for forced
                 // discards triggered on the human's hand during an AI turn).
-                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
+                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && !G.pendingChoice.customHandTarget;
                 const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
                 // Hide ineligible cards entirely when options restrict which cards are pickable
