@@ -58,6 +58,7 @@ export function moveOwnTroopToAdjacent(): EffectHandler {
           kind: 'select-troop-space',
           prompt: 'Tunnel Patrols: move which of your troops?',
           options: eligible,
+          optional: true,
         } as PendingChoice;
         ctx.paused = true;
         return false;
