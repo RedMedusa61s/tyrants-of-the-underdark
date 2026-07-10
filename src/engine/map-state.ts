@@ -8,6 +8,7 @@ import type { TyrantsState, Color } from '../game';
 import { ROUTES, ADJACENCY } from '../data/routes';
 import { TROOP_SPACES_BY_ID, sitesSpaces, routeSpaces } from '../data/troop-spaces';
 import { SITES_BY_ID } from '../data/sites';
+import { HouseHooks } from '../houses/hooks';
 import SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
 
 /** Per-route geometric mapping of the two endmost slot indices (0 and N-1) to the
@@ -152,6 +153,15 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
       const t = G.troops[sp.id];
       if (t) counts[t] = (counts[t] || 0) + 1;
     }
+    // Faen Tlabbar's Deep Cover: that player's spies also count toward the
+    // CONTROL majority tally at this site (on top of the troops above).
+    // Cheap no-op for every other player (colorCountsSpiesForControl is
+    // false unless someone actually picked Faen Tlabbar).
+    for (const spyColor of G.spies[siteId] ?? []) {
+      if (HouseHooks.colorCountsSpiesForControl(G, spyColor)) {
+        counts[spyColor] = (counts[spyColor] || 0) + 1;
+      }
+    }
     // Strict-majority leader: must exceed every other entry, white included.
     let leader: TroopOwner | null = null;
     let leaderCount = 0;
@@ -169,6 +179,22 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
 
     // --- NEW: Check if this marker is currently stolen ---
     const isStolen = (G as any).stolenMarkers?.some((stolen: any) => stolen.siteId === siteId);
+    // House hooks: fire whenever someone currently controls this site (see
+    // houses/types.ts's HousePassiveHooks doc — these fire on every
+    // recompute where the condition holds, not strictly once-per-transition;
+    // the two houses that use this only latch a boolean, so re-firing is
+    // harmless). Faen Tlabbar's Eyes Everywhere and Barrison Del'Armgo's
+    // Conquest Doctrine both key off "gain (total) control", which reads as
+    // an event rather than a live "has control right now" state, so these
+    // stay as hooks instead of `available` predicates like most other
+    // control-gated house abilities.
+    if (newController) {
+      const hasMarker = !!G.controlMarkers[siteId];
+      HouseHooks.onControlGain(G, newController, siteId, hasMarker);
+      if (hasTotalControl(G, newController, siteId)) {
+        HouseHooks.onTotalControlGain(G, newController, siteId, hasMarker);
+      }
+    }
 
     // Site-control marker bookkeeping per the revised rulebook:
     //   "When you take control of a site that has a control marker, take
@@ -332,6 +358,15 @@ export function assassinateTroop(G: TyrantsState, spaceId: TroopSpaceId): TroopO
   // Stash for any chained handlers that care about the location.
   (G as unknown as { _lastAssassinatedSpace?: string })._lastAssassinatedSpace = spaceId;
 
+  // Hun'ett's Paid in Blood: fires for whoever's turn it currently is. Every
+  // assassinate — base action or card/house effect — happens during the
+  // acting player's own turn, so G.activeTurnColor (already tracked for the
+  // control-marker payout above) identifies the actor without needing an
+  // actorId threaded through every one of this function's ~8 call sites.
+  if (G.activeTurnColor) {
+    const pid = Object.keys(G.players).find(k => G.players[k].color === G.activeTurnColor);
+    if (pid) HouseHooks.onAssassinate(G, pid, t);
+  }
   return t;
 }
 

@@ -5,6 +5,8 @@
 // resource pools, or scores directly. They call Mechanics.
 
 import type { TyrantsState, CardRef } from '../game';
+import { HouseHooks } from '../houses/hooks';
+import { lookupCard } from '../card-data';
 
 function p(G: TyrantsState, playerId: string) {
   const player = G.players[playerId];
@@ -157,6 +159,20 @@ export const Mechanics = {
   recruitFromMarket(G: TyrantsState, playerId: string, marketIndex: number): boolean {
     const card = G.market.row[marketIndex];
     if (!card) return false;
+    // Mizzrym's Shadow Investment: if a VP token sits on this row slot, pay
+    // it out — to the token's owner if someone ELSE recruits the card; the
+    // token just clears with no bonus if the owner recruits their own pick.
+    const token = G.marketVpTokens?.[marketIndex];
+    if (token) {
+      if (token.pid !== playerId) {
+        const owner = G.players[token.pid];
+        if (owner) {
+          owner.vp += token.vp;
+          Mechanics.log(G, `P${Number(token.pid) + 1} +${token.vp} VP (Shadow Investment token on ${card.name})`);
+        }
+      }
+      delete G.marketVpTokens[marketIndex];
+    }
     p(G, playerId).discard.push(card);
     const refill = G.market.deck.shift() ?? null;
     // Refilling the row from the face-down market deck reveals a new card to
@@ -164,6 +180,8 @@ export const Mechanics = {
     if (refill) Mechanics.markInfoRevealed(G);
     G.market.row[marketIndex] = refill;
     Mechanics.log(G, `P${Number(playerId) + 1} recruited ${card.name}`);
+    const data = lookupCard(card.deck, card.slot);
+    if (data) HouseHooks.onRecruit(G, playerId, data);
     return true;
   },
 
@@ -180,6 +198,8 @@ export const Mechanics = {
     p(G, playerId).discard.push(card);
     G.auxStacks[stack] -= 1;
     Mechanics.log(G, `P${Number(playerId) + 1} recruited ${card.name} (${G.auxStacks[stack]} left in stack)`);
+    const data = lookupCard(card.deck, card.slot);
+    if (data) HouseHooks.onRecruit(G, playerId, data);
     return true;
   },
 

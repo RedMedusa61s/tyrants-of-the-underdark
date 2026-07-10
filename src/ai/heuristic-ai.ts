@@ -12,6 +12,7 @@ import { TROOP_SPACES, TROOP_SPACES_BY_ID, sitesSpaces } from '../data/troop-spa
 import { lookupCard } from '../card-data';
 import { hasPresence } from '../engine/map-state';
 import type { AiMove } from './random-ai';
+import { pickHouseAction } from './house-ai';
 import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
 import { takePhaseSnapshot, type PhaseSnapshot } from './game-phase';
 import { lookaheadPick, type SimulateMoveFn, type RolloutToTurnEndFn } from './lookahead';
@@ -535,6 +536,13 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   }
 
   const me = G.players[currentPlayer];
+
+  // 2a. A house ability (or the reserved-card recruit), if useful right now
+  // — see ai/house-ai.ts. Checked before card-play/board-actions/recruit;
+  // re-run every decision tick, so this alone interleaves house actions
+  // correctly through the turn without a separate "early"/"late" phase.
+  const houseMove = pickHouseAction(G, currentPlayer);
+  if (houseMove) return houseMove;
 
   // 3a. Play all hand cards first (always strictly better than not playing).
   //
