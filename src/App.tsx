@@ -1677,9 +1677,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         Player P{Number(me) + 1} ({p.color}) — Turn: P{Number(ctx.currentPlayer) + 1} {myTurn ? '(your turn)' : ''}
         {' · '}Power: {p.power} · Influence: {p.influence}
         {' · '}{pileButton('Deck', p.deck.length, () => { setPilePlayer(null); setPileView('deck'); })}
-        {' · '}{pileButton('Discard', p.discard.length, () => { setPilePlayer(null); setPileView('discard'); })}
+        {/* {' · '}{pileButton('Discard', p.discard.length, () => { setPilePlayer(null); setPileView('discard'); })}
         {' · '}{pileButton('Inner Circle', p.innerCircle.length, () => { setPilePlayer(null); setPileView('inner'); })}
-        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => { setPilePlayer(null); setPileView('trophy'); })}
+        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => { setPilePlayer(null); setPileView('trophy'); })} */}
         {' · '}Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
         {' · '}<b style={{ color: '#ffcc44' }}>VP: {p.vp}</b>
         {G.endGameTriggeredAtTurn !== null && <span style={{ color: '#ffcc44', marginLeft: 8 }}>· Final round!</span>}

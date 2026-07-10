@@ -580,18 +580,27 @@ export const TyrantsGame: Game<TyrantsState> = {
       ? [setupData.humanColor, ...COLORS.filter(c => c !== setupData.humanColor)]
       : COLORS;
     const housesEnabled = !!setupData?.houses?.enabled;
-    const houseIds = HOUSES.map(h => h.id);
-    const randomHouse = (): HouseId | null =>
-      houseIds.length > 0 ? houseIds[Math.floor(rng() * houseIds.length)] : null;
+    // Assign each seat a distinct house — no two players may share one. The
+    // human's explicit pick (if any) is reserved for seat 0 first; every
+    // other seat draws from a single shuffle of the remaining houses, so
+    // there's no chance of a repeat (the old per-seat independent random
+    // pick could hand the same house to two players).
+    const houseAssignment: (HouseId | null)[] = new Array(ctx.numPlayers).fill(null);
+    if (housesEnabled) {
+      const humanPick = setupData?.houses?.humanHouse;
+      const reserved = humanPick && humanPick !== 'random' ? humanPick : null;
+      if (reserved) houseAssignment[0] = reserved;
+      const pool = shuffle(HOUSES.map(h => h.id).filter(id => id !== reserved), rng);
+      let poolIdx = 0;
+      for (let i = 0; i < ctx.numPlayers; i++) {
+        if (houseAssignment[i] == null) houseAssignment[i] = pool[poolIdx++] ?? null;
+      }
+    }
     const players: Record<string, PlayerData> = {};
     for (let i = 0; i < ctx.numPlayers; i++) {
       const deck = shuffle(startingDeck(), rng);
       const hand = deck.splice(0, HAND_SIZE);
-      let house: HouseId | null = null;
-      if (housesEnabled) {
-        const humanPick = i === 0 ? setupData?.houses?.humanHouse : undefined;
-        house = (humanPick && humanPick !== 'random') ? humanPick : randomHouse();
-      }
+      const house = houseAssignment[i];
       const houseState = freshHouseState();
       if (house === 'nasadra') houseState.data.startingDeploysRemaining = 3;
       players[String(i)] = {
