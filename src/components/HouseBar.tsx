@@ -11,8 +11,11 @@ interface HouseBarProps {
   moves: Record<string, (...args: unknown[]) => void>;
 }
 
-/** Toolbar of the acting player's house abilities — a passive-ability strip
- *  plus action buttons, styled to sit alongside the existing action bar.
+/** Toolbar of the acting player's clickable house action abilities, styled
+ *  to sit alongside the existing action bar. Passive and automatic
+ *  end-of-turn abilities are hidden here for now (they still apply/fire in
+ *  game logic as normal) — the full ability list including those is
+ *  available via the House info popup (Scoreboard's "House: X" link).
  *  Renders nothing when houses are off / this player has no house. */
 export function HouseBar({ G, pid, myTurn, moves }: HouseBarProps) {
   const player = G.players[pid];
@@ -29,23 +32,12 @@ export function HouseBar({ G, pid, myTurn, moves }: HouseBarProps) {
       border: '1px solid #3a2055', borderRadius: 4,
       display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'center',
     }}>
-      <span style={{ fontSize: 12, opacity: 0.65, marginRight: 4 }}>House {house.name}:</span>
+      <span style={{ fontSize: 12, opacity: 0.65, marginRight: 4, width: '100%' }}>House {house.name}:</span>
       {house.abilities.map(ability => {
-        if (ability.kind === 'passive' || ability.endOfTurn) {
-          const used = ability.endOfTurn && player.houseState.usedThisTurn[ability.key];
-          return (
-            <span
-              key={ability.key}
-              title={`${ability.text}${ability.endOfTurn ? (used ? ' — already offered this turn.' : ' — offered automatically when you end your turn.') : ''}`}
-              style={{
-                padding: '4px 10px', borderRadius: 4, fontSize: 12,
-                background: '#2a1840', color: '#b69cff', border: '1px dashed #5a3380',
-                cursor: 'help', opacity: ability.endOfTurn && used ? 0.55 : 1,
-              }}>
-              {ability.name}{ability.endOfTurn ? ' (end of turn)' : ''}
-            </span>
-          );
-        }
+        // Passive and automatic end-of-turn abilities have no button to
+        // click — hidden here for now; see the House info popup for the
+        // full list (Scoreboard's "House: X" link).
+        if (ability.kind === 'passive' || ability.endOfTurn) return null;
 
         const used = ability.frequency === 'turn' ? player.houseState.usedThisTurn[ability.key]
           : ability.frequency === 'game' ? player.houseState.usedThisGame[ability.key]
@@ -55,22 +47,24 @@ export function HouseBar({ G, pid, myTurn, moves }: HouseBarProps) {
         const enabled = canAct && !used && conditionOk;
         const freqTag = ability.frequency === 'turn' ? ' (once/turn)'
           : ability.frequency === 'game' ? ' (once/game)' : '';
+        const statusNote = used ? ' — already used.' : !conditionOk ? ' — not usable right now.' : '';
 
         return (
           <button
             key={ability.key}
             disabled={!enabled}
-            title={`${ability.text}${used ? ' — already used.' : !conditionOk ? ' — not usable right now.' : ''}`}
+            title={`${ability.text}${statusNote}`}
             onClick={() => moves.houseAction(ability.key)}
             style={{
-              padding: '6px 12px', borderRadius: 4, fontSize: 12,
+              padding: '6px 12px', borderRadius: 4, fontSize: 12, minWidth: 160, maxWidth: 260, textAlign: 'left',
               background: enabled ? '#5a3380' : '#2a1840',
               color: enabled ? '#fff' : '#776',
               border: '1px solid #3a2055',
               cursor: enabled ? 'pointer' : 'not-allowed',
               opacity: enabled ? 1 : 0.55,
             }}>
-            {ability.name}{freqTag}{used ? ' ✓' : ''}
+            <div style={{ fontWeight: 600 }}>{ability.name}{freqTag}{used ? ' ✓' : ''}</div>
+            <div style={{ opacity: 0.85, fontWeight: 'normal', marginTop: 2 }}>{ability.text}{statusNote}</div>
           </button>
         );
       })}
@@ -80,14 +74,17 @@ export function HouseBar({ G, pid, myTurn, moves }: HouseBarProps) {
           title="Recruit the market card reserved for you (Web of Debts), at 1 less Influence."
           onClick={() => moves.recruitReservedCard()}
           style={{
-            padding: '6px 12px', borderRadius: 4, fontSize: 12,
+            padding: '6px 12px', borderRadius: 4, fontSize: 12, minWidth: 160, maxWidth: 260, textAlign: 'left',
             background: canAct ? '#5a3380' : '#2a1840',
             color: canAct ? '#fff' : '#776',
             border: '1px solid #3a2055',
             cursor: canAct ? 'pointer' : 'not-allowed',
             opacity: canAct ? 1 : 0.55,
           }}>
-          Recruit reserved card
+          <div style={{ fontWeight: 600 }}>Recruit reserved card</div>
+          <div style={{ opacity: 0.85, fontWeight: 'normal', marginTop: 2 }}>
+            Recruit the market card reserved for you (Web of Debts), at 1 less Influence.
+          </div>
         </button>
       )}
     </div>

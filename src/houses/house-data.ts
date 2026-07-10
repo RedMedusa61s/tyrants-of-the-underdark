@@ -34,6 +34,9 @@ export interface HouseAbilityData {
 export interface HouseData {
   id: HouseId;
   name: string;
+  /** Flavor line printed on the house card, shown in the House Bar / Lobby
+   *  preview / House info popup. */
+  motto?: string;
   abilities: HouseAbilityData[];
 }
 
@@ -41,6 +44,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'do-urden',
     name: "Do'Urden",
+    motto: 'Only fools rush. The wise prepare.',
     abilities: [
       {
         key: 'silken-snare',
@@ -60,6 +64,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'fey-branche',
     name: 'Fey-Branche',
+    motto: 'The city watches — and Lolth remembers who honors her most loudly.',
     abilities: [
       {
         key: 'ceremonial-elevation',
@@ -79,6 +84,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'agrach-dyrr',
     name: 'Agrach Dyrr',
+    motto: 'Death is not an ending. It is an opportunity.',
     abilities: [
       {
         key: 'tunnel-patrols',
@@ -99,6 +105,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'nasadra',
     name: 'Nasadra',
+    motto: 'Ched Nasad stands because we will it so.',
     abilities: [
       {
         key: 'first-house-privilege',
@@ -118,6 +125,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'baenre',
     name: 'Baenre',
+    motto: 'Power is not seized. It is acknowledged.',
     abilities: [
       {
         key: 'lolths-favor',
@@ -137,6 +145,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'barrison-delarmgo',
     name: "Barrison Del'Armgo",
+    motto: 'A city taken is a city held.',
     abilities: [
       {
         key: 'conquest-doctrine',
@@ -156,6 +165,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'faen-tlabbar',
     name: 'Faen Tlabbar',
+    motto: 'A whispered secret can rule where armies fail.',
     abilities: [
       {
         key: 'eyes-everywhere',
@@ -181,6 +191,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'xorlarrin',
     name: 'Xorlarrin',
+    motto: "Progress demands sacrifice — preferably someone else's.",
     abilities: [
       {
         key: 'forbidden-knowledge',
@@ -201,6 +212,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'hunett',
     name: "Hun'ett",
+    motto: 'Every death buys another favor.',
     abilities: [
       {
         key: 'death-from-the-shadows',
@@ -219,6 +231,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'mizzrym',
     name: 'Mizzrym',
+    motto: 'Everything has a price — we simply decide when it is paid.',
     abilities: [
       {
         key: 'shrewd-bargains',
@@ -239,6 +252,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'oblodra',
     name: 'Oblodra',
+    motto: 'Your thoughts were never truly yours.',
     abilities: [
       {
         key: 'precognitive-glimpse',
@@ -259,6 +273,7 @@ export const HOUSES: HouseData[] = [
   {
     id: 'melarn',
     name: 'Melarn',
+    motto: 'Devotion is the foundation of power.',
     abilities: [
       {
         key: 'established-shrines',

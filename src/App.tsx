@@ -36,6 +36,8 @@ import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { lookupCard } from './card-data';
 import { scoreAll } from './engine/scoring';
 import { HouseBar } from './components/HouseBar';
+import { HouseInfoModal } from './components/HouseInfoModal';
+import { HOUSES_BY_ID } from './houses/house-data';
 import { HouseSelect, type HousePick } from './components/HouseSelect';
 
 const HUMAN_SEAT = '0';
@@ -416,6 +418,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // player can be inspected from the scoreboard (#82, Drew W.). Deck and hand
   // stay private and are never offered for opponents.
   const [pilePlayer, setPilePlayer] = useState<string | null>(null);
+  // Which player's house info popup is open, if any (Scoreboard "House: X" link).
+  const [houseInfoPid, setHouseInfoPid] = useState<string | null>(null);
   // "Play all basic": when true, the driver effect auto-plays non-interactive
   // hand cards one at a time until none remain (#66).
   const [playingAll, setPlayingAll] = useState(false);
@@ -1168,6 +1172,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
 
   const actionBar = (
     <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 13, opacity: 0.85 }}>Power: <b>{p.power}</b></span>
       {actionBtn(deployLabel, canDeploy, baseAction?.kind === 'deploy',
         () => setBaseAction(baseAction?.kind === 'deploy' ? null : { kind: 'deploy' }))}
       {actionBtn(`Assassinate (${assassinateCost} Power)`, canAssassinate, baseAction?.kind === 'assassinate',
@@ -1607,6 +1612,13 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </button>
       </div>
       {pileViewOverlay}
+      {houseInfoPid && G.players[houseInfoPid]?.house && (
+        <HouseInfoModal
+          houseId={G.players[houseInfoPid].house!}
+          playerLabel={houseInfoPid === me ? 'Your' : `P${Number(houseInfoPid) + 1}'s`}
+          onClose={() => setHouseInfoPid(null)}
+        />
+      )}
       {fixNoteQueue.length > 0 && (
         <BugFixResponseDialog
           update={fixNoteQueue[0]}
@@ -1745,6 +1757,20 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                     {link('inner-circle', pl.innerCircle.length, pid, 'inner')}
                     <span style={{ opacity: 0.55 }}>·</span>
                     {link('trophies', trophies, pid, 'trophy')}
+                    {pl.house && (
+                      <>
+                        <span style={{ opacity: 0.55 }}>·</span>
+                        <button
+                          onClick={() => setHouseInfoPid(pid)}
+                          title={`View P${Number(pid) + 1}'s house`}
+                          style={{
+                            background: 'none', border: 'none', padding: 0, font: 'inherit',
+                            color: '#9ecbff', cursor: 'pointer', textDecoration: 'underline',
+                          }}>
+                          House: {HOUSES_BY_ID[pl.house].name}
+                        </button>
+                      </>
+                    )}
                     <span style={{ opacity: 0.55 }}>·</span>
                     <span
                       title="Troops left in barracks. The game ends when any player's barracks reach 0."
@@ -2077,7 +2103,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </div>
 
         <h2 style={{ marginTop: 24 }}>
-          Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck</span>
+          Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck · Influence: {p.influence}</span>
         </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
           {/* Rotating market row (6 slots from the chosen half-decks). */}
@@ -2687,7 +2713,7 @@ function SplitPlayView(props: {
           </div>
           <div style={{ flex: '2 1 480px', minWidth: 360 }}>
             <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85 }}>
-              Market <span style={{ opacity: 0.6, fontWeight: 'normal' }}>· {G.market.deck.length} left in deck</span>
+              Market <span style={{ opacity: 0.6, fontWeight: 'normal' }}>· {G.market.deck.length} left in deck · Influence: {p.influence}</span>
             </h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
               {G.market.row.map((c, i) => {
