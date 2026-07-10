@@ -30,9 +30,9 @@ export function HouseBar({ G, pid, myTurn, moves }: HouseBarProps) {
     <div style={{
       marginTop: 12, padding: '8px 12px', background: '#241638',
       border: '1px solid #3a2055', borderRadius: 4,
-      display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', justifyContent: 'center',
+      display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'stretch',
     }}>
-      <span style={{ fontSize: 12, opacity: 0.65, marginRight: 4, width: '100%' }}>House {house.name}:</span>
+      <span style={{ fontSize: 12, opacity: 0.65 }}>House {house.name}:</span>
       {house.abilities.map(ability => {
         // Passive and automatic end-of-turn abilities have no button to
         // click — hidden here for now; see the House info popup for the
@@ -50,42 +50,45 @@ export function HouseBar({ G, pid, myTurn, moves }: HouseBarProps) {
         const statusNote = used ? ' — already used.' : !conditionOk ? ' — not usable right now.' : '';
 
         return (
-          <button
-            key={ability.key}
-            disabled={!enabled}
-            title={`${ability.text}${statusNote}`}
-            onClick={() => moves.houseAction(ability.key)}
-            style={{
-              padding: '6px 12px', borderRadius: 4, fontSize: 12, minWidth: 160, maxWidth: 260, textAlign: 'left',
-              background: enabled ? '#5a3380' : '#2a1840',
-              color: enabled ? '#fff' : '#776',
-              border: '1px solid #3a2055',
-              cursor: enabled ? 'pointer' : 'not-allowed',
-              opacity: enabled ? 1 : 0.55,
-            }}>
-            <div style={{ fontWeight: 600 }}>{ability.name}{freqTag}{used ? ' ✓' : ''}</div>
-            <div style={{ opacity: 0.85, fontWeight: 'normal', marginTop: 2 }}>{ability.text}{statusNote}</div>
-          </button>
+          <div key={ability.key}>
+            <button
+              disabled={!enabled}
+              title={`${ability.text}${statusNote}`}
+              onClick={() => moves.houseAction(ability.key)}
+              style={{
+                width: '100%', padding: '6px 12px', borderRadius: 4, fontSize: 12, textAlign: 'left', fontWeight: 600,
+                background: enabled ? '#5a3380' : '#2a1840',
+                color: enabled ? '#fff' : '#776',
+                border: '1px solid #3a2055',
+                cursor: enabled ? 'pointer' : 'not-allowed',
+                opacity: enabled ? 1 : 0.55,
+              }}>
+              {ability.name}{freqTag}{used ? ' ✓' : ''}
+            </button>
+            <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>{ability.text}{statusNote}</div>
+          </div>
         );
       })}
       {player.houseState.data.reservedMarketCard != null && (
-        <button
-          disabled={!canAct}
-          title="Recruit the market card reserved for you (Web of Debts), at 1 less Influence."
-          onClick={() => moves.recruitReservedCard()}
-          style={{
-            padding: '6px 12px', borderRadius: 4, fontSize: 12, minWidth: 160, maxWidth: 260, textAlign: 'left',
-            background: canAct ? '#5a3380' : '#2a1840',
-            color: canAct ? '#fff' : '#776',
-            border: '1px solid #3a2055',
-            cursor: canAct ? 'pointer' : 'not-allowed',
-            opacity: canAct ? 1 : 0.55,
-          }}>
-          <div style={{ fontWeight: 600 }}>Recruit reserved card</div>
-          <div style={{ opacity: 0.85, fontWeight: 'normal', marginTop: 2 }}>
+        <div>
+          <button
+            disabled={!canAct}
+            title="Recruit the market card reserved for you (Web of Debts), at 1 less Influence."
+            onClick={() => moves.recruitReservedCard()}
+            style={{
+              width: '100%', padding: '6px 12px', borderRadius: 4, fontSize: 12, textAlign: 'left', fontWeight: 600,
+              background: canAct ? '#5a3380' : '#2a1840',
+              color: canAct ? '#fff' : '#776',
+              border: '1px solid #3a2055',
+              cursor: canAct ? 'pointer' : 'not-allowed',
+              opacity: canAct ? 1 : 0.55,
+            }}>
+            Recruit reserved card
+          </button>
+          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
             Recruit the market card reserved for you (Web of Debts), at 1 less Influence.
           </div>
-        </button>
+        </div>
       )}
     </div>
   );
