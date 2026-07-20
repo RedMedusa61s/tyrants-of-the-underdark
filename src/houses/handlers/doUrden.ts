@@ -17,6 +17,7 @@ function setAsideCard(): EffectHandler {
         Mechanics.log(ctx.G, '(Silken Snare: your hand is empty — skipped)');
         return true;
       }
+      if (!Mechanics.expendInfluence(ctx.G, ctx.actorId, 1)) return true;
       ctx.pendingChoice = {
         kind: 'select-card-in-hand',
         prompt: 'Silken Snare: set aside which card? (returns to your hand at the start of your next turn)',
@@ -38,7 +39,10 @@ function setAsideCard(): EffectHandler {
   };
 }
 
-HouseRegistry.registerAction('do-urden', 'silken-snare', { handler: setAsideCard() });
+HouseRegistry.registerAction('do-urden', 'silken-snare', {
+  handler: setAsideCard(),
+  available: (G, actorId) => G.players[actorId].influence >= 1,
+});
 
 HouseRegistry.registerPassives('do-urden', {
   onTurnBegin(G, pid) {

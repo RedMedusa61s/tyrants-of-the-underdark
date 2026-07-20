@@ -7,7 +7,7 @@
 import { CardRegistry } from './registry';
 import { Mechanics } from './mechanics';
 import type { EffectContext, EffectHandler, PendingChoice } from './types';
-import { placeSpy, assassinateTroop, deployTroop, hasPresence, returnSpy, returnTroop, moveTroop } from './map-state';
+import { placeSpy, assassinateTroop, deployTroop, hasPresence, hasPhantomPresence, returnSpy, returnTroop, moveTroop, siteOf } from './map-state';
 import { SITES } from '../data/sites';
 import { ROUTES } from '../data/routes';
 import { TROOP_SPACES, sitesSpaces, routeSpaces } from '../data/troop-spaces';
@@ -630,7 +630,12 @@ export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; 
     const eligible = spacesWithPresence(ctx.G, me.color).filter(id => {
       const occ = ctx.G.troops[id];
       if (!occ || occ === me.color) return false;
-      if (opts?.whiteOnly && occ !== 'white') return false;
+      if (opts?.whiteOnly && occ !== 'white') {
+        // Hun'ett's Death from the Shadows lifts the white-only restriction
+        // at a site where it granted presence this turn.
+        const siteId = siteOf(id);
+        if (!siteId || !hasPhantomPresence(ctx.G, me.color, siteId)) return false;
+      }
       if (opts?.sameSite && state.site && siteKeyOf(id) !== state.site) return false;
       return true;
     });
@@ -1659,7 +1664,11 @@ export function playerCanAssassinate(
     if (!(t.id in G.troops)) continue; // outside active sections
     const occ = G.troops[t.id];
     if (!occ || occ === me.color) continue;
-    if (opts?.whiteOnly && occ !== 'white') continue;
+    if (opts?.whiteOnly && occ !== 'white') {
+      // Hun'ett's Death from the Shadows lifts the white-only restriction
+      // at a site where it granted presence this turn.
+      if (!t.parentSite || !hasPhantomPresence(G, me.color, t.parentSite)) continue;
+    }
     if (t.parentSite && hasPresence(G, me.color, { site: t.parentSite })) return true;
     if (t.parentRoute && hasPresence(G, me.color, { space: t.id })) return true;
   }

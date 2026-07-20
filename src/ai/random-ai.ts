@@ -84,11 +84,14 @@ export function decideAiMove(G: TyrantsState, currentPlayer: string): AiMove | n
 
   // 2. Setup phase: pick a random empty starting site.
   if (G.setupPhase) {
-    const open = SITES.filter(s =>
-      s.isStartingSite && s.id in G.siteControl &&
-      sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
-      !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
-    );
+    const chosenSite = G.players[currentPlayer]?.houseState.data.startingSiteChosen as string | undefined;
+    const open = chosenSite
+      ? SITES.filter(s => s.id === chosenSite)
+      : SITES.filter(s =>
+          s.isStartingSite && s.id in G.siteControl &&
+          sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
+          !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
+        );
     const pick = pickRandom(open);
     return pick ? { name: 'deployStartingTroop', args: [pick.id] } : null;
   }

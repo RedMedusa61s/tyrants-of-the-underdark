@@ -7,7 +7,7 @@ import { Mechanics } from '../../engine/mechanics';
 import type { EffectHandler } from '../../engine/types';
 
 HouseRegistry.registerAction('xorlarrin', 'forbidden-knowledge', {
-  handler: devourFromHandCost(grant({ power: 2 }), { promptLabel: 'Forbidden Knowledge: devour a card from your hand for +2 Power?' }),
+  handler: devourFromHandCost(grant({ influence: 1 }), { promptLabel: 'Forbidden Knowledge: devour a card from your hand for +1 Influence?' }),
   available: (G, actorId) => hasTotalControlOfMarkerSite(G, actorId),
 });
 

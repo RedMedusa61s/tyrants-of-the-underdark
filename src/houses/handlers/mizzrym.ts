@@ -8,9 +8,9 @@ import type { EffectHandler, PendingChoice } from '../../engine/types';
 
 HouseRegistry.registerAction('mizzrym', 'shrewd-bargains', {
   handler: chooseOne(
-    { label: 'Pay 2 Power \u2192 gain 2 Influence', handler: convert({ power: 2 }, { influence: 2 }),
+    { label: 'Pay 2 Power \u2192 gain 1 Influence', handler: convert({ power: 2 }, { influence: 1 }),
       available: (G, actorId) => G.players[actorId].power >= 2 },
-    { label: 'Pay 2 Influence \u2192 gain 2 Power', handler: convert({ influence: 2 }, { power: 2 }),
+    { label: 'Pay 2 Influence \u2192 gain 1 Power', handler: convert({ influence: 2 }, { power: 1 }),
       available: (G, actorId) => G.players[actorId].influence >= 2 },
   ),
 });

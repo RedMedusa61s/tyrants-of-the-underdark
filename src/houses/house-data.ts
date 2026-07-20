@@ -49,7 +49,7 @@ export const HOUSES: HouseData[] = [
       {
         key: 'silken-snare',
         name: 'Silken Snare',
-        text: 'Once per turn: Set aside 1 card from your hand face down. At the start of your next turn, reveal that card and return it to your hand.',
+        text: 'Once per turn, pay 1 Influence: Set aside 1 card from your hand face down. At the start of your next turn, reveal that card and return it to your hand.',
         kind: 'action',
         frequency: 'turn',
       },
@@ -116,7 +116,7 @@ export const HOUSES: HouseData[] = [
       {
         key: 'web-of-debts',
         name: 'Web of Debts',
-        text: "Remove a card from the market row and place it face up in front of you. That card is reserved for you and may only be recruited by you — when you recruit it, it costs 1 less Influence. You can't use Web of Debts while you have a reserved card.",
+        text: "Pay 3 Influence: Remove a card from the market row and place it face up in front of you. That card is reserved for you and may only be recruited by you — when you recruit it, it costs 1 less Influence. You can't use Web of Debts while you have a reserved card.",
         kind: 'action',
         frequency: 'turn',
       },
@@ -130,7 +130,7 @@ export const HOUSES: HouseData[] = [
       {
         key: 'lolths-favor',
         name: "Lolth's Favor",
-        text: 'At the start of your turn, if you control 4 or more sites, gain 1 Power.',
+        text: 'At the start of your turn, if you control 4 or more sites, gain 1 Influence.',
         kind: 'passive',
       },
       {
@@ -183,7 +183,7 @@ export const HOUSES: HouseData[] = [
       {
         key: 'web-of-informants',
         name: 'Web of Informants',
-        text: 'Once per turn: if you have 3 spies in play, gain 1 Influence; if you have 5 spies, gain 1 Power and 1 Influence instead.',
+        text: 'Once per turn: if you have 3 spies in play, gain 1 Influence; if you have 5 spies, gain 2 Influence instead.',
         kind: 'passive',
       },
     ],
@@ -196,7 +196,7 @@ export const HOUSES: HouseData[] = [
       {
         key: 'forbidden-knowledge',
         name: 'Forbidden Knowledge',
-        text: 'Once per turn: If you have total control of a site with a control marker, you may devour a card from your hand to gain 2 Power.',
+        text: 'Once per turn: If you have total control of a site with a control marker, you may devour a card from your hand to gain 1 Influence.',
         kind: 'action',
         frequency: 'turn',
       },
@@ -217,13 +217,13 @@ export const HOUSES: HouseData[] = [
       {
         key: 'death-from-the-shadows',
         name: 'Death from the Shadows',
-        text: "Return one of your spies to assassinate a troop at that site. (Printed text also lets a would-be white-troop assassination redirect to another player's troop there — not modeled; any troop at the site, white or otherwise, is a legal target here.)",
+        text: "Return one of your spies. Until the end of the turn, you're still considered to have presence at that site, and an assassination performed there this turn that would otherwise be restricted to white troops only may target a player's troop instead.",
         kind: 'action',
       },
       {
         key: 'paid-in-blood',
         name: 'Paid in Blood',
-        text: 'Once per turn, when you assassinate a troop: gain 1 Power.',
+        text: 'Once per turn, when you assassinate a troop: gain 1 Influence.',
         kind: 'passive',
       },
     ],
@@ -236,7 +236,7 @@ export const HOUSES: HouseData[] = [
       {
         key: 'shrewd-bargains',
         name: 'Shrewd Bargains',
-        text: 'Once per turn, choose one: pay 2 Power to gain 2 Influence, or pay 2 Influence to gain 2 Power.',
+        text: 'Once per turn, choose one: pay 2 Power to gain 1 Influence, or pay 2 Influence to gain 1 Power.',
         kind: 'action',
         frequency: 'turn',
       },
