@@ -963,12 +963,17 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     // sites that isn't already occupied by another player." White troops
     // printed at a starting site don't block it (the player drops into the
     // next empty slot) — but ANY non-white troop means a rival player has
-    // already claimed it, so it's off-limits.
-    ? new Set(SITES.filter(s =>
-        s.isStartingSite && s.id in G.siteControl &&
-        sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
-        !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
-      ).map(s => s.id))
+    // already claimed it, so it's off-limits. Houses that deploy more than 1
+    // starting troop (Nasadra's First House's Privilege) lock onto whichever
+    // site their first deploy this setup turn used — the rest can't scatter
+    // across different starting sites.
+    ? (p.houseState.data.startingSiteChosen
+        ? new Set([p.houseState.data.startingSiteChosen as string])
+        : new Set(SITES.filter(s =>
+            s.isStartingSite && s.id in G.siteControl &&
+            sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
+            !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
+          ).map(s => s.id)))
     : humanSitePick
       ? new Set((humanSitePick.options as string[] | undefined) ?? SITES.map(s => s.id))
       : baseActionClickableSites;

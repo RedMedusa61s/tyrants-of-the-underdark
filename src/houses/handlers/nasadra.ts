@@ -28,6 +28,7 @@ function reserveMarketCard(): EffectHandler {
         Mechanics.log(ctx.G, '(Web of Debts: market row is empty — skipped)');
         return true;
       }
+      if (!Mechanics.expendInfluence(ctx.G, ctx.actorId, 3)) return true;
       ctx.pendingChoice = {
         kind: 'select-market-card',
         prompt: 'Web of Debts: reserve which market card? (only you may recruit it, at 1 less Influence)',
@@ -54,7 +55,8 @@ function reserveMarketCard(): EffectHandler {
 
 HouseRegistry.registerAction('nasadra', 'web-of-debts', {
   handler: reserveMarketCard(),
-  available: (G, actorId) => !G.players[actorId].houseState.data[RESERVED_MARKET_CARD_KEY],
+  available: (G, actorId) => !G.players[actorId].houseState.data[RESERVED_MARKET_CARD_KEY]
+    && G.players[actorId].influence >= 3,
 });
 
 HouseRegistry.registerPassives('nasadra', {

@@ -156,9 +156,13 @@ function enumerateLegal(state: BgioState, actor: PlayerId): TyrantsAction[] {
   // 2. Setup phase: open starting sites.
   if (G.setupPhase) {
     const out: TyrantsAction[] = [];
+    const chosenSite = G.players[actor]?.houseState.data.startingSiteChosen as string | undefined;
     for (const s of SITES) {
       if (!s.isStartingSite) continue;
       if (!(s.id in G.siteControl)) continue;
+      // Multi-troop starting deploys (Nasadra) lock onto the site the first
+      // deploy this setup turn used — see game.ts's deployStartingTroop.
+      if (chosenSite && s.id !== chosenSite) continue;
       const spaces = sitesSpaces(s.id);
       const hasOpen = spaces.some(sp => !G.troops[sp.id]);
       const rivalHeld = spaces.some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white');

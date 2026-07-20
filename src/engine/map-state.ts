@@ -71,11 +71,22 @@ function hasTroopAtSite(G: TyrantsState, color: Color, siteId: SiteId): boolean 
 }
 
 /** Compute whether `color` has presence at the given site (rulebook p.10). */
+/** True when `color` has been granted temporary presence at `siteId` by
+ *  Hun'ett's Death from the Shadows (returning a spy from there still
+ *  counts as presence, until the end of the turn, even after the spy is
+ *  gone). Also used by assassinate target filters to lift the "white
+ *  troops only" restriction some card effects print, at that site. */
+export function hasPhantomPresence(G: TyrantsState, color: Color, siteId: SiteId): boolean {
+  return (G.phantomPresenceSites?.[siteId] ?? []).includes(color);
+}
+
 export function hasPresenceAtSite(G: TyrantsState, color: Color, siteId: SiteId): boolean {
   // (a) Spy at the site
   if ((G.spies[siteId] ?? []).includes(color)) return true;
   // (b) Troop in a site space
   if (hasTroopAtSite(G, color, siteId)) return true;
+  // (b2) Phantom presence granted by Hun'ett's Death from the Shadows.
+  if (hasPhantomPresence(G, color, siteId)) return true;
   // (c) Either a troop in the route-space *adjacent to* the site (endmost of the
   // touching route — not mid-route), OR — for routes with zero spaces (sites that
   // touch each other directly) — a troop at the other endpoint site.

@@ -29,9 +29,8 @@ HouseRegistry.registerPassives('faen-tlabbar', {
     const p = G.players[pid];
     const n = spyCount(G, p.color);
     if (n >= 5) {
-      Mechanics.gainPower(G, pid, 1);
-      Mechanics.gainInfluence(G, pid, 1);
-      Mechanics.log(G, `P${Number(pid) + 1} +1 Power, +1 Influence (Web of Informants — ${n} spies)`);
+      Mechanics.gainInfluence(G, pid, 2);
+      Mechanics.log(G, `P${Number(pid) + 1} +2 Influence (Web of Informants — ${n} spies)`);
     } else if (n >= 3) {
       Mechanics.gainInfluence(G, pid, 1);
       Mechanics.log(G, `P${Number(pid) + 1} +1 Influence (Web of Informants — ${n} spies)`);

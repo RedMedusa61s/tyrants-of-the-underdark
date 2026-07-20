@@ -57,8 +57,8 @@ HouseRegistry.registerPassives('baenre', {
     const color = G.players[pid].color;
     const controlled = Object.values(G.siteControl).filter(c => c === color).length;
     if (controlled >= 4) {
-      Mechanics.gainPower(G, pid, 1);
-      Mechanics.log(G, `P${Number(pid) + 1} +1 Power (Lolth's Favor — controls ${controlled} sites)`);
+      Mechanics.gainInfluence(G, pid, 1);
+      Mechanics.log(G, `P${Number(pid) + 1} +1 Influence (Lolth's Favor — controls ${controlled} sites)`);
     }
   },
 });

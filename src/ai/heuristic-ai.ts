@@ -509,11 +509,14 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
 
   // 2. Setup phase.
   if (G.setupPhase) {
-    const open = SITES.filter(s =>
-      s.isStartingSite && s.id in G.siteControl &&
-      sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
-      !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
-    );
+    const chosenSite = G.players[currentPlayer]?.houseState.data.startingSiteChosen as string | undefined;
+    const open = chosenSite
+      ? SITES.filter(s => s.id === chosenSite)
+      : SITES.filter(s =>
+          s.isStartingSite && s.id in G.siteControl &&
+          sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
+          !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
+        );
     // Prefer a starting site with a control marker / highest VP, then sample
     // among the top few (weighted by rank) so the AI doesn't open at the same
     // site every game — keeps the strongest most likely but adds variety (#83).

@@ -190,6 +190,15 @@ export interface TyrantsState {
    *  at end of turn but got no VP" bug. Cleared each turn at onBegin. */
   markerTcGrantedThisTurn: string[];
 
+  /** SiteIds where a color has been granted temporary presence (Hun'ett's
+   *  Death from the Shadows: returning a spy still counts as presence at
+   *  that site until the end of the turn), even without a troop or spy of
+   *  theirs physically there. Consulted by map-state.ts's hasPresenceAtSite
+   *  and by the whiteOnly-restricted assassinate filters (which it also
+   *  frees to target a player's troop, not just white, at that site).
+   *  Cleared at turn.onEnd. */
+  phantomPresenceSites: Partial<Record<string, Color[]>>;
+
   /** Color of the player whose turn it currently is. Mirrors
    *  G.players[ctx.currentPlayer].color so engine code that doesn't get ctx
    *  (notably recomputeSiteControl in map-state.ts) can still know who's
@@ -678,6 +687,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       devouredPile: [],
       markerInfluenceGrantedThisTurn: [],
       markerTcGrantedThisTurn: [],
+      phantomPresenceSites: {},
       activeTurnColor: null,
       turnLogStart: 0,
       turnLogs: [],
@@ -732,6 +742,9 @@ export const TyrantsGame: Game<TyrantsState> = {
       G.markerInfluenceGrantedThisTurn = [];
       // Backfill on legacy saves loaded before this field existed.
       G.markerTcGrantedThisTurn = [];
+      // Hun'ett's Death from the Shadows presence grant only lasts through the
+      // turn it was cast — reset (and backfill legacy saves) every turn.
+      G.phantomPresenceSites = {};
       if (!G.devouredPile) G.devouredPile = [];
       if (!G.marketVpTokens) G.marketVpTokens = {};
 
@@ -867,9 +880,17 @@ export const TyrantsGame: Game<TyrantsState> = {
         const occ = G.troops[sp.id];
         return occ && occ !== 'white' && occ !== color;
       })) return INVALID_MOVE;
+      // Multi-troop starting deploys (Nasadra's First House's Privilege: 3
+      // troops instead of 1) all go to the SAME chosen starting site — this
+      // isn't 3 independent site picks. Lock to whichever site the first
+      // deploy this setup turn used.
+      const chosenSiteKey = 'startingSiteChosen';
+      const chosenSite = player.houseState.data[chosenSiteKey] as string | undefined;
+      if (chosenSite && siteId !== chosenSite) return INVALID_MOVE;
       const space = sitesSpaces(siteId).find(sp => !G.troops[sp.id]);
       if (!space) return INVALID_MOVE;
       if (!deployTroop(G, color, space.id)) return INVALID_MOVE;
+      player.houseState.data[chosenSiteKey] = siteId;
       player.barracksLeft -= 1;
       Mechanics.log(G, `P${Number(pid) + 1} deployed starting troop at ${site.name}`);
 
