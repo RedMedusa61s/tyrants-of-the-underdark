@@ -1356,12 +1356,13 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     const ranked = Object.entries(scores).sort((a, b) => b[1].total - a[1].total);
     const winner = ranked[0];
     return (
-      <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ padding: 24, maxWidth: 'min(900px, 95vw)', margin: '0 auto', boxSizing: 'border-box' }}>
         <h1 style={{ margin: 0 }}>Game Over</h1>
         <div style={{ marginTop: 8, fontSize: 18 }}>
           Winner: <b>P{Number(winner[0]) + 1} ({G.players[winner[0]].color})</b> — {winner[1].total} VP
         </div>
-        <table style={{ marginTop: 24, width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ marginTop: 24, width: '100%', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #3a2055', textAlign: 'left' }}>
               <th style={{ padding: 4 }}>Player</th>
@@ -1438,6 +1439,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             })}
           </tbody>
         </table>
+        </div>
         <div style={{ marginTop: 16, opacity: 0.6, fontSize: 12 }}>
           {isOnline ? (
             <span>
