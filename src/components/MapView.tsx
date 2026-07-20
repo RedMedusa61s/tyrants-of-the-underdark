@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { SITES, type Site } from '../data/sites';
 import { ROUTES, type Route } from '../data/routes';
 import { sitesSpaces } from '../data/troop-spaces';
@@ -300,8 +301,41 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
   // all still render on top via the regular passes below.
   const useSchematic = isNoImagesMode() && !calibrate && !editRoutes;
 
+  // Pinch-to-zoom / pan on the map. Disabled entirely in calibrate/route-edit
+  // mode so the dev-only drag-to-reposition and click-to-link-sites tools keep
+  // their original raw mouse behavior (no competing pan gesture). `disabled`
+  // still mounts the wrapper (keeping the DOM/layout shape identical) but
+  // short-circuits all wheel/pinch/pan handling, so this is a no-op passthrough
+  // in those modes rather than a behavior change.
+  const zoomDisabled = calibrate || editRoutes;
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', maxWidth: 1200, margin: '0 auto' }}>
+    <TransformWrapper
+      disabled={zoomDisabled}
+      initialScale={1}
+      minScale={1}
+      maxScale={4}
+      centerOnInit
+      limitToBounds
+      doubleClick={{ disabled: true }}
+      // Require Ctrl/Cmd+wheel to zoom (Google-Maps/Figma convention) so a
+      // plain scroll over the map still scrolls the enclosing section
+      // (SplitPlayView's map box is `overflow: auto`) instead of both
+      // scrolling AND zooming at once — the library's wheel listener is
+      // passive and can't preventDefault the native scroll, so without this
+      // gate every wheel tick would do both simultaneously.
+      // activationKeys takes either a fixed list (ALL of which must be held —
+      // AND semantics) or a predicate over currently-pressed keys, which is
+      // what we need here: Ctrl on Windows/Linux OR Cmd on Mac, not both.
+      wheel={{ step: 0.2, activationKeys: (keys: string[]) => keys.includes('Control') || keys.includes('Meta') }}
+      pinch={{ step: 5 }}
+      panning={{ velocityDisabled: true }}
+    >
+      <TransformComponent
+        wrapperStyle={{ width: '100%', touchAction: 'pan-y' }}
+        contentStyle={{ width: '100%', display: 'block' }}
+      >
       {useSchematic ? (
         <div id="totu-board" style={{
           width: '100%', aspectRatio: '4646 / 4605',
@@ -855,6 +889,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           </details>
         </div>
       )}
+      </TransformComponent>
+    </TransformWrapper>
     </div>
   );
 }
