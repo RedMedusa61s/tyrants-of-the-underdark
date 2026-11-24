@@ -47,6 +47,8 @@ function toAction(move: AiMove | null): TyrantsAction | null {
     case 'deployTroop':         return { kind: 'deployTroop', spaceId: move.args[0] };
     case 'assassinateTroop':    return { kind: 'assassinateTroop', spaceId: move.args[0] };
     case 'returnEnemySpy':      return { kind: 'returnEnemySpy', siteId: move.args[0], targetColor: move.args[1] as Color };
+    case 'houseAction':         return { kind: 'houseAction', abilityKey: move.args[0] };
+    case 'recruitReservedCard': return { kind: 'recruitReservedCard' };
     case 'resolveChoice':       return { kind: 'resolveChoice', response: move.args[0] };
     case 'endTurn':             return { kind: 'endTurn' };
     default:                    return null;

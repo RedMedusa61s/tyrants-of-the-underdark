@@ -6,6 +6,8 @@
 
 import type { TyrantsState, CardRef } from '../game';
 import { logEvent, type LogMeta } from './log';
+import { HouseHooks } from '../houses/hooks';
+import { lookupCard } from '../card-data';
 
 function p(G: TyrantsState, playerId: string) {
   const player = G.players[playerId];
@@ -163,6 +165,20 @@ export const Mechanics = {
   recruitFromMarket(G: TyrantsState, playerId: string, marketIndex: number): boolean {
     const card = G.market.row[marketIndex];
     if (!card) return false;
+    // Mizzrym's Shadow Investment: if a VP token sits on this row slot, pay
+    // it out — to the token's owner if someone ELSE recruits the card; the
+    // token just clears with no bonus if the owner recruits their own pick.
+    const token = G.marketVpTokens?.[marketIndex];
+    if (token) {
+      if (token.pid !== playerId) {
+        const owner = G.players[token.pid];
+        if (owner) {
+          owner.vp += token.vp;
+          Mechanics.log(G, `P${Number(token.pid) + 1} +${token.vp} VP (Shadow Investment token on ${card.name})`);
+        }
+      }
+      delete G.marketVpTokens[marketIndex];
+    }
     p(G, playerId).discard.push(card);
     const refill = G.market.deck.shift() ?? null;
     // Refilling the row from the face-down market deck reveals a new card to
@@ -171,6 +187,8 @@ export const Mechanics = {
     G.market.row[marketIndex] = refill;
     Mechanics.log(G, `P${Number(playerId) + 1} recruited ${card.name}`,
       { kind: 'card.recruit', payload: { card: card.name, from: 'market' }, side: playerId });
+    const data = lookupCard(card.deck, card.slot);
+    if (data) HouseHooks.onRecruit(G, playerId, data);
     return true;
   },
 
@@ -188,10 +206,25 @@ export const Mechanics = {
     G.auxStacks[stack] -= 1;
     Mechanics.log(G, `P${Number(playerId) + 1} recruited ${card.name} (${G.auxStacks[stack]} left in stack)`,
       { kind: 'card.recruit', payload: { card: card.name, from: stack }, side: playerId });
+    const data = lookupCard(card.deck, card.slot);
+    if (data) HouseHooks.onRecruit(G, playerId, data);
     return true;
   },
 
   // -- map mutations come once we wire occupancy into TyrantsState --
   // deployTroop, assassinateTroop, moveTroop, placeSpy, returnTroop, returnSpy,
   // supplant, recomputeSiteControl
+
+  /** Mercenary card Sylgar:
+   * Once recruited, can never be promoted, devoured or forcibly discarded.
+   * Instead, the card remains in place and awards 1VP.
+   */
+  trySylgarReact(G: TyrantsState, playerId: string, card: CardRef): boolean {
+    if (card.name === 'Sylgar') {
+      G.players[playerId].vp += 1;
+      Mechanics.log(G, `P${Number(playerId) + 1} gained 1 VP and kept Sylgar in place (reactive)`);
+      return true; // Tells the caller to skip removing the card
+    }
+    return false;
+  },
 };

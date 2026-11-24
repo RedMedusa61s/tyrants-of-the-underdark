@@ -48,6 +48,14 @@ export const DECK_SHEETS: Record<string, SheetInfo> = (() => {
   for (const alias of ['starter-1', 'starter-2', 'starter-3', 'starter-4']) {
     if (drowSheet) out[alias] = drowSheet;
   }
+
+  out['mercenaries'] = {
+    url: '', // Explicitly blank; caught locally by your src/image-cache.ts override
+    cols: 10,
+    rows: 4,
+    width: 2400,
+    height: 1344
+  };
   return out;
 })();
 

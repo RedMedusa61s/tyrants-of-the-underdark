@@ -52,6 +52,20 @@ export interface PendingChoice {
    *  can spend the spy on a site where the follow-up has no legal target and
    *  only find out from a parenthetical log line. Reported as #105. */
   highlight?: string[];
+  /** For 'select-card-in-discard' prompts that browse an OPPONENT's discard
+   *  pile rather than the answering player's own (e.g. Nar'l Xibrindas'
+   *  "choose a card in an opponent's discard pile"). `playerId` still answers,
+   *  `options` are indices into `G.players[discardOwnerId].discard`. Unlike
+   *  `actorId`, this field is not overwritten by the resolveChoice dispatcher
+   *  when a handler suspends, so it survives across the prompt/resume cycle. */
+  discardOwnerId?: string;
+  /** For 'select-card-in-hand' prompts that browse an OPPONENT's hand rather
+   *  than the answering player's own (e.g. Jarlaxle's "look at an opponent's
+   *  hand and choose a card"). `playerId` still answers, `options` are
+   *  indices into `G.players[customHandTarget].hand`. Like `discardOwnerId`,
+   *  this survives the resolveChoice dispatcher's `actorId` override since
+   *  it's a distinct field. */
+  customHandTarget?: string;
 }
 
 export interface EffectContext {

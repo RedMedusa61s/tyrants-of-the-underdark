@@ -42,6 +42,10 @@ import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { lookupCard } from './card-data';
 import { scoreAll } from './engine/scoring';
 import { alertYourTurn, stopTurnAlert } from './online/turnAlert';
+import { HouseBar } from './components/HouseBar';
+import { HouseInfoModal } from './components/HouseInfoModal';
+import { HOUSES_BY_ID } from './houses/house-data';
+import { HouseSelect, type HousePick } from './components/HouseSelect';
 
 const HUMAN_SEAT = '0';
 
@@ -201,6 +205,22 @@ export function isSkipSummariesMode(): boolean {
 // has one definition shared with its test.
 type AiStyle = AiStyleT;
 
+// Difficulty tiers exposed in the new-game dialog. 'easy' is the same
+// heuristic as 'standard', but with the rollout-lookahead disabled — that
+// difference alone is worth ~28 pp of win-rate (rollout-on vs rollout-off
+// tournament measurement) and roughly tracks the pre/post change in
+// browser-game win rates against humans (~8% vs ~32%). 'standard' is the
+// current default. We deliberately don't call it "hard" — it still loses
+// ~2/3 of games to a competent human; truly hard would need deeper
+// lookahead or opponent-reply modeling.
+type AiStyle = 'random' | 'easy' | 'heuristic';
+type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead' | 'mercenaries';
+const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'mercenaries'];
+// Half-decks introduced in the Aberrations & Undead expansion. The new-game
+// dialog separates these from the base half-decks under an "Expansion" header
+// so unfamiliar players see clearly which decks are base-game and which need
+// the expansion. Game logic treats all six identically.
+const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead', 'mercenaries']);
 type ThirdPlayerSide = 'left' | 'right';
 interface GameConfig {
   numPlayers: number;
@@ -214,6 +234,10 @@ interface GameConfig {
   /** Colour the human (seat 0) plays. Remaining colours go to the AI seats.
    *  Undefined → default seat order (black, red, orange, blue). */
   humanColor?: Color;
+  /** Drow House system config (off by default). humanHouse picks seat 0's
+   *  house ('random' or omitted while enabled → random); every other seat
+   *  always gets a random house when enabled — see HouseSelect. */
+  houses?: { enabled: boolean; humanHouse?: HousePick };
 }
 const AI_FNS: Record<AiStyle, (G: TyrantsState, pid: string) => AiMove | null> = {
   random: decideAiMove,
@@ -478,6 +502,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // player can be inspected from the scoreboard (#82, Drew W.). Deck and hand
   // stay private and are never offered for opponents.
   const [pilePlayer, setPilePlayer] = useState<string | null>(null);
+  // Which player's house info popup is open, if any (Scoreboard "House: X" link).
+  const [houseInfoPid, setHouseInfoPid] = useState<string | null>(null);
   // "Play all basic": when true, the driver effect auto-plays non-interactive
   // hand cards one at a time until none remain (#66).
   const [playingAll, setPlayingAll] = useState(false);
@@ -1092,12 +1118,17 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     // sites that isn't already occupied by another player." White troops
     // printed at a starting site don't block it (the player drops into the
     // next empty slot) — but ANY non-white troop means a rival player has
-    // already claimed it, so it's off-limits.
-    ? new Set(SITES.filter(s =>
-        s.isStartingSite && s.id in G.siteControl &&
-        sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
-        !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
-      ).map(s => s.id))
+    // already claimed it, so it's off-limits. Houses that deploy more than 1
+    // starting troop (Nasadra's First House's Privilege) lock onto whichever
+    // site their first deploy this setup turn used — the rest can't scatter
+    // across different starting sites.
+    ? (p.houseState.data.startingSiteChosen
+        ? new Set([p.houseState.data.startingSiteChosen as string])
+        : new Set(SITES.filter(s =>
+            s.isStartingSite && s.id in G.siteControl &&
+            sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
+            !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
+          ).map(s => s.id)))
     : humanSitePick
       ? new Set((humanSitePick.options as string[] | undefined) ?? SITES.map(s => s.id))
       : baseActionClickableSites;
@@ -1169,7 +1200,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // Auto-cancel sticky base-action mode when the player can no longer afford it.
   useEffect(() => {
     if (!baseAction) return;
-    const cost = baseAction.kind === 'deploy' ? 1 : 3;
+    // const cost = baseAction.kind === 'deploy' ? 1 : 3;
+    const cost = baseAction.kind === 'deploy' ? 1 : baseAction.kind === 'assassinate' ? (G.assassinateCostOverride ?? BASE_ACTION_POWER_COST) : 3;
     if (p.power < cost) setBaseAction(null);
   }, [baseAction, p.power]);
 
@@ -1177,7 +1209,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // game tab so the player can always Cancel sticky modes / switch actions
   // while looking at the map.
   const canDeploy = myTurn && p.power >= 1 && !G.pendingChoice;
-  const canAssassinate = myTurn && p.power >= BASE_ACTION_POWER_COST && !G.pendingChoice;
+  const assassinateCost = G.assassinateCostOverride ?? BASE_ACTION_POWER_COST;
+  const canAssassinate = myTurn && p.power >= assassinateCost && !G.pendingChoice;
   const canReturnSpy = myTurn && p.power >= BASE_ACTION_POWER_COST && !G.pendingChoice;
   const actionBtn = (label: string, enabled: boolean, active: boolean, onClick: () => void) => (
     <button onClick={onClick} disabled={!enabled}
@@ -1401,12 +1434,19 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   );
 
   const discardOf = (pid: string) => rulesDiscard(G, pid, ctx.currentPlayer);
+  // House Bar — the acting player's Drow House passives/actions, if any.
+  // Renders nothing when houses are off for this game. Kept as its own
+  // memo-free const (cheap to rebuild each render, same as actionBar) so it
+  // can be dropped in wherever actionBar already is.
+  const houseBar = <HouseBar G={G} pid={me} myTurn={myTurn} moves={moves} />;
+
 
   const actionBar = (
     <div style={{ marginTop: 16, display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 13, opacity: 0.85 }}>Power: <b>{p.power}</b></span>
       {actionBtn(deployLabel, canDeploy, baseAction?.kind === 'deploy',
         () => setBaseAction(baseAction?.kind === 'deploy' ? null : { kind: 'deploy' }))}
-      {actionBtn(`Assassinate (${powerCost(BASE_ACTION_POWER_COST)})`, canAssassinate, baseAction?.kind === 'assassinate',
+      {actionBtn(`Assassinate (${assassinateCost} Power)`, canAssassinate, baseAction?.kind === 'assassinate',
         () => setBaseAction(baseAction?.kind === 'assassinate' ? null : { kind: 'assassinate' }))}
       {actionBtn(`Return enemy spy (${powerCost(BASE_ACTION_POWER_COST)})`, canReturnSpy, baseAction?.kind === 'return-spy',
         () => setBaseAction(baseAction?.kind === 'return-spy' ? null : { kind: 'return-spy' }))}
@@ -1676,7 +1716,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     const byForfeit = !!(ctx.gameover as { byForfeit?: boolean } | undefined)?.byForfeit;
     const theyConceded = isOnline && !iConceded && byForfeit && winner[0] === me;
     return (
-      <div style={{ padding: 24, maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ padding: 24, maxWidth: 'min(900px, 95vw)', margin: '0 auto' }}>
         {(iConceded || theyConceded) && (
           <div style={{
             margin: '0 0 20px', padding: '40px 24px', borderRadius: 10, textAlign: 'center',
@@ -1708,7 +1748,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         <div style={{ marginTop: 8, fontSize: 18 }}>
           Winner: <b>P{Number(winner[0]) + 1} ({G.players[winner[0]].color})</b> — {winner[1].total} VP
         </div>
-        <table style={{ marginTop: 24, width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <div style={{ marginTop: 24, width: '100%', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #3a2055', textAlign: 'left' }}>
               <th style={{ padding: 4 }}>Player</th>
@@ -1793,6 +1834,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             })}
           </tbody>
         </table>
+        </div>
         <div style={{ marginTop: 16, opacity: 0.6, fontSize: 12 }}>
           {isOnline ? (
             <span>
@@ -1801,6 +1843,27 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           ) : (
             'Reload the page to start a fresh game.'
           )}
+          <button onClick={async () => {
+          if (!confirm('Start a new game? Current progress will be lost.')) return;
+          // Archive the current playthrough before discarding it, so it
+          // doesn't get lost between sessions. The bulk Upload-logs button
+          // picks it up on the next click.
+          if (session) {
+            try {
+              await archiveGame(G, {
+                numPlayers: Object.keys(G.players).length,
+                halfDecks: session.config.halfDecks,
+                aiStyles: session.config.aiStyles,
+              });
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.warn('[archive-game] new-game archive failed:', err);
+            }
+          }
+          session?.onNewGame();
+        }} style={{ padding: '6px 14px', background: '#5a1f1f', color: '#fdd', border: '1px solid #802626', borderRadius: 4, cursor: 'pointer' }}>
+          New game
+        </button>
         </div>
       </div>
     );
@@ -1996,6 +2059,13 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </button>
       </div>
       {pileViewOverlay}
+      {houseInfoPid && G.players[houseInfoPid]?.house && (
+        <HouseInfoModal
+          houseId={G.players[houseInfoPid].house!}
+          playerLabel={houseInfoPid === me ? 'Your' : `P${Number(houseInfoPid) + 1}'s`}
+          onClose={() => setHouseInfoPid(null)}
+        />
+      )}
       {fixNoteQueue.length > 0 && (
         <BugFixResponseDialog
           update={fixNoteQueue[0]}
@@ -2081,9 +2151,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         Player P{Number(me) + 1} ({p.color}) — Turn: P{Number(ctx.currentPlayer) + 1} {myTurn ? '(your turn)' : ''}
         {' · '}Power: {p.power} · Influence: {p.influence}
         {' · '}{pileButton('Deck', p.deck.length, () => { setPilePlayer(null); setPileView('deck'); })}
-        {' · '}{pileButton('Discard', discardOf(me).length, () => { setPilePlayer(null); setPileView('discard'); })}
+        {/* {' · '}{pileButton('Discard', p.discard.length, () => { setPilePlayer(null); setPileView('discard'); })}
         {' · '}{pileButton('Inner Circle', p.innerCircle.length, () => { setPilePlayer(null); setPileView('inner'); })}
-        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => { setPilePlayer(null); setPileView('trophy'); })}
+        {' · '}{pileButton('Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), () => { setPilePlayer(null); setPileView('trophy'); })} */}
         {' · '}Barracks: {p.barracksLeft} · Spies: {p.spiesLeft}
         {' · '}<b style={{ color: '#ffcc44' }}>VP: {p.vp}</b>
         {G.endGameTriggeredAtTurn !== null && <span style={{ color: '#ffcc44', marginLeft: 8 }}>· Final round!</span>}
@@ -2141,6 +2211,20 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                     {link('inner-circle', pl.innerCircle.length, pid, 'inner')}
                     <span style={{ opacity: 0.55 }}>·</span>
                     {link('trophies', trophies, pid, 'trophy')}
+                    {pl.house && (
+                      <>
+                        <span style={{ opacity: 0.55 }}>·</span>
+                        <button
+                          onClick={() => setHouseInfoPid(pid)}
+                          title={`View P${Number(pid) + 1}'s house`}
+                          style={{
+                            background: 'none', border: 'none', padding: 0, font: 'inherit',
+                            color: '#9ecbff', cursor: 'pointer', textDecoration: 'underline',
+                          }}>
+                          House: {HOUSES_BY_ID[pl.house].name}
+                        </button>
+                      </>
+                    )}
                     <span style={{ opacity: 0.55 }}>·</span>
                     <span
                       title="Troops left in barracks. The game ends when any player's barracks reach 0."
@@ -2244,6 +2328,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               (Cancel sticky base-actions, Assassinate / Deploy / Return
               Spy / End Turn). Kept inside the map-tab block so the bar
               only shows when relevant. */}
+          {houseBar}
           {reviewBanner}{actionBar}
           <MapView G={G}
             clickableSites={startingClickable} onSiteClick={handleSiteClick}
@@ -2258,9 +2343,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           startingClickable={startingClickable} handleSiteClick={handleSiteClick}
           highlightSites={highlightSites}
           clickableSpaces={clickableSpaces} handleSpaceClick={handleSpaceClick}
+          highlightedSpaces={highlightedSpaces}
           clickableMarketSlots={clickableMarketSlots}
           marketHeading={marketHeading}
           humanMapPick={humanMapPick}
+          houseBar={houseBar}
           actionBar={<>{reviewBanner}{actionBar}</>}
           interactivePromptBar={<>{spyPickBar}{interactivePromptBar}</>}
           mySeat={me}
@@ -2362,22 +2449,32 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
+        {houseBar}
         {reviewBanner}{actionBar}
 
         {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
           <>
-            <h2 style={{ marginTop: 24 }}>Discard — pick one</h2>
+            <h2 style={{ marginTop: 24 }}>
+              {G.pendingChoice.discardOwnerId
+                ? `P${Number(G.pendingChoice.discardOwnerId) + 1}'s Discard — pick one`
+                : 'Discard — pick one'}
+            </h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
               {/* Only the engine-supplied option indices are valid — e.g. Matron
                   Mother excludes cards played this turn (those are in your play
-                  area, not your discard pile). Show only those. */}
+                  area, not your discard pile). Show only those. discardOwnerId
+                  (Nar'l Xibrindas) points this at an opponent's pile instead
+                  of your own. */}
               {(() => {
+                const pile = G.pendingChoice!.discardOwnerId
+                  ? (G.players[G.pendingChoice!.discardOwnerId!]?.discard ?? [])
+                  : p.discard;
                 const opts = G.pendingChoice!.options as number[] | undefined;
-                const idxs = opts ?? p.discard.map((_, i) => i);
+                const idxs = opts ?? pile.map((_, i) => i);
                 return idxs
-                  .filter(i => p.discard[i])
+                  .filter(i => pile[i])
                   .map(i => (
-                    <Card key={i} card={p.discard[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
+                    <Card key={i} card={pile[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
                   ));
               })()}
             </div>
@@ -2413,6 +2510,33 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           </>
         )}
 
+        {G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && G.pendingChoice.customHandTarget && (
+          <>
+            <h2 style={{ marginTop: 24 }}>
+              P{Number(G.pendingChoice.customHandTarget) + 1}'s Hand — pick a card
+            </h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {(() => {
+                const targetPid = G.pendingChoice!.customHandTarget!;
+                const targetHand = G.players[targetPid]?.hand ?? [];
+                const opts = G.pendingChoice!.options as number[] | undefined;
+                
+                return targetHand.map((c, i) => {
+                  if (opts && !opts.includes(i)) return null;
+                  return (
+                    <Card 
+                      key={i} 
+                      card={c} 
+                      label="pick" 
+                      onClick={() => moves.resolveChoice(i)} 
+                    />
+                  );
+                });
+              })()}
+            </div>
+          </>
+        )}
+
         <h2 style={{ marginTop: 24, display: 'flex', alignItems: 'baseline', gap: 12 }}>
           Your Hand
           <button onClick={() => { setPilePlayer(null); setPileView('played'); }}
@@ -2432,7 +2556,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             // discards (Mindwitness, Chuul, Neogi, …) the prompt may target
             // the human while it's an AI's turn. Gate on HUMAN_SEAT, not
             // currentPlayer.
-            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
+            const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && !G.pendingChoice.customHandTarget;
             // If options provided, only those indices are pickable (e.g. Focus reveal filtered to one aspect).
             const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
             const eligible = !isChoosing || !opts || opts.includes(i);
@@ -2555,6 +2679,8 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
   const [humanColor, setHumanColor] = useState<Color>(
     lastConfig?.humanColor ?? COLORS[0]
   );
+  const [housesEnabled, setHousesEnabled] = useState(lastConfig?.houses?.enabled ?? false);
+  const [housePick, setHousePick] = useState<HousePick>(lastConfig?.houses?.humanHouse ?? 'random');
 
   function setStyle(i: number, s: AiStyle) {
     setStyles(prev => {
@@ -2722,9 +2848,18 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
             Random 2
           </button>
         </div>
+        <HouseSelect
+          enabled={housesEnabled}
+          onToggleEnabled={setHousesEnabled}
+          pick={housePick}
+          onPick={setHousePick}
+        />
         <button
           disabled={halfDecks.length !== 2}
-          onClick={() => onStart({ numPlayers, aiStyles: trimmedStyles, halfDecks, thirdPlayerSide: thirdSide, humanColor })}
+          onClick={() => onStart({
+            numPlayers, aiStyles: trimmedStyles, halfDecks, thirdPlayerSide: thirdSide, humanColor,
+            houses: housesEnabled ? { enabled: true, humanHouse: housePick } : { enabled: false },
+          })}
           style={{
             padding: '10px 24px', fontSize: 14, color: '#fff', border: 'none',
             borderRadius: 4,
@@ -2755,10 +2890,11 @@ function ClientHolder({ config, onNewGame }: { config: GameConfig; onNewGame: ()
           halfDecks: config.halfDecks,
           activeSections: activeSectionsFor(config),
           humanColor: config.humanColor,
+          houses: config.houses,
         }),
     };
     return Client({ game, board: Board, numPlayers: config.numPlayers, debug: false });
-  }, [config.numPlayers, config.halfDecks, config.humanColor]);
+  }, [config.numPlayers, config.halfDecks, config.humanColor, config.houses]);
   return (
     <SessionContext.Provider value={{ config, onNewGame }}>
       <ClientCmp />
@@ -2779,6 +2915,7 @@ function loadConfig(): GameConfig | null {
         numPlayers: cfg.numPlayers, aiStyles: cfg.aiStyles, halfDecks,
         thirdPlayerSide: cfg.thirdPlayerSide,
         humanColor: cfg.humanColor,
+        houses: cfg.houses,
       };
     }
   } catch { /* fall through */ }
@@ -2821,10 +2958,12 @@ function SplitPlayView(props: {
   highlightSites: Set<string> | undefined;
   clickableSpaces: Set<string> | undefined;
   handleSpaceClick: (spaceId: string) => void;
+  highlightedSpaces: Set<string> | undefined;
   clickableMarketSlots: Set<number> | null | undefined;
   /** Built by Board so both layouts show the same devoured link + low-deck warning. */
   marketHeading: React.ReactNode;
   humanMapPick: { prompt: string; optional?: boolean; highlight?: string[] } | null;
+  houseBar: React.ReactNode;
   actionBar: React.ReactNode;
   interactivePromptBar: React.ReactNode;
   /** Seat the local human controls — '0' in hotseat, the server-assigned seat
@@ -2835,7 +2974,7 @@ function SplitPlayView(props: {
 }) {
   const { G, myTurn, p, moves, playCardSafe,
           startingClickable, handleSiteClick, highlightSites, clickableSpaces, handleSpaceClick,
-          clickableMarketSlots, humanMapPick, actionBar, interactivePromptBar, marketHeading,
+          clickableMarketSlots, humanMapPick, houseBar, actionBar, interactivePromptBar, marketHeading,
           mySeat: me, onViewPile } = props;
   const wide = useWideLayout();
 
@@ -2910,6 +3049,7 @@ function SplitPlayView(props: {
             )}
           </div>
         )}
+      {houseBar}
       {actionBar}
       {/* Pile inspector strip (#68): split view has no full status line, so
           surface clickable Deck / Discard / Inner Circle counts here. */}
@@ -2944,17 +3084,26 @@ function SplitPlayView(props: {
       )}
       {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
         <div>
-          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>Discard — pick one</h3>
+          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>
+            {G.pendingChoice.discardOwnerId
+              ? `P${Number(G.pendingChoice.discardOwnerId) + 1}'s Discard — pick one`
+              : 'Discard — pick one'}
+          </h3>
           <div style={{ display: 'flex', flexWrap: 'wrap' }}>
             {/* Honor the engine's option list (Matron Mother excludes cards
-                played this turn — they're in the play area, not the discard). */}
+                played this turn — they're in the play area, not the discard).
+                discardOwnerId (Nar'l Xibrindas) points this at an opponent's
+                pile instead of your own. */}
             {(() => {
+              const pile = G.pendingChoice!.discardOwnerId
+                ? (G.players[G.pendingChoice!.discardOwnerId!]?.discard ?? [])
+                : p.discard;
               const opts = G.pendingChoice!.options as number[] | undefined;
-              const idxs = opts ?? p.discard.map((_, i) => i);
+              const idxs = opts ?? pile.map((_, i) => i);
               return idxs
-                .filter(i => p.discard[i])
+                .filter(i => pile[i])
                 .map(i => (
-                  <Card key={i} card={p.discard[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
+                  <Card key={i} card={pile[i]} label="pick" onClick={() => moves.resolveChoice(i)} />
                 ));
             })()}
           </div>
@@ -3006,7 +3155,7 @@ function SplitPlayView(props: {
                 // See same-named check in the play tab above — the
                 // prompted player owns this choice (HUMAN_SEAT for forced
                 // discards triggered on the human's hand during an AI turn).
-                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me;
+                const isChoosing = G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && !G.pendingChoice.customHandTarget;
                 const opts = isChoosing ? (G.pendingChoice!.options as number[] | undefined) : undefined;
                 const eligible = !isChoosing || !opts || opts.includes(i);
                 // Hide ineligible cards entirely when options restrict which cards are pickable

@@ -15,6 +15,7 @@ import { SITES } from '../data/sites';
 import { TROOP_SPACES, sitesSpaces } from '../data/troop-spaces';
 import { lookupCard } from '../card-data';
 import { hasPresence } from '../engine/map-state';
+import { pickHouseAction } from './house-ai';
 
 export type AiMove =
   | { name: 'deployStartingTroop'; args: [string] }
@@ -25,6 +26,8 @@ export type AiMove =
   | { name: 'deployTroop'; args: [string] }
   | { name: 'assassinateTroop'; args: [string] }
   | { name: 'returnEnemySpy'; args: [string, string] }
+  | { name: 'houseAction'; args: [string] }
+  | { name: 'recruitReservedCard'; args: [] }
   | { name: 'endTurn'; args: [] };
 
 function pickRandom<T>(arr: T[]): T | undefined {
@@ -81,17 +84,26 @@ export function decideAiMove(G: TyrantsState, currentPlayer: string): AiMove | n
 
   // 2. Setup phase: pick a random empty starting site.
   if (G.setupPhase) {
-    const open = SITES.filter(s =>
-      s.isStartingSite && s.id in G.siteControl &&
-      sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
-      !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
-    );
+    const chosenSite = G.players[currentPlayer]?.houseState.data.startingSiteChosen as string | undefined;
+    const open = chosenSite
+      ? SITES.filter(s => s.id === chosenSite)
+      : SITES.filter(s =>
+          s.isStartingSite && s.id in G.siteControl &&
+          sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
+          !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
+        );
     const pick = pickRandom(open);
     return pick ? { name: 'deployStartingTroop', args: [pick.id] } : null;
   }
 
   // 3. Regular turn.
   const me = G.players[currentPlayer];
+
+  // 3aa. A house ability (or the reserved-card recruit), if useful right
+  // now — see ai/house-ai.ts for why a single check here (re-run every
+  // decision tick) is enough to interleave these correctly through the turn.
+  const houseMove = pickHouseAction(G, currentPlayer);
+  if (houseMove) return houseMove;
 
   // 3a. Play one card from hand.
   if (me.hand.length > 0) {

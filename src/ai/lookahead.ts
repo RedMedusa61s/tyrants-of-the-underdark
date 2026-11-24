@@ -119,6 +119,32 @@ export type RolloutToTurnEndFn = (
   args: unknown[],
 ) => TyrantsState | null;
 
+/**
+ * Calculates a "Soft VP" score for a player's board presence.
+ * This allows the lookahead to value loose troops and spies that haven't 
+ * yet resulted in Hard VP (like site control or trophies).
+ */
+function evaluateBoardPresence(G: TyrantsState, pid: string): number {
+  const p = G.players[pid];
+  let presenceValue = 0;
+
+  // Value troops on the board (e.g., 0.3 Soft VP per troop)
+  for (const t of TROOP_SPACES) {
+    if (G.troops[t.id] === p.color) {
+      presenceValue += 0.3;
+    }
+  }
+
+  // Value spies on the board (e.g., 0.5 Soft VP per spy)
+  for (const s of SITES) {
+    if ((G.spies[s.id] ?? []).includes(p.color)) {
+      presenceValue += 0.5;
+    }
+  }
+
+  return presenceValue;
+}
+
 /** Value of a state from `pid`'s perspective: own total VP minus the
  *  MEAN of opponents' total VPs. Uses the full scoreAll so trophies,
  *  control markers, inner-circle VP, and final-scoring riders all count.
@@ -157,8 +183,8 @@ export function stateValue(G: TyrantsState, pid: string): number {
     oppSum += s.total + pres(id);
     oppCount++;
   }
-  if (oppCount === 0) return my;
-  return my - oppSum / oppCount;
+  if (oppCount === 0) return myTotalValue;
+  return myTotalValue - (oppSum / oppCount);
 }
 
 /** Pick the best candidate by 1-ply lookahead.

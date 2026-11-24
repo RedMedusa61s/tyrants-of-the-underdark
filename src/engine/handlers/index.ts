@@ -6,3 +6,4 @@ import './elemental';
 import './demons';
 import './aberrations';
 import './undead';
+import './mercenaries';

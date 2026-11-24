@@ -14,6 +14,9 @@ import { hasTotalControl } from '../engine/map-state';
 const COLOR_HEX = PLAYER_COLOR_HEX;
 const WHITE_TOKEN = WHITE_TOKEN_HEX;
 
+// Additional highlighted spaces
+const HIGHLIGHTED_SPACE_COLOR = '#66ccff';
+
 // Samsung Internet / Chrome Android "Website dark mode" repaints solid
 // background-COLORS but leaves background-IMAGES (gradients) alone. Painting a
 // game-state token colour as a flat gradient keeps it exactly as authored even
@@ -74,6 +77,7 @@ interface MapViewProps {
   /** Troop spaces the user can click (e.g. for assassinate/deploy/supplant prompts). */
   clickableSpaces?: Set<string>;
   onSpaceClick?: (spaceId: string) => void;
+  highlightedSpaces?: Set<string>;
 }
 
 const ROUTES_STORAGE_KEY = 'totu.routes';
@@ -336,8 +340,41 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
   // all still render on top via the regular passes below.
   const useSchematic = isNoImagesMode() && !calibrate && !editRoutes;
 
+  // Pinch-to-zoom / pan on the map. Disabled entirely in calibrate/route-edit
+  // mode so the dev-only drag-to-reposition and click-to-link-sites tools keep
+  // their original raw mouse behavior (no competing pan gesture). `disabled`
+  // still mounts the wrapper (keeping the DOM/layout shape identical) but
+  // short-circuits all wheel/pinch/pan handling, so this is a no-op passthrough
+  // in those modes rather than a behavior change.
+  const zoomDisabled = calibrate || editRoutes;
+
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', maxWidth: 1200, margin: '0 auto' }}>
+    <TransformWrapper
+      disabled={zoomDisabled}
+      initialScale={1}
+      minScale={1}
+      maxScale={4}
+      centerOnInit
+      limitToBounds
+      doubleClick={{ disabled: true }}
+      // Require Ctrl/Cmd+wheel to zoom (Google-Maps/Figma convention) so a
+      // plain scroll over the map still scrolls the enclosing section
+      // (SplitPlayView's map box is `overflow: auto`) instead of both
+      // scrolling AND zooming at once — the library's wheel listener is
+      // passive and can't preventDefault the native scroll, so without this
+      // gate every wheel tick would do both simultaneously.
+      // activationKeys takes either a fixed list (ALL of which must be held —
+      // AND semantics) or a predicate over currently-pressed keys, which is
+      // what we need here: Ctrl on Windows/Linux OR Cmd on Mac, not both.
+      wheel={{ step: 0.2, activationKeys: (keys: string[]) => keys.includes('Control') || keys.includes('Meta') }}
+      pinch={{ step: 5 }}
+      panning={{ velocityDisabled: true }}
+    >
+      <TransformComponent
+        wrapperStyle={{ width: '100%', touchAction: 'pan-y' }}
+        contentStyle={{ width: '100%', display: 'block' }}
+      >
       {useSchematic ? (
         <div id="totu-board" style={{
           width: '100%', aspectRatio: '4646 / 4605',
@@ -599,7 +636,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           }
           const occ = G.troops[spaceId];
           const pickable = clickableSpaces?.has(spaceId);
-          const size = px(pickable ? 26 : 22);
+          const highlighted = highlightedSpaces?.has(spaceId); // <-- Check highlight
+          const size = px(pickable ? 26 : highlighted ? 26 : 22); // <-- Enlarge highlighted troops slightly
           return (
             <div key={spaceId}
               onClick={() => { if (pickable) onSpaceClick?.(spaceId); }}
@@ -721,13 +759,14 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           }
           const occ = G.troops[sp.id];
           const isSpacePickable = clickableSpaces?.has(sp.id);
+          const highlighted = highlightedSpaces?.has(sp.id); // <-- Check highlight
           // Slot clicks now ONLY satisfy troop-space picks. Site picks have a
           // dedicated overlay below so the user can tell which they're targeting.
           const pickable = isSpacePickable;
           const onClick = () => {
             if (isSpacePickable) onSpaceClick?.(sp.id);
           };
-          const size = px(pickable ? 26 : 22);
+          const size = px(pickable ? 26 : highlighted ? 26 : 22); // <-- Enlarge highlighted troops slightly
           // While a site-pick is active, let clicks fall through non-pickable
           // slots to the site overlay disc underneath. Otherwise the user has
           // to aim outside the slots to hit the ring.
@@ -912,6 +951,8 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           </details>
         </div>
       )}
+      </TransformComponent>
+    </TransformWrapper>
     </div>
   );
 }

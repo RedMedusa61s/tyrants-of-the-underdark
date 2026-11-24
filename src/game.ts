@@ -1,6 +1,7 @@
 import type { Game } from 'boardgame.io';
 import { INVALID_MOVE } from 'boardgame.io/core';
-import './engine/handlers'; // register handlers
+import './engine/handlers'; // register card-effect handlers
+import './houses/handlers'; // register house ability handlers
 import { CardRegistry } from './engine/registry';
 import { Mechanics } from './engine/mechanics';
 import { logEvent, ensureStructuredLog, nextLogSeq, logLineText } from './engine/log';
@@ -10,8 +11,13 @@ import type { EffectContext, PendingChoice } from './engine/types';
 import { SITES } from './data/sites';
 import { TROOP_SPACES, sitesSpaces } from './data/troop-spaces';
 import { ROUTES } from './data/routes';
-import { deployTroop, assassinateTroop, hasPresence, returnSpy, payHeldMarkerEffectsAtTurnStart } from './engine/map-state';
+import { deployTroop, assassinateTroop, hasPresence, hasTotalControl,
+         returnSpy, payHeldMarkerEffectsAtTurnStart, recomputeSiteControl } from './engine/map-state';
 import { ensureSpiesLeftInitialized, applyEotInnerCircleVp } from './engine/handler-helpers';
+import { HouseHooks } from './houses/hooks';
+import { HOUSES_BY_ID, HOUSES } from './houses/house-data';
+import type { HouseId } from './houses/types';
+import { RESERVED_MARKET_CARD_KEY } from './houses/types';
 
 // The four canonical seat colours from the printed game, plus extras we offer
 // human players who want something different. The AI seats only ever use the
@@ -34,6 +40,22 @@ export interface CardRef {
   image: string;
 }
 
+/** Per-player house-system bookkeeping. Generic on purpose — individual
+ *  houses stash whatever scratch data they need under `data` (a set-aside
+ *  card, a reserved market card, a per-turn flag, ...) rather than each
+ *  adding their own field to PlayerData. `usedThisTurn` / `usedThisGame`
+ *  are the frequency ledgers the `houseAction` move and Lobby/House Bar UI
+ *  both read, keyed by the ability's `key` from houses/house-data.ts. */
+export interface HouseState {
+  usedThisTurn: Record<string, boolean>;
+  usedThisGame: Record<string, boolean>;
+  data: Record<string, unknown>;
+}
+
+export function freshHouseState(): HouseState {
+  return { usedThisTurn: {}, usedThisGame: {}, data: {} };
+}
+
 export interface PlayerData {
   color: Color;
   deck: CardRef[];
@@ -41,6 +63,10 @@ export interface PlayerData {
   discard: CardRef[];
   innerCircle: CardRef[];
   cardsPlayed: CardRef[];
+  /** House pick for this player, or null if houses are off / not assigned.
+   *  See houses/house-data.ts for the full ability list per house. */
+  house: HouseId | null;
+  houseState: HouseState;
   /** Per-color count of captured tokens. Orcus moves specific colored tokens out,
    *  so we keep the source color around (we don't aggregate non-white into one
    *  "enemy" bucket). Black Dragon's scoring rider reads `.white`. */
@@ -56,6 +82,32 @@ export interface PlayerData {
   power: number;
   influence: number;
   vp: number;
+}
+
+function triggerRecruitEffects(G: TyrantsState, pid: string) {
+  const Gx = G as unknown as { _xanatharZushaxxActive?: boolean };
+  if (Gx._xanatharZushaxxActive) {
+    const opponentsWithVp = Object.keys(G.players).filter(id => id !== pid && G.players[id].vp >= 1);
+    
+    if (opponentsWithVp.length > 0) {
+      if (opponentsWithVp.length === 1) {
+        // Auto-resolve if there's only one valid opponent to steal from
+        G.players[opponentsWithVp[0]].vp -= 1;
+        G.players[pid].vp += 1;
+        Mechanics.log(G, `P${Number(pid) + 1} stole 1 VP from P${Number(opponentsWithVp[0]) + 1} (Xanathar Zushaxx)`);
+      } else {
+        // Suspend with a choice if multiple opponents have VP
+        G.pendingChoice = {
+          kind: 'select-player',
+          prompt: 'Xanathar Zushaxx: Steal 1 VP from an opponent',
+          options: opponentsWithVp,
+          optional: false,
+          playerId: pid,
+          cardKey: '__xanathar_steal__'
+        };
+      }
+    }
+  }
 }
 
 export function totalTrophies(p: PlayerData): number {
@@ -95,6 +147,14 @@ export interface ControlMarker {
   totalControlVp: number;
 }
 
+export interface StolenMarker {
+  siteId: string;
+  thief: Color;
+  originalController: Color | null;
+  hasTotalControl: boolean;
+  expiresAtTurnStartOf: Color;
+}
+
 /** Printed per-site values for both faces of each control marker. Sourced
  *  directly from assets/tokens/<site>-control.jpg and -total-control.jpg. */
 export const MARKER_VALUES: Record<string, {
@@ -124,6 +184,12 @@ export interface TyrantsState {
    *  tracked separately by the card handlers that hand them out — not a
    *  player-recruitable stack. */
   auxStacks: { houseGuards: number; priestesses: number };
+  /** Market-row Victory Point tokens placed by Mizzrym's Shadow Investment,
+   *  keyed by row index. Paid out (to `pid`) when the tagged card leaves the
+   *  row via Mechanics.recruitFromMarket — see engine/mechanics.ts. Absent/
+   *  empty on legacy saves and for games with houses off; onBegin backfills
+   *  it to {} the same way it backfills other optional-field additions. */
+  marketVpTokens: Record<number, { pid: string; vp: number }>;
   players: Record<string, PlayerData>;
   /** Structured game log (framework log-format v2). Legacy saves carried
    *  string[] here — ensureStructuredLog upgrades them on load/turn start. */
@@ -165,7 +231,16 @@ export interface TyrantsState {
    *  payMarkerEffect pays the delta and adds the marker here. Without this
    *  separate ledger, the TC VP bonus is silently skipped — the "I had TC
    *  at end of turn but got no VP" bug. Cleared each turn at onBegin. */
-  markerTcGrantedThisTurn: string[];
+  // markerTcGrantedThisTurn: string[];
+
+  /** SiteIds where a color has been granted temporary presence (Hun'ett's
+   *  Death from the Shadows: returning a spy still counts as presence at
+   *  that site until the end of the turn), even without a troop or spy of
+   *  theirs physically there. Consulted by map-state.ts's hasPresenceAtSite
+   *  and by the whiteOnly-restricted assassinate filters (which it also
+   *  frees to target a player's troop, not just white, at that site).
+   *  Cleared at turn.onEnd. */
+  phantomPresenceSites: Partial<Record<string, Color[]>>;
 
   /** Color of the player whose turn it currently is. Mirrors
    *  G.players[ctx.currentPlayer].color so engine code that doesn't get ctx
@@ -264,6 +339,12 @@ export interface TyrantsState {
 
   /** Which sections are in play this game ('left' | 'center' | 'right'). */
   activeSections: string[];
+
+  /** Track markers temporarily stolen by effects like Bregan D'aerthe Spy */
+  stolenMarkers?: StolenMarker[];
+
+  /** Active override for the power cost of the assassinate board action. */
+  assassinateCostOverride?: number;
 }
 
 // Canonical seat order — AI seats always draw from these four, and a game with
@@ -353,6 +434,83 @@ function eotEligibleIndices(
   return out;
 }
 
+/** Look for the current player's next not-yet-offered `endOfTurn` house
+ *  ability (currently only Agrach Dyrr's Tunnel Patrols) and try to run it.
+ *  Mirrors the pendingEotPromotions flow: called from the `endTurn` move
+ *  (and, after each house-EOT prompt resolves, from resolveChoice) — never
+ *  from turn.onEnd itself, since that callback runs after the seat has
+ *  already changed and can't surface a pendingChoice for the outgoing player.
+ *
+ *  Returns the pendingChoice/handlerState to surface if the ability's
+ *  handler suspended (has legal targets), or null if there's nothing left
+ *  to offer this turn (either every endOfTurn ability has been used/skipped,
+ *  or the player has no house). Abilities with no eligible target complete
+ *  synchronously (their handler logs "(...: skipped)" and returns true) and
+ *  are marked used without surfacing anything, same as an eot-promotion
+ *  trigger with no eligible cards. */
+function tryHouseEndOfTurnAbility(
+  G: TyrantsState,
+  ctx: { currentPlayer: string },
+  random?: { Number(): number },
+): { pendingChoice: PendingChoice & { playerId: string; cardKey: string }; handlerState: unknown } | null {
+  const pid = ctx.currentPlayer;
+  const player = G.players[pid];
+  const houseId = player.house;
+  if (!houseId) return null;
+  const abilities = HOUSES_BY_ID[houseId]?.abilities.filter(a => a.kind === 'action' && a.endOfTurn) ?? [];
+  for (const ability of abilities) {
+    if (player.houseState.usedThisTurn[ability.key]) continue;
+    const impl = HouseHooks.getAction(houseId, ability.key);
+    if (!impl || (impl.available && !impl.available(G, pid))) {
+      player.houseState.usedThisTurn[ability.key] = true;
+      continue;
+    }
+    const ctx2: EffectContext = {
+      card: { deck: '__house__', slot: 0, name: `${HOUSES_BY_ID[houseId].name}: ${ability.name}`, image: '' },
+      actorId: pid, G,
+      pendingChoice: null,
+      paused: false,
+      handlerState: null,
+      random: random ?? undefined,
+    };
+    const done = impl.handler(ctx2);
+    if (!done && ctx2.pendingChoice) {
+      return {
+        pendingChoice: {
+          ...ctx2.pendingChoice,
+          playerId: pid,
+          actorId: pid,
+          cardKey: `__house_eot__:${houseId}:${ability.key}`,
+        },
+        handlerState: ctx2.handlerState,
+      };
+    }
+    // Completed synchronously (no eligible target, or a handler that never
+    // suspends) — mark used and move on to the next endOfTurn ability, if any.
+    player.houseState.usedThisTurn[ability.key] = true;
+  }
+  return null;
+}
+
+/** The single point every "actually end the turn now" path funnels through:
+ *  offer the next pending house end-of-turn ability if there is one,
+ *  otherwise really end the turn. Replaces every bare `events.endTurn()`
+ *  call that follows the (pre-existing) pendingEotPromotions drain. */
+function finishTurnOrOfferHouseEot(
+  G: TyrantsState,
+  ctx: { currentPlayer: string },
+  events: { endTurn: () => void },
+  random?: { Number(): number },
+): void {
+  const houseEot = tryHouseEndOfTurnAbility(G, ctx, random);
+  if (houseEot) {
+    G.pendingChoice = houseEot.pendingChoice;
+    G.pausedHandlerState = houseEot.handlerState;
+    return;
+  }
+  events.endTurn();
+}
+
 function buildMarketDeck(rng: () => number, halfDecks: string[] = ['drow', 'dragons']): CardRef[] {
   // Per build-card-data: each card-data entry's `rarity` field equals "how
   // many physical copies of this card the market deck should contain FROM
@@ -391,6 +549,9 @@ function startingDeck(): CardRef[] {
   const nobleRef = toCardRef(noble.deck, noble.slot);
   const soldierRef = toCardRef(soldier.deck, soldier.slot);
   return [...Array(7).fill(nobleRef), ...Array(3).fill(soldierRef)];
+  // const test_card5 = cardsInDeck('mercenaries').find(c => c.name === "Nihiloor")!;
+  // const test_cardRef5 = toCardRef(test_card5.deck, test_card5.slot);
+  // return [...Array(4).fill(soldierRef), test_cardRef5];
 }
 
 /** Encode the game state to a base64 JSON codec string, excluding the snapshots
@@ -531,7 +692,15 @@ export const TyrantsGame: Game<TyrantsState> = {
     return undefined;
   },
 
-  setup: ({ ctx, random }, setupData?: { halfDecks?: string[]; activeSections?: Array<'left'|'center'|'right'>; humanColor?: Color; seatColors?: Color[]; botSeats?: string[] }) => {
+  setup: ({ ctx, random }, setupData?: {
+    halfDecks?: string[]; activeSections?: Array<'left'|'center'|'right'>; humanColor?: Color; seatColors?: Color[]; botSeats?: string[];
+    /** Drow House system config (off by default — a game with no `houses`
+     *  input plays exactly as before). `humanHouse` picks seat 0's house;
+     *  'random' (or omitted while enabled) assigns a random house. Every
+     *  other seat always gets a random house when enabled — there's no
+     *  per-AI-seat picker in the Lobby yet. */
+    houses?: { enabled?: boolean; humanHouse?: HouseId | 'random' };
+  }) => {
     const rng = () => random!.Number();
     const halfDecks = setupData?.halfDecks?.length === 2 ? setupData.halfDecks : ['drow', 'dragons'];
     // Rulebook p.5: limit the board to the sections in play. 2P = center only,
@@ -569,11 +738,30 @@ export const TyrantsGame: Game<TyrantsState> = {
     const spare = (explicit.length ? LEFTOVER_COLORS : COLORS).filter(c => !taken.has(c));
     for (let i = 0; i < ctx.numPlayers; i++) {
       colorOrder.push(explicit[i] ?? spare.shift() ?? COLORS[i % COLORS.length]);
+    const housesEnabled = !!setupData?.houses?.enabled;
+    // Assign each seat a distinct house — no two players may share one. The
+    // human's explicit pick (if any) is reserved for seat 0 first; every
+    // other seat draws from a single shuffle of the remaining houses, so
+    // there's no chance of a repeat (the old per-seat independent random
+    // pick could hand the same house to two players).
+    const houseAssignment: (HouseId | null)[] = new Array(ctx.numPlayers).fill(null);
+    if (housesEnabled) {
+      const humanPick = setupData?.houses?.humanHouse;
+      const reserved = humanPick && humanPick !== 'random' ? humanPick : null;
+      if (reserved) houseAssignment[0] = reserved;
+      const pool = shuffle(HOUSES.map(h => h.id).filter(id => id !== reserved), rng);
+      let poolIdx = 0;
+      for (let i = 0; i < ctx.numPlayers; i++) {
+        if (houseAssignment[i] == null) houseAssignment[i] = pool[poolIdx++] ?? null;
+      }
     }
     const players: Record<string, PlayerData> = {};
     for (let i = 0; i < ctx.numPlayers; i++) {
       const deck = shuffle(startingDeck(), rng);
       const hand = deck.splice(0, HAND_SIZE);
+      const house = houseAssignment[i];
+      const houseState = freshHouseState();
+      if (house === 'nasadra') houseState.data.startingDeploysRemaining = 3;
       players[String(i)] = {
         color: colorOrder[i],
         deck,
@@ -581,6 +769,8 @@ export const TyrantsGame: Game<TyrantsState> = {
         discard: [],
         innerCircle: [],
         cardsPlayed: [],
+        house,
+        houseState,
         trophyHall: { black: 0, red: 0, orange: 0, blue: 0, white: 0 },
         barracksLeft: 40,
         spiesLeft: 5,
@@ -634,6 +824,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       log: appendGameLog<string>([], { turn: 0, side: String(firstSeat), kind: 'game.start', msg: startLog, payload: { firstSeat } }),
       pendingChoice: null,
       pausedHandlerState: null,
+      marketVpTokens: {},
       troops,
       spies: {},
       siteControl: Object.fromEntries(SITES.filter(s => activeSiteSet.has(s.id)).map(s => [s.id, null])),
@@ -647,13 +838,15 @@ export const TyrantsGame: Game<TyrantsState> = {
       pendingEotInnerCircleVp: [],
       devouredPile: [],
       markerInfluenceGrantedThisTurn: [],
-      markerTcGrantedThisTurn: [],
+      // markerTcGrantedThisTurn: [],
+      phantomPresenceSites: {},
       activeTurnColor: null,
       turnLogStart: 0,
       turnLogs: [],
       snapshots: [],
       undoStack: [],
       endGameTriggeredAtTurn: null,
+      stolenMarkers: [],
     };
   },
 
@@ -717,8 +910,57 @@ export const TyrantsGame: Game<TyrantsState> = {
       // turn (granted live by Mechanics.claimMarkerInfluenceIfControlled).
       G.markerInfluenceGrantedThisTurn = [];
       // Backfill on legacy saves loaded before this field existed.
-      G.markerTcGrantedThisTurn = [];
+      // G.markerTcGrantedThisTurn = [];
+      // Hun'ett's Death from the Shadows presence grant only lasts through the
+      // turn it was cast — reset (and backfill legacy saves) every turn.
+      G.phantomPresenceSites = {};
       if (!G.devouredPile) G.devouredPile = [];
+      if (!G.marketVpTokens) G.marketVpTokens = {};
+
+      // House system: backfill legacy saves (predate the house/houseState
+      // fields) and, for the player whose turn is starting, reset their
+      // per-turn ability-usage ledger and run their house's turn-begin
+      // passive (if any). Skipped during the setup-phase deploy turns —
+      // those aren't "turns" in the rulebook sense (see onEnd's matching
+      // `_endingSetupTurn` skip).
+      for (const pid of Object.keys(G.players)) {
+        const pl = G.players[pid];
+        if (pl.house === undefined) pl.house = null;
+        if (!pl.houseState) pl.houseState = freshHouseState();
+      }
+      if (!G.setupPhase) {
+        const activePid = ctx.currentPlayer;
+        const activePlayer = G.players[activePid];
+        activePlayer.houseState.usedThisTurn = {};
+        // Generic "is this the player's first real turn" flag, reused by
+        // Nasadra's extra first-turn draw and Melarn's Established Shrines.
+        if (!activePlayer.houseState.data._hadFirstTurn) {
+          activePlayer.houseState.data.isFirstTurn = true;
+          activePlayer.houseState.data._hadFirstTurn = true;
+        } else {
+          activePlayer.houseState.data.isFirstTurn = false;
+        }
+        HouseHooks.onTurnBegin(G, activePid);
+      }
+
+      G.markerInfluenceGrantedThisTurn = [];
+      // G.markerTcGrantedThisTurn = [];
+      if (!G.devouredPile) G.devouredPile = [];
+
+      // --- NEW: Process Stolen Marker Expirations ---
+      if (G.stolenMarkers && G.stolenMarkers.length > 0) {
+        const activeColor = G.players[ctx.currentPlayer].color;
+        const expiring = G.stolenMarkers.filter(m => m.expiresAtTurnStartOf === activeColor);
+        if (expiring.length > 0) {
+          // Remove them from the active stolen array
+          G.stolenMarkers = G.stolenMarkers.filter(m => m.expiresAtTurnStartOf !== activeColor);
+          for (const m of expiring) {
+            Mechanics.log(G, `Stolen control marker at ${m.siteId} expires and returns to the map/owner`);
+            // Force a recompute so the marker snaps back to its rightful controller
+            recomputeSiteControl(G, [m.siteId]);
+          }
+        }
+      }
 
       // Per-turn marker effect for chits the active player held coming into
       // this turn. Pays both the influence (cobweb) and any VP printed on
@@ -791,6 +1033,18 @@ export const TyrantsGame: Game<TyrantsState> = {
       // turn start (held-over markers) or live when the marker is taken
       // during the turn. See engine/map-state.ts → recomputeSiteControl /
       // payMarkerEffect / payHeldMarkerEffectsAtTurnStart.
+      // ! ^ Above is wrong. Site marker VP is awarded at the end of the turn, not immediately on control change.
+      // NEW: Total Control VP is awarded at the end of the turn
+      const activeColor = p.color;
+      for (const [siteId, m] of Object.entries(G.controlMarkers)) {
+        if (m.holder === activeColor && hasTotalControl(G, activeColor, siteId)) {
+          if (m.totalControlVp > 0) {
+            Mechanics.gainVpTokens(G, ctx.currentPlayer, m.totalControlVp);
+            Mechanics.log(G, `P${Number(ctx.currentPlayer) + 1} +${m.totalControlVp} VP from ${siteId} (Total Control)`);
+          }
+        }
+      }
+
 
       p.discard.push(...p.hand);
       p.hand = [];
@@ -798,6 +1052,10 @@ export const TyrantsGame: Game<TyrantsState> = {
       p.power = 0;
       p.influence = 0;
       G.turnAspectsPlayed = {};
+
+      // Xanathar Zushaax cleanup
+      (G as unknown as { _xanatharZushaxxActive?: boolean })._xanatharZushaxxActive = false;
+
       // Refill hand
       for (let i = 0; i < HAND_SIZE; i++) {
         if (p.deck.length === 0) {
@@ -824,6 +1082,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       // any state mutation in between turns (saves, replays) doesn't
       // accidentally grant influence to a player who isn't currently active.
       G.activeTurnColor = null;
+      // Return Assassinate cost to normal
+      G.assassinateCostOverride = undefined;
     },
   },
 
@@ -831,23 +1091,48 @@ export const TyrantsGame: Game<TyrantsState> = {
     deployStartingTroop: ({ G, ctx, events }, siteId: string) => {
       if (!G.setupPhase) return INVALID_MOVE;
       const pid = ctx.currentPlayer;
-      const site = SITES.find(s => s.id === siteId);
-      if (!site || !site.isStartingSite) return INVALID_MOVE;
-      // Per rulebook setup p.4: starting sites already claimed by a rival
-      // (i.e. containing any non-white troop) are off-limits.
-      if (sitesSpaces(siteId).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')) return INVALID_MOVE;
-      const space = sitesSpaces(siteId).find(sp => !G.troops[sp.id]);
-      if (!space) return INVALID_MOVE;
       const player = G.players[pid];
       const color = player.color;
+      const site = SITES.find(s => s.id === siteId);
+      if (!site || !site.isStartingSite) return INVALID_MOVE;
+      // Per rulebook setup p.4: starting sites already claimed by a RIVAL
+      // (another color's troop) are off-limits. A site already holding
+      // this player's OWN troop is fine — that's the normal mid-sequence
+      // state for a house (Nasadra) depositing more than one starting troop.
+      if (sitesSpaces(siteId).some(sp => {
+        const occ = G.troops[sp.id];
+        return occ && occ !== 'white' && occ !== color;
+      })) return INVALID_MOVE;
+      // Multi-troop starting deploys (Nasadra's First House's Privilege: 3
+      // troops instead of 1) all go to the SAME chosen starting site — this
+      // isn't 3 independent site picks. Lock to whichever site the first
+      // deploy this setup turn used.
+      const chosenSiteKey = 'startingSiteChosen';
+      const chosenSite = player.houseState.data[chosenSiteKey] as string | undefined;
+      if (chosenSite && siteId !== chosenSite) return INVALID_MOVE;
+      const space = sitesSpaces(siteId).find(sp => !G.troops[sp.id]);
+      if (!space) return INVALID_MOVE;
       if (!deployTroop(G, color, space.id)) return INVALID_MOVE;
+      player.houseState.data[chosenSiteKey] = siteId;
       player.barracksLeft -= 1;
       Mechanics.log(G, `P${Number(pid) + 1} deployed starting troop at ${site.name}`,
         { kind: 'troop.deploy', payload: { site: siteId, setup: true }, side: pid });
 
-      // Setup complete once everyone has placed one troop.
-      const placed = Object.values(G.troops).filter(t => t && t !== 'white').length;
-      if (placed >= ctx.numPlayers) {
+      // Most players deploy exactly 1 starting troop (the default when the
+      // counter was never seeded). Nasadra's "deploy 3 instead of 1" seeds
+      // this to 3 at setup(); each deploy decrements it, and the "turn"
+      // only actually ends once it reaches 0 — until then the same seat
+      // keeps its move rights so they can place the rest.
+      const remainingKey = 'startingDeploysRemaining';
+      const remaining = ((player.houseState.data[remainingKey] as number | undefined) ?? 1) - 1;
+      player.houseState.data[remainingKey] = remaining;
+      if (remaining > 0) return;
+
+      // Setup complete once every player has used up their starting-deploy quota.
+      const allDone = (Object.values(G.players) as PlayerData[]).every(
+        p => ((p.houseState.data[remainingKey] as number | undefined) ?? 1) <= 0
+      );
+      if (allDone) {
         G.setupPhase = false;
         Mechanics.log(G, 'Setup complete — game begins.');
       }
@@ -892,6 +1177,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (!handler) {
         // No handler yet — drop the card to discard with no effect.
         p.discard.push(card);
+        HouseHooks.onCardPlayed(G, pid, card, cardData);
         return;
       }
 
@@ -928,6 +1214,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         G.cardsPlayedThisTurn.push(card);
         p.cardsPlayed.push(card);
       }
+      HouseHooks.onCardPlayed(G, pid, card, cardData);
     },
 
     resolveChoice: ({ G, ctx, events, random }, response: unknown) => {
@@ -947,22 +1234,24 @@ export const TyrantsGame: Game<TyrantsState> = {
           const playerId = pc.playerId;
           const card = G.cardsPlayedThisTurn[idx];
           if (card) {
-            // Remove from the played list by EXACT index (unambiguous even
-            // with duplicate same-type cards — #47 / #48). Mechanics.promote
-            // no longer touches cardsPlayedThisTurn, so this is the sole
-            // removal for the EOT path.
-            G.cardsPlayedThisTurn.splice(idx, 1);
-            // Remove card played from PlayerData
+            if (!Mechanics.trySylgarReact(G, playerId, card)) {
+              // Remove from the played list by EXACT index (unambiguous even
+              // with duplicate same-type cards — #47 / #48). Mechanics.promote
+              // no longer touches cardsPlayedThisTurn, so this is the sole
+              // removal for the EOT path.
+              G.cardsPlayedThisTurn.splice(idx, 1);
+              // Remove card played from PlayerData
             const pPlayedIdx = G.players[playerId].cardsPlayed.findIndex(
               c => c.deck === card.deck && c.slot === card.slot
             );
             if (pPlayedIdx >= 0) G.players[playerId].cardsPlayed.splice(pPlayedIdx, 1);
 
             const di = G.players[playerId].discard.findIndex(
-              c => c.deck === card.deck && c.slot === card.slot
-            );
-            if (di >= 0) G.players[playerId].discard.splice(di, 1);
-            Mechanics.promote(G, playerId, card);
+                c => c.deck === card.deck && c.slot === card.slot
+              );
+              if (di >= 0) G.players[playerId].discard.splice(di, 1);
+              Mechanics.promote(G, playerId, card);
+            }
           }
         }
         // Consume the trigger we were responding to.
@@ -1014,7 +1303,93 @@ export const TyrantsGame: Game<TyrantsState> = {
           };
           return;
         }
-        events.endTurn();
+        finishTurnOrOfferHouseEot(G, ctx, events, random);
+        return;
+      }
+
+      // House-ability resume: pendingChoice.cardKey is '__house__:<houseId>:<abilityKey>'
+      // rather than a real card. Dispatches through HouseRegistry instead of
+      // CardRegistry/p.discard — house abilities aren't cards, so none of the
+      // discard/cardsPlayedThisTurn bookkeeping below applies to them.
+      if (typeof pc.cardKey === 'string' && pc.cardKey.startsWith('__house__:')) {
+        const [, houseIdPart, abilityKey] = pc.cardKey.split(':');
+        const actorPid = pc.actorId ?? pc.playerId;
+        const impl = HouseHooks.getAction(houseIdPart as HouseId, abilityKey);
+        if (!impl) { G.pendingChoice = null; G.pausedHandlerState = null; return; }
+        const ctx2: EffectContext = {
+          card: { deck: '__house__', slot: 0, name: abilityKey, image: '' },
+          actorId: actorPid, G,
+          pendingChoice: { ...pc, response },
+          paused: true,
+          handlerState: G.pausedHandlerState,
+          random: random ?? undefined,
+        };
+        const done = impl.handler(ctx2);
+        if (!done) {
+          G.pendingChoice = ctx2.pendingChoice
+            ? { ...ctx2.pendingChoice, playerId: ctx2.pendingChoice.playerId ?? actorPid, actorId: actorPid, cardKey: pc.cardKey }
+            : null;
+          G.pausedHandlerState = ctx2.handlerState;
+          return;
+        }
+        G.pendingChoice = null;
+        G.pausedHandlerState = null;
+        const actor = G.players[actorPid];
+        const ability = HOUSES_BY_ID[houseIdPart as HouseId]?.abilities.find(a => a.key === abilityKey);
+        if (ability?.frequency === 'turn') actor.houseState.usedThisTurn[abilityKey] = true;
+        if (ability?.frequency === 'game') actor.houseState.usedThisGame[abilityKey] = true;
+        return;
+      }
+
+      // Resume of an AUTOMATIC end-of-turn house ability (cardKey prefix
+      // '__house_eot__:' — see tryHouseEndOfTurnAbility / the `endTurn` move).
+      // Same dispatch as the '__house__:' branch above, except completion
+      // doesn't just stop: it's still mid-way through actually ending the
+      // turn, so it hands off to finishTurnOrOfferHouseEot to check for any
+      // further queued end-of-turn ability before finally calling
+      // events.endTurn().
+      if (typeof pc.cardKey === 'string' && pc.cardKey.startsWith('__house_eot__:')) {
+        const [, houseIdPart, abilityKey] = pc.cardKey.split(':');
+        const actorPid = pc.actorId ?? pc.playerId;
+        const impl = HouseHooks.getAction(houseIdPart as HouseId, abilityKey);
+        if (!impl) {
+          G.pendingChoice = null;
+          G.pausedHandlerState = null;
+          finishTurnOrOfferHouseEot(G, ctx, events, random);
+          return;
+        }
+        const ctx2: EffectContext = {
+          card: { deck: '__house__', slot: 0, name: abilityKey, image: '' },
+          actorId: actorPid, G,
+          pendingChoice: { ...pc, response },
+          paused: true,
+          handlerState: G.pausedHandlerState,
+          random: random ?? undefined,
+        };
+        const done = impl.handler(ctx2);
+        if (!done) {
+          G.pendingChoice = ctx2.pendingChoice
+            ? { ...ctx2.pendingChoice, playerId: ctx2.pendingChoice.playerId ?? actorPid, actorId: actorPid, cardKey: pc.cardKey }
+            : null;
+          G.pausedHandlerState = ctx2.handlerState;
+          return;
+        }
+        G.pendingChoice = null;
+        G.pausedHandlerState = null;
+        G.players[actorPid].houseState.usedThisTurn[abilityKey] = true;
+        finishTurnOrOfferHouseEot(G, ctx, events, random);
+        return;
+      }
+
+      // Special handling for Xanathar Zushaxx's recruit-steal prompt
+      if (pc.cardKey === '__xanathar_steal__') {
+        const targetId = response as string | null;
+        G.pendingChoice = null;
+        if (targetId && G.players[targetId].vp >= 1) {
+          G.players[targetId].vp -= 1;
+          G.players[pc.playerId].vp += 1;
+          Mechanics.log(G, `P${Number(pc.playerId) + 1} stole 1 VP from P${Number(targetId) + 1} (Xanathar Zushaxx)`);
+        }
         return;
       }
 
@@ -1071,6 +1446,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         );
         if (pPlayedIdx >= 0) p.cardsPlayed.splice(pPlayedIdx, 1);
       }
+      HouseHooks.onCardPlayed(G, actorPid, card, data);
       // suppress unused-var noise
       void ctx;
     },
@@ -1092,6 +1468,9 @@ export const TyrantsGame: Game<TyrantsState> = {
         Mechanics.gainInfluence(G, pid, cost);
         return INVALID_MOVE;
       }
+      // Check for Xanathar Zushaax steal VP after recuit
+      triggerRecruitEffects(G, pid);
+
       checkEndGameTriggers(G, ctx);
     },
 
@@ -1125,6 +1504,76 @@ export const TyrantsGame: Game<TyrantsState> = {
         Mechanics.gainInfluence(G, pid, cost);
         return INVALID_MOVE;
       }
+      // Check for Xanathar Zushaax steal VP after recuit
+      triggerRecruitEffects(G, pid);
+    },
+
+    /** Recruit the market card a house ability set aside exclusively for
+     *  this player (currently only Nasadra's Web of Debts), at 1 less
+     *  Influence than its printed cost. Bypasses the market row entirely —
+     *  the card already left the row when it was reserved. */
+    recruitReservedCard: ({ G, ctx }) => {
+      if (G.setupPhase) return INVALID_MOVE;
+      if (G.pendingChoice) return INVALID_MOVE;
+      const pid = ctx.currentPlayer;
+      const p = G.players[pid];
+      const card = p.houseState.data[RESERVED_MARKET_CARD_KEY] as CardRef | undefined;
+      if (!card) return INVALID_MOVE;
+      const data = lookupCard(card.deck, card.slot);
+      const cost = Math.max(0, (data?.cost ?? 999) - 1);
+      pushUndoSnapshot(G, ctx.currentPlayer);
+      if (!Mechanics.expendInfluence(G, pid, cost)) return INVALID_MOVE;
+      p.houseState.data[RESERVED_MARKET_CARD_KEY] = undefined;
+      p.discard.push(card);
+      Mechanics.log(G, `P${Number(pid) + 1} recruited their reserved ${card.name} for ${cost} Influence`);
+      if (data) HouseHooks.onRecruit(G, pid, data);
+      checkEndGameTriggers(G, ctx);
+    },
+
+    /** Run one of the current player's house 'action' abilities (see
+     *  houses/house-data.ts for the full list, houses/registry.ts for how
+     *  the implementation is looked up). Mirrors playCard's dispatch to
+     *  CardRegistry — same EffectHandler contract, same pendingChoice
+     *  suspend/resume flow via resolveChoice (see the '__house__:' branch
+     *  there), just keyed by ability key instead of a hand index. */
+    houseAction: ({ G, ctx, random }, abilityKey: string) => {
+      if (G.setupPhase) return INVALID_MOVE;
+      if (G.pendingChoice) return INVALID_MOVE;
+      const pid = ctx.currentPlayer;
+      const p = G.players[pid];
+      const houseId = p.house;
+      if (!houseId) return INVALID_MOVE;
+      const ability = HOUSES_BY_ID[houseId]?.abilities.find(a => a.key === abilityKey && a.kind === 'action');
+      if (!ability) return INVALID_MOVE;
+      if (ability.frequency === 'turn' && p.houseState.usedThisTurn[abilityKey]) return INVALID_MOVE;
+      if (ability.frequency === 'game' && p.houseState.usedThisGame[abilityKey]) return INVALID_MOVE;
+      const impl = HouseHooks.getAction(houseId, abilityKey);
+      if (!impl) return INVALID_MOVE;
+      if (impl.available && !impl.available(G, pid)) return INVALID_MOVE;
+      pushUndoSnapshot(G, pid);
+
+      const ctx2: EffectContext = {
+        card: { deck: '__house__', slot: 0, name: `${HOUSES_BY_ID[houseId].name}: ${ability.name}`, image: '' },
+        actorId: pid, G,
+        pendingChoice: null,
+        paused: false,
+        handlerState: null,
+        random: random ?? undefined,
+      };
+      const done = impl.handler(ctx2);
+      if (!done && ctx2.pendingChoice) {
+        G.pendingChoice = {
+          ...ctx2.pendingChoice,
+          playerId: ctx2.pendingChoice.playerId ?? pid,
+          actorId: pid,
+          cardKey: `__house__:${houseId}:${abilityKey}`,
+        };
+        G.pausedHandlerState = ctx2.handlerState;
+        return;
+      }
+      if (ability.frequency === 'turn') p.houseState.usedThisTurn[abilityKey] = true;
+      if (ability.frequency === 'game') p.houseState.usedThisGame[abilityKey] = true;
+      Mechanics.log(G, `P${Number(pid) + 1} used ${HOUSES_BY_ID[houseId].name}: ${ability.name}`);
     },
 
     /** Mark a seat as having abandoned the game. Server-side only: the online
@@ -1226,7 +1675,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       const presenceOk = hasPresence(G, color, { site: target.parentSite, space: target.parentRoute ? spaceId : undefined });
       if (!presenceOk) return INVALID_MOVE;
 
-      if (!Mechanics.expendPower(G, pid, BASE_ACTION_POWER_COST)) return INVALID_MOVE;
+      const cost = G.assassinateCostOverride ?? BASE_ACTION_POWER_COST;
+      if (!Mechanics.expendPower(G, pid, cost)) return INVALID_MOVE;
       const killed = assassinateTroop(G, spaceId);
       if (killed === 'white') p.trophyHall.white += 1;
       else if (killed) p.trophyHall[killed] = (p.trophyHall[killed] ?? 0) + 1;
@@ -1243,7 +1693,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (p.color === targetColor) return INVALID_MOVE;
       if (!hasPresence(G, p.color, { site: siteId })) return INVALID_MOVE;
       if (!(G.spies[siteId] ?? []).includes(targetColor)) return INVALID_MOVE;
-      if (!Mechanics.expendPower(G, pid, BASE_ACTION_POWER_COST)) return INVALID_MOVE;
+      const powerCost = HouseHooks.returnSpyPowerCostOverride(G, pid) ?? BASE_ACTION_POWER_COST;
+      if (!Mechanics.expendPower(G, pid, powerCost)) return INVALID_MOVE;
       if (returnSpy(G, targetColor, siteId)) {
         // Returned spy goes back to ITS OWNER's supply (not yours). Backfill
         // a missing spiesLeft for the owner first (legacy saves predate the
@@ -1318,7 +1769,7 @@ export const TyrantsGame: Game<TyrantsState> = {
       Mechanics.log(G, 'Undo');
     },
 
-    endTurn: ({ G, ctx, events }) => {
+    endTurn: ({ G, ctx, events, random }) => {
       if (G.setupPhase) return INVALID_MOVE;
       if (G.pendingChoice) return INVALID_MOVE;
       // If end-of-turn promotions are queued, surface a picker over cards played this turn
@@ -1342,7 +1793,7 @@ export const TyrantsGame: Game<TyrantsState> = {
             G.pendingEotPromotions.shift();
             Mechanics.log(G, `(end of turn: ${t.name} promote skipped — no eligible cards)`);
           }
-          if (G.pendingEotPromotions.length === 0) { events.endTurn(); return; }
+          if (G.pendingEotPromotions.length === 0) { finishTurnOrOfferHouseEot(G, ctx, events, random); return; }
         }
         const trigger2 = G.pendingEotPromotions[0];
         const eligible2 = eotEligibleIndices(G, trigger2);
@@ -1360,7 +1811,7 @@ export const TyrantsGame: Game<TyrantsState> = {
         };
         return;
       }
-      events.endTurn();
+      finishTurnOrOfferHouseEot(G, ctx, events, random);
     },
   },
 };

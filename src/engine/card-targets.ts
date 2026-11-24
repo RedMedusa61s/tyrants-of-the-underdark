@@ -16,6 +16,7 @@
 import type { TyrantsState, Color } from '../game';
 import { TROOP_SPACES } from '../data/troop-spaces';
 import { spacesWithPresence } from './handler-helpers';
+import { hasPhantomPresence, siteOf } from './map-state';
 
 interface SupplantOpts { whiteOnly?: boolean; anywhere?: boolean }
 interface AssassinateOpts { whiteOnly?: boolean }
@@ -33,7 +34,14 @@ function legalSupplantTargets(G: TyrantsState, color: Color, opts: SupplantOpts)
 function legalAssassinateTargets(G: TyrantsState, color: Color, opts: AssassinateOpts): string[] {
   return spacesWithPresence(G, color).filter(id => {
     const occ = G.troops[id];
-    return occ && occ !== color && (!opts.whiteOnly || occ === 'white');
+    if (!occ || occ === color) return false;
+    if (opts.whiteOnly && occ !== 'white') {
+      // Hun'ett's Death from the Shadows lifts the white-only restriction
+      // at a site where it granted presence this turn.
+      const siteId = siteOf(id);
+      if (!siteId || !hasPhantomPresence(G, color, siteId)) return false;
+    }
+    return true;
   });
 }
 
@@ -79,6 +87,19 @@ export function cardWhiffReason(G: TyrantsState, pid: string, effectKey: string)
     case 'eternal-flame-cultist':
       if (legalAssassinateTargets(G, color, {}).length === 0) {
         return 'no enemy/white troops you can reach';
+      }
+      return null;
+
+    // Mercenary cards added
+    case 'dragonborn-hireling':
+      if (legalAssassinateTargets(G, color, {}).length === 0) {
+        return 'no enemy or white troops you can reach';
+      }
+      return null;
+      
+    case 'artemis-entreri':
+      if (legalAssassinateTargets(G, color, {}).length === 0) {
+        return 'no enemy or white troops you can reach';
       }
       return null;
 

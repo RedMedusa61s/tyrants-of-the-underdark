@@ -7,7 +7,7 @@
 import { CardRegistry } from './registry';
 import { Mechanics } from './mechanics';
 import type { EffectContext, EffectHandler, PendingChoice } from './types';
-import { placeSpy, assassinateTroop, deployTroop, hasPresence, returnSpy, returnTroop, moveTroop } from './map-state';
+import { placeSpy, assassinateTroop, deployTroop, hasPresence, hasPhantomPresence, returnSpy, returnTroop, moveTroop, siteOf } from './map-state';
 import { SITES } from '../data/sites';
 import { ROUTES } from '../data/routes';
 import { TROOP_SPACES, sitesSpaces, routeSpaces } from '../data/troop-spaces';
@@ -418,10 +418,12 @@ export function devourFromHandCost(thenEffect: EffectHandler, opts?: { promptLab
       const me = ctx.G.players[ctx.actorId];
       const card = me.hand[idx];
       if (!card) { ctx.handlerState = null; return true; }
-      me.hand.splice(idx, 1);
-      Mechanics.devour(ctx.G, card);
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} devoured ${card.name} from hand`,
-      { kind: 'card.devour', payload: { card: card.name, from: 'hand' }, side: ctx.actorId });
+      // ONLY splice and devour if Sylgar didn't intercept it
+      if (!Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+        me.hand.splice(idx, 1);
+        Mechanics.devour(ctx.G, card);
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} devoured ${card.name} from hand`);
+      }
       state = { paid: true, childState: null };
     }
     // Run the gated follow-up.
@@ -679,7 +681,12 @@ export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; 
     const eligible = spacesWithPresence(ctx.G, me.color).filter(id => {
       const occ = ctx.G.troops[id];
       if (!occ || occ === me.color) return false;
-      if (opts?.whiteOnly && occ !== 'white') return false;
+      if (opts?.whiteOnly && occ !== 'white') {
+        // Hun'ett's Death from the Shadows lifts the white-only restriction
+        // at a site where it granted presence this turn.
+        const siteId = siteOf(id);
+        if (!siteId || !hasPhantomPresence(ctx.G, me.color, siteId)) return false;
+      }
       if (opts?.sameSite && state.site && siteKeyOf(id) !== state.site) return false;
       return true;
     });
@@ -1205,7 +1212,11 @@ export function promoteTopOfDeck(opts?: { count?: number }): EffectHandler {
       if (!card) break;
       // Promoting the top of the deck reveals a previously-hidden card — bars undo.
       Mechanics.markInfoRevealed(ctx.G);
-      Mechanics.promote(ctx.G, ctx.actorId, card);
+      if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+        me.deck.unshift(card); // It was already shifted, so put it right back on top
+      } else {
+        Mechanics.promote(ctx.G, ctx.actorId, card);
+      }
     }
     return true;
   };
@@ -1474,8 +1485,10 @@ export function promoteFromDiscardChoice(opts?: { optional?: boolean }): EffectH
     const me = ctx.G.players[ctx.actorId];
     const card = me.discard[idx];
     if (!card) return true;
-    me.discard.splice(idx, 1);
-    Mechanics.promote(ctx.G, ctx.actorId, card);
+    if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+      me.discard.splice(idx, 1);
+      Mechanics.promote(ctx.G, ctx.actorId, card);
+    }
     return true;
   };
 }
@@ -1848,7 +1861,11 @@ export function playerCanAssassinate(
     if (!(t.id in G.troops)) continue; // outside active sections
     const occ = G.troops[t.id];
     if (!occ || occ === me.color) continue;
-    if (opts?.whiteOnly && occ !== 'white') continue;
+    if (opts?.whiteOnly && occ !== 'white') {
+      // Hun'ett's Death from the Shadows lifts the white-only restriction
+      // at a site where it granted presence this turn.
+      if (!t.parentSite || !hasPhantomPresence(G, me.color, t.parentSite)) continue;
+    }
     if (t.parentSite && hasPresence(G, me.color, { site: t.parentSite })) return true;
     if (t.parentRoute && hasPresence(G, me.color, { space: t.id })) return true;
   }
@@ -1949,7 +1966,9 @@ export function devourMarketChoice(opts?: { optional?: boolean }): EffectHandler
     if (idx == null) return true;
     const card = ctx.G.market.row[idx];
     if (!card) return true;
-    Mechanics.devour(ctx.G, card);
+    if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+      Mechanics.devour(ctx.G, card);
+    }
     const refill = ctx.G.market.deck.shift() ?? null;
     if (refill) Mechanics.markInfoRevealed(ctx.G);
     ctx.G.market.row[idx] = refill;
@@ -1988,6 +2007,7 @@ export function spacesAdjacentTo(spaceId: string): string[] {
   if (!s) return [];
   const out = new Set<string>();
 
+
   if (s.parentSite) {
     // Other spaces at the same site.
     for (const t of sitesSpaces(s.parentSite)) if (t.id !== spaceId) out.add(t.id);
@@ -2018,6 +2038,33 @@ export function spacesAdjacentTo(spaceId: string): string[] {
 
   return [...out];
 }
+
+// ! Depreciated Method:
+// ! Incorrect implementation of adjacency; previous logic considered (for site spaces) all
+// ! spaces on routes connected to the deployed space's site as adjacent, and (for route spaces)
+// ! all spaces on the route plus all site spaces at the route's endpoints as adjacent. 
+// ! This was too broad and did not match the intended adjacency (Presence) rules.
+// ! Method left here for reference.
+// function spacesAdjacentTo(spaceId: string): string[] {
+//   const s = TROOP_SPACES.find(t => t.id === spaceId);
+//   if (!s) return [];
+//   const out = new Set<string>();
+//   if (s.parentSite) {
+//     for (const t of TROOP_SPACES) if (t.parentSite === s.parentSite && t.id !== spaceId) out.add(t.id);
+//     for (const r of ROUTES) {
+//       if (r.a === s.parentSite || r.b === s.parentSite) {
+//         for (let i = 0; i < r.spaces; i++) out.add(`${r.id}:${i}`);
+//       }
+//     }
+//   } else if (s.parentRoute) {
+//     const r = ROUTES.find(rr => rr.id === s.parentRoute)!;
+//     for (let i = 0; i < r.spaces; i++) if (i !== s.index) out.add(`${r.id}:${i}`);
+//     for (const endpoint of [r.a, r.b]) {
+//       for (const t of TROOP_SPACES) if (t.parentSite === endpoint) out.add(t.id);
+//     }
+//   }
+//   return [...out];
+// }
 
 export function giveOutcastToOpponentAdjacentToLastDeploy(): EffectHandler {
   return ctx => {
@@ -2457,10 +2504,13 @@ function applyForcedDiscard(
   const target = G.players[targetPid];
   const card = target.hand[idx];
   if (!card) return;
-  target.hand.splice(idx, 1);
-  target.discard.push(card);
-  Mechanics.log(G, `P${Number(targetPid) + 1} discarded ${card.name} (forced)`);
-  fireForcedDiscardReactive(G, card, targetPid, offenderPid);
+  // Intercept before forcing the discard
+  if (!Mechanics.trySylgarReact(G, targetPid, card)) {
+    target.hand.splice(idx, 1);
+    target.discard.push(card);
+    Mechanics.log(G, `P${Number(targetPid) + 1} discarded ${card.name} (forced)`);
+    fireForcedDiscardReactive(G, card, targetPid, offenderPid);
+  }
 }
 
 /** Force EACH opponent (excluding ctx.actorId) with at least `minHand`
@@ -2816,8 +2866,10 @@ export function promoteFromHandChoice(opts?: { optional?: boolean }): EffectHand
     const me = ctx.G.players[ctx.actorId];
     const card = me.hand[idx];
     if (!card) return true;
-    me.hand.splice(idx, 1);
-    Mechanics.promote(ctx.G, ctx.actorId, card);
+    if (Mechanics.trySylgarReact(ctx.G, ctx.actorId, card)) {
+      me.hand.splice(idx, 1);
+      Mechanics.promote(ctx.G, ctx.actorId, card);
+    }
     return true;
   };
 }

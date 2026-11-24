@@ -9,6 +9,7 @@ import { logEvent } from './log';
 import { ROUTES, ADJACENCY } from '../data/routes';
 import { TROOP_SPACES_BY_ID, sitesSpaces, routeSpaces } from '../data/troop-spaces';
 import { SITES_BY_ID } from '../data/sites';
+import { HouseHooks } from '../houses/hooks';
 import SLOT_POSITIONS from '../../assets/slot-positions-auto.json';
 
 /** Per-route geometric mapping of the two endmost slot indices (0 and N-1) to the
@@ -71,11 +72,22 @@ function hasTroopAtSite(G: TyrantsState, color: Color, siteId: SiteId): boolean 
 }
 
 /** Compute whether `color` has presence at the given site (rulebook p.10). */
+/** True when `color` has been granted temporary presence at `siteId` by
+ *  Hun'ett's Death from the Shadows (returning a spy from there still
+ *  counts as presence, until the end of the turn, even after the spy is
+ *  gone). Also used by assassinate target filters to lift the "white
+ *  troops only" restriction some card effects print, at that site. */
+export function hasPhantomPresence(G: TyrantsState, color: Color, siteId: SiteId): boolean {
+  return (G.phantomPresenceSites?.[siteId] ?? []).includes(color);
+}
+
 export function hasPresenceAtSite(G: TyrantsState, color: Color, siteId: SiteId): boolean {
   // (a) Spy at the site
   if ((G.spies[siteId] ?? []).includes(color)) return true;
   // (b) Troop in a site space
   if (hasTroopAtSite(G, color, siteId)) return true;
+  // (b2) Phantom presence granted by Hun'ett's Death from the Shadows.
+  if (hasPhantomPresence(G, color, siteId)) return true;
   // (c) Either a troop in the route-space *adjacent to* the site (endmost of the
   // touching route — not mid-route), OR — for routes with zero spaces (sites that
   // touch each other directly) — a troop at the other endpoint site.
@@ -153,6 +165,15 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
       const t = G.troops[sp.id];
       if (t) counts[t] = (counts[t] || 0) + 1;
     }
+    // Faen Tlabbar's Deep Cover: that player's spies also count toward the
+    // CONTROL majority tally at this site (on top of the troops above).
+    // Cheap no-op for every other player (colorCountsSpiesForControl is
+    // false unless someone actually picked Faen Tlabbar).
+    for (const spyColor of G.spies[siteId] ?? []) {
+      if (HouseHooks.colorCountsSpiesForControl(G, spyColor)) {
+        counts[spyColor] = (counts[spyColor] || 0) + 1;
+      }
+    }
     // Strict-majority leader: must exceed every other entry, white included.
     let leader: TroopOwner | null = null;
     let leaderCount = 0;
@@ -168,6 +189,25 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
       : (leader as Color);
     G.siteControl[siteId] = newController;
 
+    // --- NEW: Check if this marker is currently stolen ---
+    const isStolen = (G as any).stolenMarkers?.some((stolen: any) => stolen.siteId === siteId);
+    // House hooks: fire whenever someone currently controls this site (see
+    // houses/types.ts's HousePassiveHooks doc — these fire on every
+    // recompute where the condition holds, not strictly once-per-transition;
+    // the two houses that use this only latch a boolean, so re-firing is
+    // harmless). Faen Tlabbar's Eyes Everywhere and Barrison Del'Armgo's
+    // Conquest Doctrine both key off "gain (total) control", which reads as
+    // an event rather than a live "has control right now" state, so these
+    // stay as hooks instead of `available` predicates like most other
+    // control-gated house abilities.
+    if (newController) {
+      const hasMarker = !!G.controlMarkers[siteId];
+      HouseHooks.onControlGain(G, newController, siteId, hasMarker);
+      if (hasTotalControl(G, newController, siteId)) {
+        HouseHooks.onTotalControlGain(G, newController, siteId, hasMarker);
+      }
+    }
+
     // Site-control marker bookkeeping per the revised rulebook:
     //   "When you take control of a site that has a control marker, take
     //    that marker from the game map or from the site's previous
@@ -176,7 +216,7 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
     // Transfer the chit immediately on every control change. If we now
     // have no controller, the chit returns to the map (holder = null).
     const m = G.controlMarkers[siteId];
-    if (m && m.holder !== newController) {
+    if (m && !isStolen && m.holder !== newController) {
       const previous = m.holder;
       m.holder = newController;
       if (newController) {
@@ -194,7 +234,7 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
     // a-previous-turn markers are paid at turn.onBegin; the same ledger
     // (markerInfluenceGrantedThisTurn) guards against double-paying when a
     // player flips control on/off mid-turn.
-    if (m && newController === G.activeTurnColor && newController != null) {
+    if (m && !isStolen && newController === G.activeTurnColor && newController != null) {
       payMarkerEffect(G, m, newController);
     }
   }
@@ -211,28 +251,20 @@ export function recomputeSiteControl(G: TyrantsState, siteIds: SiteId[]) {
  *  the beginning of your turn if you start with it (same as it does for
  *  influence). Same as influence, you only get it once per turn, you
  *  can't farm VP by losing and gaining total control." */
-function payMarkerEffect(G: TyrantsState, m: { siteId: string; controlInfluence: number; controlVp: number; totalControlInfluence: number; totalControlVp: number }, color: Color): void {
-  if (!G.markerTcGrantedThisTurn) G.markerTcGrantedThisTurn = []; // legacy-save backfill
-  const tc = hasTotalControl(G, color, m.siteId);
+/** Apply one control-marker's per-turn effect to `color`'s player. 
+ * Total Control VP is strictly awarded at the end of the turn. This function
+ * now only handles the immediate once-per-turn Influence grant. */
+function payMarkerEffect(
+  G: TyrantsState, 
+  m: { siteId: string; controlInfluence: number }, 
+  color: Color
+): void {
+  if (!G.markerInfluenceGrantedThisTurn) G.markerInfluenceGrantedThisTurn = []; 
+  
+  // You only get the control influence once per turn
   const controlPaid = G.markerInfluenceGrantedThisTurn.includes(m.siteId);
-  const tcPaid = G.markerTcGrantedThisTurn.includes(m.siteId);
-  // Decide what owed delta to pay:
-  //   - At TC and TC not yet paid: total owed = TC bonus. Already paid =
-  //     control bonus if control was paid earlier. Pay the delta.
-  //   - At control and neither paid: pay control bonus.
-  //   - Otherwise: nothing left to pay this turn.
-  let inf = 0, vp = 0;
-  let upgrade = false;
-  if (tc && !tcPaid) {
-    inf = m.totalControlInfluence - (controlPaid ? m.controlInfluence : 0);
-    vp = m.totalControlVp - (controlPaid ? m.controlVp : 0);
-    upgrade = controlPaid;
-  } else if (!tc && !controlPaid) {
-    inf = m.controlInfluence;
-    vp = m.controlVp;
-  } else {
-    return;
-  }
+  if (controlPaid) return;
+
   const pid = Object.keys(G.players).find(k => G.players[k].color === color);
   if (!pid) return;
   const p = G.players[pid];
@@ -252,6 +284,47 @@ function payMarkerEffect(G: TyrantsState, m: { siteId: string; controlInfluence:
   logEvent(G, `P${Number(pid) + 1} ${parts.join(', ')} from ${m.siteId} control marker${suffix}`,
     { kind: 'marker.reward', payload: { site: m.siteId, influence: inf, vp, totalControl: tc }, side: pid });
 }
+// ! Depreciated.
+// function payMarkerEffect(G: TyrantsState, m: { siteId: string; controlInfluence: number; controlVp: number; totalControlInfluence: number; totalControlVp: number }, color: Color): void {
+//   if (!G.markerTcGrantedThisTurn) G.markerTcGrantedThisTurn = []; // legacy-save backfill
+//   const tc = hasTotalControl(G, color, m.siteId);
+//   const controlPaid = G.markerInfluenceGrantedThisTurn.includes(m.siteId);
+//   const tcPaid = G.markerTcGrantedThisTurn.includes(m.siteId);
+//   // Decide what owed delta to pay:
+//   //   - At TC and TC not yet paid: total owed = TC bonus. Already paid =
+//   //     control bonus if control was paid earlier. Pay the delta.
+//   //   - At control and neither paid: pay control bonus.
+//   //   - Otherwise: nothing left to pay this turn.
+//   let inf = 0, vp = 0;
+//   let upgrade = false;
+//   if (tc && !tcPaid) {
+//     inf = m.totalControlInfluence - (controlPaid ? m.controlInfluence : 0);
+//     vp = m.totalControlVp - (controlPaid ? m.controlVp : 0);
+//     upgrade = controlPaid;
+//   } else if (!tc && !controlPaid) {
+//     inf = m.controlInfluence;
+//     vp = m.controlVp;
+//   } else {
+//     return;
+//   }
+//   const pid = Object.keys(G.players).find(k => G.players[k].color === color);
+//   if (!pid) return;
+//   const p = G.players[pid];
+//   if (inf > 0) p.influence += inf;
+//   if (vp > 0) p.vp += vp;
+//   if (!controlPaid) G.markerInfluenceGrantedThisTurn.push(m.siteId);
+//   if (tc) G.markerTcGrantedThisTurn.push(m.siteId);
+//   // Suppress no-op log lines (delta might be 0/0 if the marker has no
+//   // additional TC reward beyond its control reward — Phaerlin, etc.).
+//   if (inf === 0 && vp === 0) return;
+//   const parts: string[] = [];
+//   if (inf > 0) parts.push(`+${inf} influence`);
+//   if (vp > 0) parts.push(`+${vp} VP`);
+//   const suffix = upgrade
+//     ? ' (upgrade to TOTAL CONTROL)'
+//     : (tc ? ' (TOTAL CONTROL)' : '');
+//   G.log.push(`P${Number(pid) + 1} ${parts.join(', ')} from ${m.siteId} control marker${suffix}`);
+// }
 
 /** Used by turn.onBegin to pay markers the active player already held from a
  *  previous turn. Re-exported so game.ts can drive the start-of-turn payout
@@ -304,6 +377,19 @@ export function assassinateTroop(G: TyrantsState, spaceId: TroopSpaceId): TroopO
   G.troops[spaceId] = null;
   const sid = siteOf(spaceId);
   if (sid) recomputeSiteControl(G, [sid]);
+
+  // Stash for any chained handlers that care about the location.
+  (G as unknown as { _lastAssassinatedSpace?: string })._lastAssassinatedSpace = spaceId;
+
+  // Hun'ett's Paid in Blood: fires for whoever's turn it currently is. Every
+  // assassinate — base action or card/house effect — happens during the
+  // acting player's own turn, so G.activeTurnColor (already tracked for the
+  // control-marker payout above) identifies the actor without needing an
+  // actorId threaded through every one of this function's ~8 call sites.
+  if (G.activeTurnColor) {
+    const pid = Object.keys(G.players).find(k => G.players[k].color === G.activeTurnColor);
+    if (pid) HouseHooks.onAssassinate(G, pid, t);
+  }
   return t;
 }
 

@@ -25,6 +25,8 @@ import { lookupCard } from '../card-data';
 import { hasPresence } from '../engine/map-state';
 import { scoreAll } from '../engine/scoring';
 import { BASE_ACTION_POWER_COST } from '../game';
+import { HouseHooks } from '../houses/hooks';
+import { RESERVED_MARKET_CARD_KEY } from '../houses/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +51,8 @@ export type TyrantsAction =
   | { kind: 'deployTroop'; spaceId: string }
   | { kind: 'assassinateTroop'; spaceId: string }
   | { kind: 'returnEnemySpy'; siteId: string; targetColor: Color }
+  | { kind: 'houseAction'; abilityKey: string }
+  | { kind: 'recruitReservedCard' }
   | { kind: 'resolveChoice'; response: unknown }
   | { kind: 'endTurn' }
   // Server-side only (the abandoned-seat sweep). Never returned by
@@ -155,6 +159,8 @@ function toBgioAction(action: TyrantsAction, actor: PlayerId, currentPlayer: str
     case 'deployTroop':         return mk('deployTroop', [action.spaceId]);
     case 'assassinateTroop':    return mk('assassinateTroop', [action.spaceId]);
     case 'returnEnemySpy':      return mk('returnEnemySpy', [action.siteId, action.targetColor]);
+    case 'houseAction':         return mk('houseAction', [action.abilityKey]);
+    case 'recruitReservedCard': return mk('recruitReservedCard', []);
     // A pendingChoice may belong to a player who is NOT the current player (a
     // cross-player forced discard: an aberrations card makes the OPPONENT
     // discard). boardgame.io only permits the current player to submit a move,
@@ -196,9 +202,13 @@ function enumerateLegal(state: BgioState, actor: PlayerId): TyrantsAction[] {
   // 2. Setup phase: open starting sites.
   if (G.setupPhase) {
     const out: TyrantsAction[] = [];
+    const chosenSite = G.players[actor]?.houseState.data.startingSiteChosen as string | undefined;
     for (const s of SITES) {
       if (!s.isStartingSite) continue;
       if (!(s.id in G.siteControl)) continue;
+      // Multi-troop starting deploys (Nasadra) lock onto the site the first
+      // deploy this setup turn used — see game.ts's deployStartingTroop.
+      if (chosenSite && s.id !== chosenSite) continue;
       const spaces = sitesSpaces(s.id);
       const hasOpen = spaces.some(sp => !G.troops[sp.id]);
       const rivalHeld = spaces.some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white');
@@ -266,6 +276,19 @@ function enumerateLegal(state: BgioState, actor: PlayerId): TyrantsAction[] {
     if ((G.auxStacks[stack] ?? 0) <= 0) continue;
     if (ref.cost > me.influence) continue;
     out.push({ kind: 'recruitFromAuxStack', stack });
+  }
+
+  // 3c-2. House abilities + the reserved-card recruit (Drow House system —
+  // see houses/house-data.ts). No-op set when houses are off (me.house is
+  // null, eligibleActionKeys returns []).
+  for (const key of HouseHooks.eligibleActionKeys(G, actor)) {
+    out.push({ kind: 'houseAction', abilityKey: key });
+  }
+  const reserved = me.houseState?.data[RESERVED_MARKET_CARD_KEY] as CardRef | undefined;
+  if (reserved) {
+    const data = lookupCard(reserved.deck, reserved.slot);
+    const cost = Math.max(0, (data?.cost ?? 999) - 1);
+    if (me.influence >= cost) out.push({ kind: 'recruitReservedCard' });
   }
 
   // 3d. End turn is always legal during a regular (non-setup) turn.

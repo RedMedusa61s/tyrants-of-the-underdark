@@ -13,6 +13,7 @@ import { ADJACENCY } from '../data/routes';
 import { lookupCard } from '../card-data';
 import { hasPresence, hasTotalControl } from '../engine/map-state';
 import type { AiMove } from './random-ai';
+import { pickHouseAction } from './house-ai';
 import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
 import { takePhaseSnapshot, type PhaseSnapshot } from './game-phase';
 import { lookaheadPick, setPositionalWeights, setFittedEval, type SimulateMoveFn, type RolloutToTurnEndFn } from './lookahead';
@@ -309,18 +310,25 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       //       shrink the deck. Always worth doing if any card is eligible
       //       (the Outcast itself is pure poison; even sacrificing a starter
       //       turn-resource is a good trade).
+      // (c) Jarlaxle's "look at an opponent's hand and choose a card for
+      //     them to play": customHandTarget points at whose hand this is —
+      //     NOT the acting player's own, and the cycling-deck-floor guard
+      //     (which protects the actor's own deck) doesn't apply. Reuse
+      //     trashScore as "pick their weakest card to force on them".
       const isOutcastDiscard = pc.cardKey?.startsWith('insane-outcasts::') ?? false;
+      const handOwner = pc.customHandTarget ? G.players[pc.customHandTarget] : me;
+      const sourceHand = handOwner?.hand ?? [];
       const idxs = (opts as number[]).length > 0
         ? (opts as number[])
-        : me.hand.map((_, i) => i);
+        : sourceHand.map((_, i) => i);
       if (idxs.length === 0) return { name: 'resolveChoice', args: [null] };
-      if (pc.optional && !isOutcastDiscard && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
+      if (!pc.customHandTarget && pc.optional && !isOutcastDiscard && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
       let bestIdx = idxs[0];
       let bestScore = Infinity;
       for (const i of idxs) {
-        const c = me.hand[i];
+        const c = sourceHand[i];
         if (!c) continue;
         const score = trashScore(c.deck, c.slot);
         if (score < bestScore) { bestScore = score; bestIdx = i; }
@@ -344,7 +352,9 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
       if (pc.optional && !inEndgame && cyclingDeckSize(G, pid) - 1 < WEIGHTS.minCyclingDeck) {
         return { name: 'resolveChoice', args: [null] };
       }
-      const pool = pc.kind === 'select-card-in-discard' ? me.discard : G.cardsPlayedThisTurn;
+      const pool = pc.kind === 'select-card-in-discard'
+        ? (pc.discardOwnerId ? (G.players[pc.discardOwnerId]?.discard ?? []) : me.discard)
+        : G.cardsPlayedThisTurn;
       let best = idxs[0], bestScore = -Infinity;
       for (const i of idxs) {
         const c = pool[i];
@@ -595,11 +605,14 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
 
   // 2. Setup phase.
   if (G.setupPhase) {
-    const open = SITES.filter(s =>
-      s.isStartingSite && s.id in G.siteControl &&
-      sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
-      !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
-    );
+    const chosenSite = G.players[currentPlayer]?.houseState.data.startingSiteChosen as string | undefined;
+    const open = chosenSite
+      ? SITES.filter(s => s.id === chosenSite)
+      : SITES.filter(s =>
+          s.isStartingSite && s.id in G.siteControl &&
+          sitesSpaces(s.id).some(sp => !G.troops[sp.id]) &&
+          !sitesSpaces(s.id).some(sp => G.troops[sp.id] && G.troops[sp.id] !== 'white')
+        );
     // Prefer a starting site with a control marker / highest VP, then sample
     // among the top few (weighted by rank) so the AI doesn't open at the same
     // site every game — keeps the strongest most likely but adds variety (#83).
@@ -615,6 +628,13 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   }
 
   const me = G.players[currentPlayer];
+
+  // 2a. A house ability (or the reserved-card recruit), if useful right now
+  // — see ai/house-ai.ts. Checked before card-play/board-actions/recruit;
+  // re-run every decision tick, so this alone interleaves house actions
+  // correctly through the turn without a separate "early"/"late" phase.
+  const houseMove = pickHouseAction(G, currentPlayer);
+  if (houseMove) return houseMove;
 
   // 3a. Play all hand cards first (always strictly better than not playing).
   //
@@ -675,7 +695,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   // never lower it past what the engine will accept — otherwise the AI
   // proposes an unaffordable move, the reducer returns INVALID_MOVE, and
   // the tournament harness burns the turn via fallback endTurn.
-  const assassinateThreshold = Math.max(WEIGHTS.powerThresholdForAssassinate, BASE_ACTION_POWER_COST);
+  const currentCost = G.assassinateCostOverride ?? BASE_ACTION_POWER_COST;
+  const assassinateThreshold = Math.max(WEIGHTS.powerThresholdForAssassinate, currentCost);
 
   // Decide ordering of (assassinate, deploy):
   //   - ahead+late → deploy first (accelerate end)
