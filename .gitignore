@@ -1,6 +1,8 @@
 # --- Node / build ---
-node_modules/
+node_modules
 dist/
+dist-api/
+.wrangler/
 build/
 *.tsbuildinfo
 
@@ -51,6 +53,8 @@ weights/_smoke-*.json
 weights/tuned.json
 weights/tune-log.json
 
+# Local triage working files (screenshots, issue dumps) - never commit.
+.triage/
 # --- App files ---
 android
 capacitor.config.ts

@@ -90,7 +90,40 @@ export function ensureSpiesLeftInitialized(G: import('../game').TyrantsState, co
   me.spiesLeft = Math.max(0, 5 - onBoard);
 }
 
-export function placeSpyAtChosenSite(opts?: { optional?: boolean }): EffectHandler {
+/** What the card does at the spy's site *after* the spy lands. Several cards
+ *  chain off `_lastPlacedSpySite`, and every one of them quietly does nothing
+ *  if the chosen site holds no qualifying troop. Declaring the follow-up lets
+ *  the place-a-spy prompt say so up front and flag the sites that pay off
+ *  (#105: "Yan-C-Bin did not assassinate a troop" — the reporter had spent the
+ *  spy on a site holding only their own troop, which is never a legal target). */
+export type SpyFollowUp = 'assassinate' | 'supplant' | 'enemy-troop' | 'opponent-troop';
+
+const SPY_FOLLOW_UP_TEXT: Record<SpyFollowUp, string> = {
+  assassinate:    'you then assassinate a troop there',
+  supplant:       'you then supplant a troop there',
+  'enemy-troop':  'the bonus needs an enemy troop there',
+  'opponent-troop': "the bonus needs another player's troop there",
+};
+
+/** Does `siteId` hold a troop that satisfies `followUp`? Mirrors the
+ *  eligibility filters in assassinateAtLastPlacedSpySite /
+ *  supplantAtLastPlacedSpySite / ifEnemyTroopAtLastPlacedSpySite /
+ *  ifAnotherPlayerTroopAtLastPlacedSpySite — keep them in step. */
+function siteSatisfiesFollowUp(
+  G: import('../game').TyrantsState, myColor: string, siteId: string, followUp: SpyFollowUp,
+): boolean {
+  return TROOP_SPACES.some(t => {
+    if (t.parentSite !== siteId) return false;
+    const occ = G.troops[t.id];
+    if (!occ || occ === myColor) return false;
+    // "another player" excludes unaligned white troops; the rest treat white
+    // as a legal target (rulebook p.11).
+    if (followUp === 'opponent-troop') return occ !== 'white';
+    return true;
+  });
+}
+
+export function placeSpyAtChosenSite(opts?: { optional?: boolean; followUp?: SpyFollowUp }): EffectHandler {
   return ctx => {
     const me = ctx.G.players[ctx.actorId];
     const myColor = me.color;
@@ -103,6 +136,23 @@ export function placeSpyAtChosenSite(opts?: { optional?: boolean }): EffectHandl
     const placeableSites = () => SITES
       .filter(s => s.id in ctx.G.siteControl && !(ctx.G.spies[s.id] ?? []).includes(myColor))
       .map(s => s.id);
+
+    // Helper: build the prompt (+ advisory highlight) for a place-site pick.
+    // With no declared follow-up this is the plain question it always was.
+    const placePrompt = (base: string): PendingChoice => {
+      if (!opts?.followUp) return { kind: 'select-site', prompt: base, options: placeableSites() } as PendingChoice;
+      const options = placeableSites();
+      const highlight = options.filter(id => siteSatisfiesFollowUp(ctx.G, myColor, id, opts.followUp!));
+      const tail = highlight.length > 0
+        ? `${SPY_FOLLOW_UP_TEXT[opts.followUp]} — ${highlight.length} site${highlight.length === 1 ? '' : 's'} marked below can pay off.`
+        : `${SPY_FOLLOW_UP_TEXT[opts.followUp]}, and no site on the board currently has one.`;
+      return {
+        kind: 'select-site',
+        prompt: `${base.replace(/\?$/, '')} — ${tail}`,
+        options,
+        highlight,
+      } as PendingChoice;
+    };
     // Helper: sites where I currently have a spy (eligible to return).
     const ownSpySites = () => SITES
       .filter(s => (ctx.G.spies[s.id] ?? []).includes(myColor))
@@ -112,12 +162,7 @@ export function placeSpyAtChosenSite(opts?: { optional?: boolean }): EffectHandl
     if (state.phase === 'init') {
       if (me.spiesLeft > 0) {
         // Normal path: prompt for the site to place at.
-        ctx.pendingChoice = {
-          kind: 'select-site',
-          prompt: 'Place a spy at which site?',
-          options: placeableSites(),
-          optional: opts?.optional,
-        } as PendingChoice;
+        ctx.pendingChoice = { ...placePrompt('Place a spy at which site?'), optional: opts?.optional } as PendingChoice;
         ctx.paused = true;
         ctx.handlerState = { phase: 'place' };
         return false;
@@ -192,11 +237,7 @@ export function placeSpyAtChosenSite(opts?: { optional?: boolean }): EffectHandl
         me.spiesLeft += 1;
         Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned spy from ${siteId} to refill supply (spies left: ${me.spiesLeft})`);
       }
-      ctx.pendingChoice = {
-        kind: 'select-site',
-        prompt: 'Place the spy at which site?',
-        options: placeableSites(),
-      } as PendingChoice;
+      ctx.pendingChoice = placePrompt('Place the spy at which site?');
       ctx.paused = true;
       ctx.handlerState = { phase: 'empty-place' };
       return false;
@@ -240,7 +281,10 @@ export function supplantAtLastPlacedSpySite(): EffectHandler {
           const occ = ctx.G.troops[id];
           return occ && occ !== me.color;
         });
-      if (eligible.length === 0) return true;
+      if (eligible.length === 0) {
+        Mechanics.log(ctx.G, `(supplant at ${siteId}: skipped — only your own troops are there, and you can't supplant your own troops)`);
+        return true;
+      }
       ctx.pendingChoice = {
         kind: 'select-troop-space',
         prompt: `Supplant a troop at ${siteId} (the spy's site).`,
@@ -264,11 +308,13 @@ export function supplantAtLastPlacedSpySite(): EffectHandler {
     if (me.barracksLeft > 0) {
       if (deployTroop(ctx.G, me.color, spaceId)) {
         me.barracksLeft -= 1;
-        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`);
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`,
+          { kind: 'troop.supplant', payload: { site: spaceId, target: killed }, side: ctx.actorId });
       }
     } else {
       me.vp += 1;
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`);
+      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`,
+        { kind: 'troop.supplant', payload: { site: spaceId, target: killed, barracksEmpty: true }, side: ctx.actorId });
     }
     return true;
   };
@@ -296,7 +342,7 @@ export function assassinateAtLastPlacedSpySite(): EffectHandler {
           return occ && occ !== me.color;
         });
       if (eligible.length === 0) {
-        Mechanics.log(ctx.G, `(assassinate at ${siteId}: no enemy/white troops to target — skipped)`);
+        Mechanics.log(ctx.G, `(assassinate at ${siteId}: skipped — only your own troops are there, and you can't assassinate your own troops)`);
         Gx._lastPlacedSpySite = undefined;
         ctx.handlerState = null;
         return true;
@@ -328,7 +374,8 @@ export function assassinateAtLastPlacedSpySite(): EffectHandler {
     const killed = assassinateTroop(ctx.G, spaceId);
     if (killed === 'white') me.trophyHall.white += 1;
     else if (killed) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
-    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`,
+      { kind: 'troop.assassinate', payload: { site: spaceId, target: killed }, side: ctx.actorId });
     return true;
   };
 }
@@ -504,7 +551,8 @@ export function assassinateAtLastReturnedSpySite(): EffectHandler {
     if (!killed) return true;
     if (killed === 'white') me.trophyHall.white += 1;
     else if (killed !== me.color) me.trophyHall[killed] = (me.trophyHall[killed] ?? 0) + 1;
-    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`,
+      { kind: 'troop.assassinate', payload: { site: spaceId, target: killed }, side: ctx.actorId });
     return true;
   };
 }
@@ -551,11 +599,13 @@ export function supplantAtLastReturnedSpySite(): EffectHandler {
     if (me.barracksLeft > 0) {
       if (deployTroop(ctx.G, me.color, spaceId)) {
         me.barracksLeft -= 1;
-        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`);
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`,
+          { kind: 'troop.supplant', payload: { site: spaceId, target: killed }, side: ctx.actorId });
       }
     } else {
       me.vp += 1;
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`);
+      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`,
+        { kind: 'troop.supplant', payload: { site: spaceId, target: killed, barracksEmpty: true }, side: ctx.actorId });
     }
     return true;
   };
@@ -618,7 +668,8 @@ export function assassinateChoice(opts?: { count?: number; whiteOnly?: boolean; 
       const killed = assassinateTroop(ctx.G, spaceId);
       if (killed === 'white') ctx.G.players[ctx.actorId].trophyHall.white += 1;
       else if (killed) ctx.G.players[ctx.actorId].trophyHall[killed] = (ctx.G.players[ctx.actorId].trophyHall[killed] ?? 0) + 1;
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`);
+      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} assassinated ${killed} at ${spaceId}`,
+      { kind: 'troop.assassinate', payload: { site: spaceId, target: killed }, side: ctx.actorId });
       // Lock subsequent kills to this site when sameSite is set.
       const lockedSite = opts?.sameSite ? (state.site ?? siteKeyOf(spaceId)) : undefined;
       state = { remaining: state.remaining - 1, site: lockedSite };
@@ -675,7 +726,8 @@ export function deployChoice(opts?: { count?: number; anywhere?: boolean; costle
       // empty-barracks → +1 VP fallback.
       if (opts?.costless) {
         if (deployTroop(ctx.G, me.color, spaceId)) {
-          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} placed a free troop at ${spaceId}`);
+          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} placed a free troop at ${spaceId}`,
+            { kind: 'troop.deploy', payload: { site: spaceId, free: true }, side: ctx.actorId });
         }
       } else if (me.barracksLeft <= 0) {
         // Rulebook p.12: with empty barracks, each deploy converts to +1 VP
@@ -684,7 +736,8 @@ export function deployChoice(opts?: { count?: number; anywhere?: boolean; costle
         Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} deploy → +1 VP (barracks empty)`);
       } else if (deployTroop(ctx.G, me.color, spaceId)) {
         me.barracksLeft -= 1;
-        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} deployed at ${spaceId} (barracks: ${me.barracksLeft})`);
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} deployed at ${spaceId} (barracks: ${me.barracksLeft})`,
+        { kind: 'troop.deploy', payload: { site: spaceId }, side: ctx.actorId });
       }
       state = { remaining: state.remaining - 1 };
     }
@@ -760,11 +813,13 @@ export function supplantChoice(opts?: { whiteOnly?: boolean; anywhere?: boolean;
       if (me.barracksLeft > 0) {
         if (deployTroop(ctx.G, me.color, spaceId)) {
           me.barracksLeft -= 1;
-          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`);
+          Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`,
+          { kind: 'troop.supplant', payload: { site: spaceId, target: killed }, side: ctx.actorId });
         }
       } else {
         me.vp += 1;
-        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP instead of deploy`);
+        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP instead of deploy`,
+        { kind: 'troop.supplant', payload: { site: spaceId, target: killed, barracksEmpty: true }, side: ctx.actorId });
       }
     }
     ctx.handlerState = null;
@@ -1026,6 +1081,21 @@ export function sequence(...steps: EffectHandler[]): EffectHandler {
 
 interface FocusState { revealChecked?: boolean; childState?: unknown }
 
+/** Names of the OTHER same-aspect cards played this turn — i.e. what actually
+ *  satisfied a chain trigger. The card being resolved is already in
+ *  cardsPlayedThisTurn whenever its handler suspended on an earlier step (see
+ *  playCard), so drop one instance of it before counting. */
+function focusEnablers(ctx: EffectContext, key: string): string[] {
+  const names: string[] = [];
+  let droppedSelf = false;
+  for (const c of ctx.G.cardsPlayedThisTurn) {
+    if (!droppedSelf && c.deck === ctx.card.deck && c.slot === ctx.card.slot) { droppedSelf = true; continue; }
+    const d = lookupCard(c.deck, c.slot);
+    if (d?.aspect.toLowerCase() === key) names.push(d.name);
+  }
+  return names;
+}
+
 export function focus(aspect: string, bonus: EffectHandler): EffectHandler {
   const key = aspect.toLowerCase();
   return ctx => {
@@ -1034,7 +1104,19 @@ export function focus(aspect: string, bonus: EffectHandler): EffectHandler {
 
     // Auto-trigger: another same-aspect card was already played this turn.
     if (count > 1) {
-      if (!state.revealChecked) Mechanics.log(ctx.G, `Focus (${aspect}) triggered (chain).`);
+      if (!state.revealChecked) {
+        // Name the earlier card(s) that satisfied the trigger. A chain Focus
+        // fires with no prompt at all, so without this the log line is the only
+        // evidence it happened — and "Focus triggered" on its own reads as
+        // having come out of nowhere (in-game report #103, where the trigger
+        // was correct but looked like it was caused by an unrelated recruit).
+        const enablers = focusEnablers(ctx, key);
+        const because = enablers.length
+          ? `already played ${enablers.join(', ')} this turn`
+          : `played ${count} ${aspect} cards this turn`;
+        Mechanics.log(ctx.G, `Focus (${aspect}) triggered — ${because}, so no reveal was needed.`,
+          { kind: 'card.focus', payload: { aspect, via: 'chain', card: ctx.card.name, enabledBy: enablers } });
+      }
       const childCtx: EffectContext = { ...ctx, pendingChoice: ctx.pendingChoice, handlerState: state.childState, paused: ctx.paused };
       const done = bonus(childCtx);
       if (!done) {
@@ -1055,7 +1137,15 @@ export function focus(aspect: string, bonus: EffectHandler): EffectHandler {
           const d = lookupCard(me.hand[i].deck, me.hand[i].slot);
           if (d?.aspect.toLowerCase() === key) eligible.push(i);
         }
-        if (eligible.length === 0) { ctx.handlerState = null; return true; } // no eligible reveal
+        if (eligible.length === 0) {
+          // No prompt, no effect, and previously no log line either — the card
+          // just silently did less than its text promised (in-game report #100).
+          // Say why.
+          Mechanics.log(ctx.G, `Focus (${aspect}) did not apply — no other ${aspect} card played this turn and none in hand to reveal.`,
+            { kind: 'card.focus', payload: { aspect, via: 'none', card: ctx.card.name } });
+          ctx.handlerState = null;
+          return true;
+        }
         ctx.pendingChoice = {
           kind: 'select-card-in-hand',
           prompt: `Reveal a ${aspect} card from hand for the Focus bonus?`,
@@ -1068,8 +1158,16 @@ export function focus(aspect: string, bonus: EffectHandler): EffectHandler {
       const idx = ctx.pendingChoice.response as number | null;
       ctx.pendingChoice = null;
       ctx.paused = false;
-      if (idx == null) { ctx.handlerState = null; return true; } // declined
-      Mechanics.log(ctx.G, `Focus (${aspect}) triggered (revealed).`);
+      if (idx == null) {
+        Mechanics.log(ctx.G, `Focus (${aspect}) declined — no card revealed.`,
+          { kind: 'card.focus', payload: { aspect, via: 'declined', card: ctx.card.name } });
+        ctx.handlerState = null;
+        return true; // declined
+      }
+      const revealed = ctx.G.players[ctx.actorId].hand[idx];
+      const revealedName = revealed ? (lookupCard(revealed.deck, revealed.slot)?.name ?? revealed.name) : aspect;
+      Mechanics.log(ctx.G, `Focus (${aspect}) triggered — revealed ${revealedName} from hand (it stays in your hand).`,
+        { kind: 'card.focus', payload: { aspect, via: 'revealed', card: ctx.card.name, revealed: revealedName } });
       state = { revealChecked: true, childState: null };
     }
 
@@ -1290,28 +1388,70 @@ export function moveDeckToDiscard(): EffectHandler {
   };
 }
 
+/** Indices into `G.players[actorId].discard` that a "promote from your discard
+ *  pile" effect may offer.
+ *
+ *  Cards played this turn sit in the player's PLAY AREA per the rules, but the
+ *  engine also pushes them into `discard` during the turn. Effects that promote
+ *  "from your discard pile" (Matron Mother, Necromancer, Vampire) must NOT
+ *  offer those play-area cards (#65). Exclude one discard entry per
+ *  card-played-this-turn (by deck::slot, multiset — handles duplicates).
+ *
+ *  Exported so the `available` predicates on the chooseOne menus that lead here
+ *  can ask the same question the picker will (#108) — a bare
+ *  `discard.length > 0` offered "Promote a card from your discard" on a turn
+ *  where the whole discard pile was this turn's play area, and picking it did
+ *  nothing visible. */
+export function promotableDiscardIndices(
+  G: import('../game').TyrantsState,
+  actorId: string,
+): number[] {
+  const me = G.players[actorId];
+  if (!me) return [];
+  const playedLeft = new Map<string, number>();
+  for (const c of G.cardsPlayedThisTurn ?? []) {
+    const k = `${c.deck}::${c.slot}`;
+    playedLeft.set(k, (playedLeft.get(k) ?? 0) + 1);
+  }
+  const options: number[] = [];
+  for (let i = 0; i < me.discard.length; i++) {
+    const c = me.discard[i];
+    const k = `${c.deck}::${c.slot}`;
+    const n = playedLeft.get(k) ?? 0;
+    if (n > 0) { playedLeft.set(k, n - 1); continue; } // play-area card — skip
+    options.push(i);
+  }
+  return options;
+}
+
+/** A player's DISCARD PILE as the rules define it — what any display of the
+ *  pile should show. During a turn the engine files the cards the current
+ *  player has played into `discard` for bookkeeping, but by the rules they sit
+ *  in the play area until end of turn, and "promote from your discard pile"
+ *  effects (Necromancer, Matron Mother, Vampire) correctly refuse them. The
+ *  display used to show the raw array, so a player who had played their whole
+ *  hand saw those cards "in the discard pile" and couldn't promote them — "I
+ *  played my necromancer as my last card ... and I'm not able to promote one of
+ *  my cards in my discard pile" (michael irsutti, BGG). This asks the same
+ *  question the promote effects do, so the display and the rule can't disagree.
+ *  Only the player whose turn it is has cards in play; any other player's pile
+ *  is returned unchanged. */
+export function rulesDiscard(
+  G: import('../game').TyrantsState,
+  pid: string,
+  currentPlayer: string,
+): import('../game').CardRef[] {
+  const pl = G.players[pid];
+  if (!pl) return [];
+  if (pid !== currentPlayer) return pl.discard;
+  return promotableDiscardIndices(G, pid).map(i => pl.discard[i]);
+}
+
 export function promoteFromDiscardChoice(opts?: { optional?: boolean }): EffectHandler {
   return ctx => {
     if (!ctx.pendingChoice) {
       const me = ctx.G.players[ctx.actorId];
-      // Cards played this turn sit in the player's PLAY AREA per the rules, but
-      // the engine also pushes them into `discard` during the turn. Effects that
-      // promote "from your discard pile" (Matron Mother, Necromancer) must NOT
-      // offer those play-area cards (#65). Exclude one discard entry per
-      // card-played-this-turn (by deck::slot, multiset — handles duplicates).
-      const playedLeft = new Map<string, number>();
-      for (const c of ctx.G.cardsPlayedThisTurn) {
-        const k = `${c.deck}::${c.slot}`;
-        playedLeft.set(k, (playedLeft.get(k) ?? 0) + 1);
-      }
-      const options: number[] = [];
-      for (let i = 0; i < me.discard.length; i++) {
-        const c = me.discard[i];
-        const k = `${c.deck}::${c.slot}`;
-        const n = playedLeft.get(k) ?? 0;
-        if (n > 0) { playedLeft.set(k, n - 1); continue; } // play-area card — skip
-        options.push(i);
-      }
+      const options = promotableDiscardIndices(ctx.G, ctx.actorId);
       if (options.length === 0) {
         // No eligible cards, so no picker opens. Players reported this as a
         // silent no-op — they chose "promote from discard" and nothing
@@ -1326,7 +1466,7 @@ export function promoteFromDiscardChoice(opts?: { optional?: boolean }): EffectH
         const msg = me.discard.length > 0
           ? `(${name}: no cards in your discard pile to promote — cards played this turn don't count)`
           : `(${name}: your discard pile is empty — nothing to promote)`;
-        ctx.G.log?.push?.(msg);
+        Mechanics.log(ctx.G, msg);
         return true;
       }
       ctx.pendingChoice = {
@@ -1414,7 +1554,8 @@ export function devourFromInnerCircleCost(thenEffect: EffectHandler, opts?: { pr
       if (!card) { ctx.handlerState = null; return true; }
       me.innerCircle.splice(idx, 1);
       Mechanics.devour(ctx.G, card);
-      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} devoured ${card.name} from inner circle`);
+      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} devoured ${card.name} from inner circle`,
+      { kind: 'card.devour', payload: { card: card.name, from: 'inner-circle' }, side: ctx.actorId });
       state = { paid: true, childState: null };
     }
     const childCtx: EffectContext = {
@@ -1545,43 +1686,99 @@ export function returnEnemyTroopChoice(opts?: { includeWhite?: boolean }): Effec
 }
 
 /** Return an enemy spy from a site where you have presence (rulebook p.13). */
+/** "Return an enemy spy" — pick the site, then, when more than one opponent has
+ *  a spy there, pick WHOSE spy goes back.
+ *
+ *  That second question used to be answered with `arr.find(c => c !== me.color)`
+ *  — the first enemy colour in the array, silently. With two opponents spying on
+ *  the same site that is a real decision being made for the player (in-game
+ *  report from BGG), and often the whole point of the action: the two spies
+ *  belong to different people and returning the wrong one can hand the site to
+ *  the player you were trying to block.
+ *
+ *  The owner prompt reuses `select-player`, which already renders as coloured
+ *  per-player buttons and is already enumerated for the AI — so no new prompt
+ *  kind, UI, or adapter case. */
+interface ReturnSpyState { siteId?: string }
+
 export function returnEnemySpyChoice(): EffectHandler {
   return ctx => {
-    if (!ctx.pendingChoice) {
-      const me = ctx.G.players[ctx.actorId];
-      const eligible = SITES.filter(s => {
-        if (!hasPresence(ctx.G, me.color, { site: s.id })) return false;
-        return (ctx.G.spies[s.id] ?? []).some(c => c !== me.color);
-      }).map(s => s.id);
-      if (eligible.length === 0) {
-        Mechanics.log(ctx.G, '(return enemy spy: no enemy spies at any site where you have presence — skipped)');
-        return true;
-      }
-      ctx.pendingChoice = {
-        kind: 'select-site',
-        prompt: 'Return an enemy spy from which site?',
-        options: eligible,
-        optional: false,
-      } as PendingChoice;
-      ctx.paused = true;
-      return false;
-    }
-    const siteId = ctx.pendingChoice.response as string | null;
-    ctx.pendingChoice = null;
-    ctx.paused = false;
-    if (!siteId) return true;
+    const state = (ctx.handlerState as ReturnSpyState | null) ?? {};
     const me = ctx.G.players[ctx.actorId];
-    const arr = ctx.G.spies[siteId] ?? [];
-    const enemyColor = arr.find(c => c !== me.color);
-    if (enemyColor) {
-      if (returnSpy(ctx.G, enemyColor, siteId)) {
-        // The returned spy goes back to its owner's supply, not yours.
-        ensureSpiesLeftInitialized(ctx.G, enemyColor);
-        const ownerPid = Object.keys(ctx.G.players).find(k => ctx.G.players[k].color === enemyColor);
-        if (ownerPid) ctx.G.players[ownerPid].spiesLeft += 1;
-        Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${enemyColor} spy from ${siteId}`);
+
+    // ---- Stage 1: which site? ----
+    if (!state.siteId) {
+      if (!ctx.pendingChoice) {
+        const eligible = SITES.filter(s => {
+          if (!hasPresence(ctx.G, me.color, { site: s.id })) return false;
+          return (ctx.G.spies[s.id] ?? []).some(c => c !== me.color);
+        }).map(s => s.id);
+        if (eligible.length === 0) {
+          Mechanics.log(ctx.G, '(return enemy spy: no enemy spies at any site where you have presence — skipped)');
+          ctx.handlerState = null;
+          return true;
+        }
+        ctx.pendingChoice = {
+          kind: 'select-site',
+          prompt: 'Return an enemy spy from which site?',
+          options: eligible,
+          optional: false,
+        } as PendingChoice;
+        ctx.paused = true;
+        ctx.handlerState = {};
+        return false;
+      }
+      const picked = ctx.pendingChoice.response as string | null;
+      ctx.pendingChoice = null;
+      ctx.paused = false;
+      if (!picked) { ctx.handlerState = null; return true; }
+      state.siteId = picked;
+    }
+
+    const siteId = state.siteId;
+    const enemies = (ctx.G.spies[siteId] ?? []).filter(c => c !== me.color);
+    if (enemies.length === 0) { ctx.handlerState = null; return true; }
+
+    // ---- Stage 2: whose spy? Only asked when it's a real choice. ----
+    let targetColor = enemies[0];
+    if (enemies.length > 1) {
+      if (!ctx.pendingChoice) {
+        const owners = enemies
+          .map(c => Object.keys(ctx.G.players).find(k => ctx.G.players[k].color === c))
+          .filter((k): k is string => !!k);
+        // Colours with no seated owner can't be offered; if that leaves one
+        // real choice, just take it rather than prompting with a single button.
+        if (owners.length > 1) {
+          const siteName = SITES.find(s => s.id === siteId)?.name ?? siteId;
+          ctx.pendingChoice = {
+            kind: 'select-player',
+            prompt: `Return whose spy from ${siteName}?`,
+            options: owners,
+            optional: false,
+          } as PendingChoice;
+          ctx.paused = true;
+          ctx.handlerState = { siteId };
+          return false;
+        }
+      } else {
+        const pid = ctx.pendingChoice.response as string | null;
+        ctx.pendingChoice = null;
+        ctx.paused = false;
+        if (!pid) { ctx.handlerState = null; return true; }
+        const chosen = ctx.G.players[pid]?.color;
+        if (chosen && enemies.includes(chosen)) targetColor = chosen;
       }
     }
+
+    if (returnSpy(ctx.G, targetColor, siteId)) {
+      // The returned spy goes back to its owner's supply, not yours.
+      ensureSpiesLeftInitialized(ctx.G, targetColor);
+      const ownerPid = Object.keys(ctx.G.players).find(k => ctx.G.players[k].color === targetColor);
+      if (ownerPid) ctx.G.players[ownerPid].spiesLeft += 1;
+      Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} returned ${targetColor} spy from ${siteId}`,
+        { kind: 'spy.return', payload: { site: siteId, target: targetColor }, side: ctx.actorId });
+    }
+    ctx.handlerState = null;
     return true;
   };
 }
@@ -2060,11 +2257,13 @@ export function returnAnySpiesAndSupplantAtEach(): EffectHandler {
           if (me.barracksLeft > 0) {
             if (deployTroop(ctx.G, myColor, spaceId)) {
               me.barracksLeft -= 1;
-              Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`);
+              Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} (barracks: ${me.barracksLeft})`,
+          { kind: 'troop.supplant', payload: { site: spaceId, target: killed }, side: ctx.actorId });
             }
           } else {
             me.vp += 1;
-            Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`);
+            Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} supplanted ${killed} at ${spaceId} — barracks empty, +1 VP`,
+        { kind: 'troop.supplant', payload: { site: spaceId, target: killed, barracksEmpty: true }, side: ctx.actorId });
           }
         }
       }
@@ -2176,13 +2375,19 @@ export function takeTrophyAndPlace(opts: { count: number; ownerPid?: string; whi
     if (state.remaining <= 0) { ctx.handlerState = null; return true; }
 
     // Step 1 fresh prompt: list every (player, color) with > 0 trophies,
-    // optionally restricted to opts.ownerPid.
-    const choices = enumerateTrophies(ctx.G, opts.ownerPid);
+    // optionally restricted to opts.ownerPid and to white (opts.whiteOnly).
+    // The whiteOnly filter MUST match the one used when the response comes
+    // back (step 1 resume, above): the response is an INDEX into this list, so
+    // a mismatch both offers illegal colours and mis-resolves the pick. Mummy
+    // Lord ("take a white troop from any trophy hall") showed exactly that —
+    // every colour was listed, and picking one silently did nothing (#107).
+    const choices = enumerateTrophies(ctx.G, opts.ownerPid, opts.whiteOnly);
     if (choices.length === 0) { ctx.handlerState = null; return true; }
     const targetTag = opts.ownerPid != null ? ` from P${Number(opts.ownerPid) + 1}'s hall` : '';
+    const colorTag = opts.whiteOnly ? 'white trophy' : 'trophy';
     ctx.pendingChoice = {
       kind: 'choose-one',
-      prompt: `Take a trophy${targetTag} (${state.remaining} remaining). Pick which trophy + color:`,
+      prompt: `Take a ${colorTag}${targetTag} (${state.remaining} remaining). Pick which trophy + color:`,
       options: choices.map(c => c.label),
       optional: opts?.optional ?? true,
     } as PendingChoice;
@@ -2741,7 +2946,8 @@ export function recruitFromDevouredPile(): EffectHandler {
       return true;
     }
     ctx.G.players[ctx.actorId].discard.push(top);
-    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} recruited ${top.name} from devoured pile (cost ${data.cost})`);
+    Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} recruited ${top.name} from devoured pile (cost ${data.cost})`,
+      { kind: 'card.recruit', payload: { card: top.name, from: 'devoured-pile' }, side: ctx.actorId });
     return true;
   };
 }

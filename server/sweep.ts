@@ -1,0 +1,306 @@
+// Abandoned-seat sweep.
+//
+// Async multiplayer's real failure mode isn't a crash, it's someone quietly
+// stopping. Everyone else is then stuck on a turn that never comes, with no
+// recourse — the game just sits there. This lets a bot finish that seat so the
+// rest of the table can play on.
+//
+// The obvious way to do that would be to rewrite the seat's identity to the
+// framework's `ai:<slug>:<difficulty>` form so its own AI driver picks it up.
+// That is exactly wrong here: seat identity is ALSO what the ratings report
+// maps through, so overwriting it would erase the walker from the result — and
+// abandoning a game you were losing would become the cheapest way to avoid
+// recording the loss. Instead we leave identities untouched and just forfeit
+// the seat, with its own token. `forfeitSeat` pins the walker's place to last,
+// and a forfeited seat is one of the adapter's serverDrivenSeats: the server's
+// AI driver plays it from then on without touching its identity (framework
+// 0.50+).
+//
+// Deliberately idempotent and stateless: re-running is safe, and a player who
+// comes back BEFORE the window runs out resets the clock and simply carries on.
+import type { GameServer, SnapshotStore, GameMeta } from 'digital-boardgame-framework/server';
+import type { Codec } from 'digital-boardgame-framework';
+import type { BgioState, TyrantsAction, PlayerId } from '../src/adapter/tyrantsAdapter';
+import { tyrantsAdapter } from '../src/adapter/tyrantsAdapter';
+
+/** How long a seat may sit on its turn before a bot takes over. Async games are
+ *  played over days, so this has to be generous — a week is a holiday, not a
+ *  walk-out, but two turns in a row at a week each is a dead game. */
+export const ABANDON_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Hard backstop on candidates per run. The real limiter is the time budget
+ *  below — this just stops a pathological list from being walked at all. */
+const MAX_GAMES_PER_SWEEP = 100;
+
+/** Wall-clock budget for the scanning phase.
+ *
+ *  Counting alone is the wrong limiter, and measuring proved it: 25 candidates
+ *  returned in ~2.5s, so 100 "should" have been ~10s — it timed out past 100s
+ *  instead. Each candidate costs a snapshot read (hundreds of KB), plus a
+ *  metadata write for any game whose clock isn't started yet, and those don't
+ *  scale the way a first sample suggests.
+ *
+ *  So: stop on the clock, not on a count. Whatever is left is picked up by the
+ *  next run — the window is a week and the cron is daily, so there is plenty of
+ *  slack. The cron allows 120s; this leaves ample headroom under it. */
+const SWEEP_BUDGET_MS = 20_000;
+
+/** The limit that actually binds: Cloudflare caps the number of outbound
+ *  requests ("subrequests") a single Worker invocation may make — 50 on the
+ *  current plan. Every store read or write counts.
+ *
+ *  This was invisible until the sweep started reporting its own error text.
+ *  A time budget looked like it was working (HTTP 200, ~26s, no complaints)
+ *  while the run was really dying partway through with "Too many subrequests",
+ *  which is why clocksStarted stayed 0 and the same three games errored every
+ *  night. Wall time was a symptom, not the cause.
+ *
+ *  Foreign rows are free — they're filtered from the single listActiveGames()
+ *  response without touching the store again — so the whole allowance goes to
+ *  real candidates. */
+const MAX_SUBREQUESTS = 40;
+
+/** Slice of the SUBREQUEST allowance held back for games with no clock yet.
+ *
+ *  Ordering most-overdue-first is right for deciding who to ACT on, but it puts
+ *  games that have never been seen at the very back — and the budget was
+ *  reliably running out before reaching them. A game whose clock never starts
+ *  can never become overdue, so it could never be swept at all: the feature
+ *  would quietly not apply to exactly the newest games, forever, while the
+ *  sweep reported success every night.
+ *
+ *  So the two jobs get separate money. Starting a clock is cheap (one read, one
+ *  small write), so a few seconds covers a lot of new games. */
+const CLOCK_START_RESERVE = 12;
+
+/** Stored snapshots carry a `v<N>:` schema prefix that the server strips on
+ *  read. That splitter is private to the framework, so mirror it here — decoding
+ *  a raw row with the bare codec otherwise dies on the prefix. Only the current
+ *  schema is handled: an older row is left for the server's own migrate path
+ *  rather than half-migrated here. */
+const SNAPSHOT_VERSION_RE = /^v(\d+):/;
+const SCHEMA_VERSION = tyrantsAdapter.schemaVersion ?? 1;
+export function decodeRow(codec: Codec<BgioState>, raw: string, schemaVersion: number): BgioState | null {
+  const m = SNAPSHOT_VERSION_RE.exec(raw);
+  const version = m ? Number(m[1]) : 1;
+  const inner = m ? raw.slice(m[0].length) : raw;
+  if (version !== schemaVersion) return null;
+  return codec.decode(inner);
+}
+
+/** Is this decoded row actually one of OUR games?
+ *
+ *  The store is a single Supabase project shared by every game on the hub —
+ *  `/api/reports` served from this very deployment returns War of the Ring and
+ *  Axis & Allies rows — and `listActiveGames()` has no app filter, so it hands
+ *  back every unresolved game of every game. Decoding a foreign row with the
+ *  Tyrants adapter is not a clean failure either: `migrate()` only touches
+ *  G.log, so a foreign state can sail through it and reach `currentActor`,
+ *  which reads ctx.currentPlayer and returns null for anything without a
+ *  boardgame.io ctx — indistinguishable from "this game is over". Anything
+ *  acting on that would corrupt another game's data.
+ *
+ *  So: positively identify a Tyrants state before touching the row, and never
+ *  write to one we can't identify. */
+function isTyrantsState(state: unknown): state is BgioState {
+  const st = state as Partial<BgioState> | null;
+  const G = st?.G as Record<string, unknown> | undefined;
+  return !!G
+    && typeof G === 'object'
+    && typeof (G as { setupPhase?: unknown }).setupPhase === 'boolean'
+    && !!(G as { market?: { row?: unknown } }).market
+    && Array.isArray((G as { market?: { row?: unknown[] } }).market?.row)
+    && !!(G as { troops?: unknown }).troops
+    && !!(G as { players?: unknown }).players
+    && !!st?.ctx
+    && typeof st.ctx.currentPlayer === 'string';
+}
+
+/** Cheap pre-filter, from metadata alone, before spending a query on the
+ *  snapshot. Tyrants seats are the boardgame.io seat indices '0'..'3'; the other
+ *  games on this shared store use named sides ('fp'/'shadow', 'uk'/'japan'/…),
+ *  so their rows are recognisable without fetching anything.
+ *
+ *  This is an optimisation, NOT the safety check — another numerically-seated
+ *  game would pass it. isTyrantsState() on the decoded snapshot is what actually
+ *  gates any read or write. Without this pre-filter the per-sweep cap gets spent
+ *  on foreign rows (in production the first 25 rows were ALL foreign), so real
+ *  Tyrants games would never be reached. */
+function looksLikeTyrantsMeta(meta: GameMeta): boolean {
+  const seats = meta.players ?? [];
+  return seats.length >= 2 && seats.length <= 4
+    && seats.every((p) => /^[0-3]$/.test(p));
+}
+
+export interface SweepResult {
+  scanned: number;
+  /** Seats newly marked as forfeited this sweep. */
+  forfeited: number;
+  /** Games where the server's bot then played the abandoned seat's turn. */
+  seatsTakenOver: number;
+  /** Games where a takeover was attempted but errored (logged, never thrown). */
+  errored: number;
+  /** Rows that belong to another game on the shared store, left untouched. */
+  skippedForeign: number;
+  /** Clocks started on games seen for the first time this run. */
+  clocksStarted: number;
+  /** First error text seen, if any — the per-game catch keeps the sweep alive,
+   *  but without this the reason only ever reached a log nobody reads. */
+  sampleError?: string;
+  /** True when the platform's per-invocation request allowance ran out. Like
+   *  ranOutOfTime, normal on a busy shared store — the rest is picked up next
+   *  run — but it's the number to watch if takeovers seem slow. */
+  ranOutOfRequests?: boolean;
+  /** Store round-trips used, for sizing the allowance against the platform cap. */
+  requestsUsed?: number;
+  /** True when the time budget ran out before every candidate was looked at.
+   *  Not an error — the remainder is picked up by the next run — but it's the
+   *  signal to watch if takeovers ever seem slow. */
+  ranOutOfTime?: boolean;
+}
+
+/** A seat is human unless the framework recorded it as one of its own AI seats.
+ *  Unattributed seats (casual, never signed in) are humans too — they're the
+ *  ones most likely to wander off. */
+function isHumanSeat(meta: GameMeta, seat: string): boolean {
+  const identity = meta.identities?.[seat];
+  return !identity || !identity.startsWith('ai:');
+}
+
+/** Counts store round-trips so a run stops just short of the platform cap
+ *  instead of being cut off mid-way through one. */
+class RequestBudget {
+  private used = 0;
+  constructor(private readonly cap: number) {}
+  /** True if there's room for `n` more; records them when there is. */
+  take(n = 1): boolean {
+    if (this.used + n > this.cap) return false;
+    this.used += n;
+    return true;
+  }
+  get spent(): number { return this.used; }
+  remaining(): number { return this.cap - this.used; }
+}
+
+export async function sweepAbandonedSeats(opts: {
+  server: GameServer<BgioState, TyrantsAction, PlayerId>;
+  store: SnapshotStore;
+  codec: Codec<BgioState>;
+  olderThanMs?: number;
+  nowMs?: number;
+  /** Override the per-invocation store-request allowance. Defaults to
+   *  MAX_SUBREQUESTS, which is sized for the Cloudflare Worker cap; tests raise
+   *  it to drive scenarios deeper than one production run would reach. */
+  maxSubrequests?: number;
+}): Promise<SweepResult> {
+  const olderThanMs = opts.olderThanMs ?? ABANDON_AFTER_MS;
+  const now = opts.nowMs ?? Date.now();
+  const out: SweepResult = { scanned: 0, forfeited: 0, seatsTakenOver: 0, errored: 0, skippedForeign: 0, clocksStarted: 0 };
+
+  // NB: deliberately NOT server.sweepTurnReminders(). It iterates the same
+  // unscoped listActiveGames(), decodes every row with OUR adapter, and marks a
+  // game resolved whenever currentActor comes back null — which is exactly what
+  // a foreign game decodes to. Running it here would quietly close other games.
+  // We keep the same clock ourselves instead, writing only to rows we have
+  // positively identified as Tyrants games.
+
+  const allGames = await opts.store.listActiveGames();
+  // Cap on PLAUSIBLE games, not raw rows: the store is shared and dominated by
+  // other games, so slicing the raw list just re-scans the same foreign rows
+  // every sweep and never reaches ours.
+  const candidates = allGames.filter(looksLikeTyrantsMeta);
+  out.skippedForeign += allGames.length - candidates.length;
+
+  // Two jobs, and they compete: acting on games that are already overdue, and
+  // starting the clock on games we've never seen. Sorting purely by staleness
+  // starves the second — see CLOCK_START_RESERVE_MS. Split the list, and give
+  // each its own share of the budget.
+  const started: GameMeta[] = [];
+  const unseen: GameMeta[] = [];
+  for (const m of candidates) (m.reminder ? started : unseen).push(m);
+  // Most overdue first among those we're tracking.
+  started.sort((a, b) =>
+    new Date(a.reminder!.since).getTime() - new Date(b.reminder!.since).getTime());
+  // Oldest games first among the unseen, so a game can't be perpetually
+  // leapfrogged by newer ones.
+  unseen.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const startedAt = Date.now();
+  // listActiveGames() above already spent one.
+  const budget = new RequestBudget((opts.maxSubrequests ?? MAX_SUBREQUESTS) - 1);
+  // Overdue games may spend everything except the reserve; unseen games may use
+  // what's left. Without that floor the acting pass consumes the whole
+  // allowance, a new game's clock never starts, and it can therefore never
+  // become overdue or be swept at all.
+  const order = [
+    ...started.map(m => ({ meta: m, floor: CLOCK_START_RESERVE })),
+    ...unseen.map(m => ({ meta: m, floor: 0 })),
+  ];
+  for (const { meta, floor } of order.slice(0, MAX_GAMES_PER_SWEEP)) {
+    // Each candidate costs a read and may cost a write right after it.
+    if (budget.remaining() - floor < 2) {
+      out.ranOutOfRequests = true;
+      if (floor > 0) continue;   // acting share exhausted — fall through to the unseen
+      break;
+    }
+    if (Date.now() - startedAt > SWEEP_BUDGET_MS) { out.ranOutOfTime = true; break; }
+    out.scanned++;
+    try {
+      budget.take();
+      const latest = await opts.store.getLatest(meta.gameId);
+      if (!latest) continue;
+
+      // Identify the game BEFORE reading or writing anything about it.
+      const state = decodeRow(opts.codec, latest.state, SCHEMA_VERSION);
+      if (!state || !isTyrantsState(state)) { out.skippedForeign++; continue; }
+
+      const r = meta.reminder;
+      // No clock yet, or the turn moved since we last looked → not abandoned.
+      // Start/restart it and wait for the next sweep.
+      if (!r || r.turn !== latest.turn) {
+        budget.take();
+        await opts.store.putGameMeta({
+          ...meta,
+          reminder: { turn: latest.turn, since: new Date(now).toISOString(), sent: r?.sent ?? false },
+        });
+        if (!r) out.clocksStarted++;
+        continue;
+      }
+      if (now - new Date(r.since).getTime() < olderThanMs) continue;
+
+      const actor = tyrantsAdapter.currentActor(state);
+      if (actor === null) continue;                  // game over
+      if (!isHumanSeat(meta, actor)) continue;       // already a bot seat
+      const token = meta.tokens[actor];
+      if (!token) continue;                          // nothing to act with
+
+      // Forfeiting is all the sweep has to do. From then on the seat is one of
+      // the adapter's serverDrivenSeats, so the server's own AI driver plays it
+      // inside this very submit, and on every later turn as soon as it comes
+      // round — the rest of the table never waits on it again. (Until framework
+      // 0.50 the sweep played the seat itself here, one turn per daily run,
+      // which left a table waiting a week for each of that seat's turns.)
+      //
+      // A seat that is ALREADY forfeited and yet stuck means that drive failed
+      // (a CPU cut, or the bot erroring on an odd state). A fetch re-drives it.
+      const alreadyForfeited = (state.G.forfeitedSeats ?? []).includes(actor);
+      // Reads, the forfeit and the bot's snapshot (each followed by a prune), and
+      // — if this ends the game — resolving it and reporting the rating.
+      if (!budget.take(8)) { out.ranOutOfRequests = true; continue; }
+      const after = alreadyForfeited
+        ? await opts.server.fetch(meta.gameId, token)
+        : await opts.server.submit(meta.gameId, token, { kind: 'forfeitSeat', seat: actor });
+      if (!alreadyForfeited) out.forfeited++;
+      // The forfeit itself is one snapshot; anything past it is the bot's turn.
+      if (after.turn > latest.turn + (alreadyForfeited ? 0 : 1)) out.seatsTakenOver++;
+    } catch (e) {
+      out.errored++;
+      if (!out.sampleError) out.sampleError = `${meta.gameId}: ${e instanceof Error ? e.message : String(e)}`.slice(0, 200);
+      // A single bad game must never abort the sweep for everyone else.
+      // eslint-disable-next-line no-console
+      console.error(`[sweep] ${meta.gameId}:`, e);
+    }
+  }
+  out.requestsUsed = budget.spent + 1;
+  return out;
+}

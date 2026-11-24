@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
+import { PLAYER_COLOR_HEX, WHITE_TOKEN_HEX, needsLightRim, rimHex, DARK_RIM_HEX, DARK_RIM_SHADOW } from '../player-colors';
 import { SITES, type Site } from '../data/sites';
 import { ROUTES, type Route } from '../data/routes';
 import { sitesSpaces } from '../data/troop-spaces';
@@ -11,22 +11,8 @@ import { loadSectionDividers } from './SectionDividerCalibration';
 import { loadMarkerPositions } from './MarkerCalibration';
 import { hasTotalControl } from '../engine/map-state';
 
-const COLOR_HEX: Record<Color, string> = {
-  // Lifted toward grey so tokens contrast against near-black site boxes.
-  black: '#4a4a4a',
-  red: '#c2362e',
-  orange: '#d97a1d',
-  blue: '#2b53b0',
-  // Extra colours human players may pick — chosen to stay distinct from each
-  // other and from the canonical four against the dark board.
-  purple: '#9b5de5',
-  green: '#3fa34d',
-  teal: '#1fb6b0',
-  pink: '#e36bb0',
-  yellow: '#d9c520',
-};
-// White tokens darkened toward light grey so they stand out on white-bordered site boxes.
-const WHITE_TOKEN = '#d0d0d0';
+const COLOR_HEX = PLAYER_COLOR_HEX;
+const WHITE_TOKEN = WHITE_TOKEN_HEX;
 
 // Additional highlighted spaces
 const HIGHLIGHTED_SPACE_COLOR = '#66ccff';
@@ -38,6 +24,19 @@ const HIGHLIGHTED_SPACE_COLOR = '#66ccff';
 // inverted to white and neutral tokens go grey/white inconsistently. Renders
 // pixel-identical to a solid fill in every normal browser.
 const flat = (c: string) => `linear-gradient(${c}, ${c})`;
+
+// Neutral (Underdark) troops read as "white-ish circle" and an empty space reads
+// as "faint circle", which over pale board art left the two almost identical —
+// the only cue was a 1px dashed-vs-solid border (reported from BGG: "it's white
+// vs light gray"). The retail game has the same problem; we're deliberately not
+// copying it. A neutral token now carries a darker ring plus a small centre pip,
+// so it's distinguishable by SHAPE and not just by shade — which also survives
+// colour-blindness and the forced-dark-mode repaint this file already fights.
+const WHITE_TOKEN_RING = '#6b6b78';
+/** Centre pip, painted as a background layer so it can't be repainted away by
+ *  the browser's forced dark mode the way a solid child element could. */
+const NEUTRAL_PIP = `radial-gradient(circle at 50% 50%, ${WHITE_TOKEN_RING} 0 22%, transparent 23%)`;
+const neutralFill = () => `${NEUTRAL_PIP}, ${flat(WHITE_TOKEN)}`;
 
 const STORAGE_KEY = 'totu.site-positions';
 const SLOTS_STORAGE_KEY = 'totu.slot-positions';
@@ -69,6 +68,12 @@ interface MapViewProps {
   /** Sites the user can click in the current context (e.g. empty starting sites during setup). */
   clickableSites?: Set<string>;
   onSiteClick?: (siteId: string) => void;
+  /** Advisory subset of clickableSites: sites where the card's follow-up step
+   *  (assassinate / supplant / "opponent troop here" bonus) actually has a
+   *  target. Drawn as a solid, brighter ring; everything in clickableSites
+   *  stays equally clickable. Report #105 — a spy spent on a site with no
+   *  legal follow-up target used to look identical to a good one. */
+  highlightSites?: Set<string>;
   /** Troop spaces the user can click (e.g. for assassinate/deploy/supplant prompts). */
   clickableSpaces?: Set<string>;
   onSpaceClick?: (spaceId: string) => void;
@@ -118,11 +123,35 @@ function ControlMarkerToken(
   // One visual state per case: a solid coloured ring (with thicker stroke
   // and brighter halo on total control) for whoever currently controls, or
   // a thin gold "unclaimed" ring when nobody does.
-  const ringColor = controller ? COLOR_HEX[controller] : 'rgba(255,204,68,0.65)';
+  // The unclaimed ring used to be gold — rgba(255,204,68) — which sits right
+  // between the yellow player (#d9c520) and the orange player (#d97a1d). On a
+  // dark board an unclaimed city therefore read as one somebody already held:
+  // "it may make you think the city is controlled by the orange player"
+  // (michael irsutti, BGG). A muted silver that matches no player colour, plus
+  // a DASHED stroke, says "nobody holds this" by shape as well as by hue —
+  // no player ring is ever dashed, so it survives colourblindness and the
+  // custom colours players can pick.
+  const ringColor = controller ? COLOR_HEX[controller] : 'rgba(198,190,214,0.55)';
   const borderWidth = !controller ? 2 : totalControl ? 6 : 3;
+  // The disc is near-black, so a ring painted in black's #4a4a4a was a ring you
+  // had to hunt for — a city held by black read as one nobody held, which is
+  // most of what "difficult to read the board state" meant in #109. Keep the
+  // ring in the player's own grey (so it still says BLACK and not "some light
+  // colour", and stays clear of the silver dashed unclaimed ring), and add a
+  // bright hairline just inside it plus a light halo. Held-by-black is then a
+  // DOUBLE ring: a shape cue, like the neutral token's centre pip.
+  const darkRing = !!controller && needsLightRim(controller);
+  const glowColor = darkRing ? 'rgba(230,225,242,0.85)' : ringColor;
   const sideLabel = totalControl ? 'TOTAL CONTROL' : 'CONTROL';
   const inf = totalControl ? totalControlInfluence : controlInfluence;
   const vp = totalControl ? totalControlVp : 0;
+  // Every control marker in the game pays +1 influence and 0 VP on its control
+  // face — the number is identical at all seven cities, so printing it on an
+  // unclaimed marker distinguishes nothing and just adds a figure to read past.
+  // Same report. Show values only once they mean something: when a player
+  // holds the city, and above all on the total-control face, where the VP
+  // actually does differ from city to city.
+  const showValues = !!controller;
   // Two-line center stack: "+N inf" (always) then "+N VP" (total-control only).
   return (
     <div title={`Control: +${controlInfluence} influence/turn. Total control: +${totalControlInfluence} influence/turn + ${totalControlVp} VP/turn.\n${
@@ -136,24 +165,34 @@ function ControlMarkerToken(
         width: sizePx, height: sizePx,
         pointerEvents: 'none', zIndex: 6,
         filter: controller
-          ? `drop-shadow(0 0 ${totalControl ? 10 : 6}px ${ringColor})`
+          ? `drop-shadow(0 0 ${totalControl ? 10 : 6}px ${glowColor})`
           : 'drop-shadow(0 1px 3px rgba(0,0,0,0.6))',
       }}>
       <svg viewBox="0 0 100 100" width="100%" height="100%">
         {/* Disc with the marker's signature deep-purple fill and a thin
             decorative inner ring to read as a chip, not a flat circle. */}
         <circle cx="50" cy="50" r="48" fill={totalControl ? '#3a2055' : '#241638'}
-          stroke={ringColor} strokeWidth={borderWidth} />
+          stroke={ringColor} strokeWidth={borderWidth}
+          strokeDasharray={controller ? undefined : '7 5'} />
+        {darkRing && (
+          <circle cx="50" cy="50" r={48 - borderWidth / 2 - 0.9} fill="none"
+            stroke={DARK_RIM_HEX} strokeWidth="1.8" />
+        )}
         <circle cx="50" cy="50" r="42" fill="none"
           stroke="rgba(196,163,245,0.25)" strokeWidth="1" />
         {/* Center value stack. "+N" + drawn cobweb icon (influence); the VP
             line is drawn only on the total-control face. The cobweb is built
             from concentric arcs + radial spokes so it renders identically
             across browsers regardless of emoji-font coverage. */}
-        <text x="42" y={vp > 0 ? 46 : 58} textAnchor="middle"
-          fontSize="22" fontWeight="700" fill="#fff"
-          fontFamily="Georgia, serif">+{inf}</text>
-        <g transform={`translate(58, ${vp > 0 ? 40 : 52}) scale(1)`}>
+        {showValues && (
+          <text x="42" y={vp > 0 ? 46 : 58} textAnchor="middle"
+            fontSize="22" fontWeight="700" fill="#fff"
+            fontFamily="Georgia, serif">+{inf}</text>
+        )}
+        <g opacity={showValues ? 1 : 0.55}
+          transform={showValues
+            ? `translate(58, ${vp > 0 ? 40 : 52}) scale(1)`
+            : 'translate(50, 50) scale(1.6)'}>
           <circle cx="0" cy="0" r="6" fill="none" stroke="#fff" strokeWidth="0.7" />
           <circle cx="0" cy="0" r="4" fill="none" stroke="#fff" strokeWidth="0.6" />
           <circle cx="0" cy="0" r="2" fill="none" stroke="#fff" strokeWidth="0.5" />
@@ -162,7 +201,7 @@ function ControlMarkerToken(
           <line x1="-4.2" y1="-4.2" x2="4.2" y2="4.2"  stroke="#fff" strokeWidth="0.5" />
           <line x1="-4.2" y1="4.2"  x2="4.2" y2="-4.2" stroke="#fff" strokeWidth="0.5" />
         </g>
-        {vp > 0 && (
+        {showValues && vp > 0 && (
           <text x="50" y="68" textAnchor="middle"
             fontSize="18" fontWeight="700" fill="#ffd966"
             fontFamily="Georgia, serif">
@@ -186,7 +225,7 @@ function ControlMarkerToken(
   );
 }
 
-export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, clickableSpaces, onSpaceClick, highlightedSpaces }: MapViewProps) {
+export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, highlightSites, clickableSpaces, onSpaceClick }: MapViewProps) {
   const boardUrl = useCachedImage('assets/board/map.jpg');
   const [overrides, setOverrides] = useState<PositionOverride>(loadOverrides);
   const [slotPositions] = useState<SlotPositions>(loadSlotPositions);
@@ -364,6 +403,9 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           {G && SITES.filter(s => isSiteActive(s.id)).map(s => {
             const p = pos(s);
             const isClickable = !!clickableSites?.has(s.id);
+            // #105: schematic mode has no ring overlay, so the follow-up
+            // highlight rides on the site card's own border instead.
+            const isHighlit = isClickable && !!highlightSites?.has(s.id);
             const controller = G.siteControl[s.id] ?? null;
             const spaces = sitesSpaces(s.id);
             return (
@@ -373,18 +415,21 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 padding: '4px 8px',
                 background: 'rgba(20, 14, 40, 0.92)',
                 color: '#e6e1f2',
-                border: isClickable ? '2px solid #ffcc44'
-                  : controller ? `2px solid ${COLOR_HEX[controller]}`
+                border: isHighlit ? '3px solid #66ff9e'
+                  : isClickable ? '2px solid #ffcc44'
+                  : controller ? `2px solid ${rimHex(controller)}`
                   : s.isStartingSite ? '1px solid #ffcc44'
                   : '1px solid #5a3380',
                 borderRadius: 8,
-                boxShadow: isClickable ? '0 0 10px #ffcc44' : undefined,
+                boxShadow: isHighlit ? '0 0 14px rgba(102, 255, 158, 0.9)'
+                  : isClickable ? '0 0 10px #ffcc44' : undefined,
                 cursor: isClickable ? 'pointer' : 'default',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                 whiteSpace: 'nowrap',
                 zIndex: 5,
               }}
-                onClick={() => { if (isClickable) onSiteClick?.(s.id); }}>
+                onClick={() => { if (isClickable) onSiteClick?.(s.id); }}
+                title={isHighlit ? `${s.name} — the card's follow-up has a target here` : undefined}>
                 <div style={{ fontSize: 11, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                   <span>{s.name}</span>
                   <span style={{ opacity: 0.6 }}>({s.vp})</span>
@@ -433,11 +478,12 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                         title={`${s.name} — slot ${i + 1}${occ ? ` · ${occ}` : ''}`}
                         style={{
                           width: sz, height: sz, borderRadius: '50%',
-                          background: occ === 'white' ? flat(WHITE_TOKEN)
+                          background: occ === 'white' ? neutralFill()
                             : occ ? flat(COLOR_HEX[occ])
                             : 'transparent',
                           border: spClick ? '2px solid #ffcc44'
-                            : occ === 'black' ? '2px solid #e6e1f2'
+                            : occ === 'white' ? `2px solid ${WHITE_TOKEN_RING}`
+                            : occ && needsLightRim(occ) ? `2px solid ${DARK_RIM_HEX}`
                             : occ ? '2px solid #fff'
                             : '1px dashed rgba(255,255,255,0.35)',
                           boxShadow: spClick ? '0 0 6px #ffcc44' : undefined,
@@ -600,9 +646,20 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 position: 'absolute', left: `${x * 100}%`, top: `${y * 100}%`,
                 width: size, height: size, marginLeft: -size/2, marginTop: -size/2,
                 borderRadius: '50%',
-                background: occ === 'white' ? flat(WHITE_TOKEN) : occ ? flat(COLOR_HEX[occ]) : 'rgba(20, 14, 40, 0.7)',
-                border: pickable ? '2px solid #ffcc44' : highlighted ? `2px solid ${HIGHLIGHTED_SPACE_COLOR}` : occ ? '1px solid #fff' : '1px solid rgba(255,255,255,0.3)',
-                boxShadow: pickable ? '0 0 6px #ffcc44' : highlighted ? `0 0 8px ${HIGHLIGHTED_SPACE_COLOR}` : undefined,
+                background: occ === 'white' ? neutralFill() : occ ? flat(COLOR_HEX[occ]) : 'rgba(20, 14, 40, 0.7)',
+                border: pickable ? '2px solid #ffcc44'
+                  : occ === 'white' ? `2px solid ${WHITE_TOKEN_RING}`
+                  // A troop out on a trail sits straight on the cavern art,
+                  // which is where black's mid-grey fill has the least to
+                  // separate it from the background — so give it the same
+                  // bright rim the site slots already give it, not the 1px
+                  // hairline every colour used to share (#109).
+                  : occ && needsLightRim(occ) ? `2px solid ${DARK_RIM_HEX}`
+                  : occ ? '1px solid #fff'
+                  : '1px solid rgba(255,255,255,0.3)',
+                boxShadow: pickable ? '0 0 6px #ffcc44'
+                  : occ && needsLightRim(occ) ? DARK_RIM_SHADOW
+                  : undefined,
                 cursor: pickable ? 'pointer' : 'default',
                 zIndex: 5,
               }} />
@@ -725,17 +782,16 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
                 width: size, height: size,
                 marginLeft: -size/2, marginTop: -size/2,
                 borderRadius: '50%',
-                background: occ === 'white' ? flat(WHITE_TOKEN)
+                background: occ === 'white' ? neutralFill()
                   : occ ? flat(COLOR_HEX[occ])
                   : 'transparent',
                 border: pickable ? '2px solid #ffcc44'
-                  : highlighted ? `2px solid ${HIGHLIGHTED_SPACE_COLOR}`
-                  : occ === 'black' ? '2px solid #e6e1f2'
+                  : occ === 'white' ? `2px solid ${WHITE_TOKEN_RING}`
+                  : occ && needsLightRim(occ) ? `2px solid ${DARK_RIM_HEX}`
                   : occ ? '2px solid #fff'
                   : '1px dashed rgba(255,255,255,0.25)',
                 boxShadow: pickable ? '0 0 8px #ffcc44'
-                  : highlighted ? `0 0 8px ${HIGHLIGHTED_SPACE_COLOR}`
-                  : occ === 'black' ? '0 0 0 1px #000, 0 1px 4px rgba(255,255,255,0.5)'
+                  : occ && needsLightRim(occ) ? DARK_RIM_SHADOW
                   : occ ? '0 1px 3px rgba(0,0,0,0.6)'
                   : undefined,
                 cursor: pickable ? 'pointer' : 'default',
@@ -764,10 +820,12 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
           cx = (p.x + centroidX) / 2;
           cy = (p.y + centroidY) / 2;
         }
+        const isHighlit = !!highlightSites?.has(s.id);
         return (
           <div key={`site-pick-${s.id}`}
             onClick={() => onSiteClick?.(s.id)}
-            title={`Pick site: ${s.name}`}
+            title={isHighlit ? `Pick site: ${s.name} — the card's follow-up has a target here`
+                             : `Pick site: ${s.name}`}
             style={{
               position: 'absolute',
               left: `${cx * 100}%`,
@@ -775,9 +833,9 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
               width: px(88), height: px(88),
               marginLeft: -px(44), marginTop: -px(44),
               borderRadius: '50%',
-              border: '3px dashed #ffcc44',
-              background: 'rgba(255, 204, 68, 0.12)',
-              boxShadow: '0 0 16px rgba(255, 204, 68, 0.6)',
+              border: isHighlit ? '4px solid #66ff9e' : '3px dashed #ffcc44',
+              background: isHighlit ? 'rgba(102, 255, 158, 0.18)' : 'rgba(255, 204, 68, 0.12)',
+              boxShadow: isHighlit ? '0 0 22px rgba(102, 255, 158, 0.85)' : '0 0 16px rgba(255, 204, 68, 0.6)',
               cursor: 'pointer',
               zIndex: 9,
               animation: 'tot-site-pulse 1.4s ease-in-out infinite',
@@ -826,9 +884,13 @@ export function MapView({ calibrate = false, editRoutes = false, G, clickableSit
             }}>
             {spies.map((sp, i) => (
               <span key={i} title={`spy: ${sp}`} style={{
-                width: px(24), height: px(24), background: COLOR_HEX[sp],
-                border: '2px solid #fff',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.7)',
+                width: px(24), height: px(24),
+                // flat() for the same forced-dark-mode reason as every other
+                // state token on this map; a solid background-color here was
+                // getting repainted while its neighbours weren't.
+                background: flat(COLOR_HEX[sp]),
+                border: `2px solid ${needsLightRim(sp) ? DARK_RIM_HEX : '#fff'}`,
+                boxShadow: needsLightRim(sp) ? DARK_RIM_SHADOW : '0 1px 4px rgba(0,0,0,0.7)',
               }} />
             ))}
           </div>

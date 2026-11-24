@@ -16,6 +16,7 @@
 // or the hotseat client.
 
 import type { GameAdapter, GameResult } from 'digital-boardgame-framework';
+import { upgradeProseLog } from 'digital-boardgame-framework';
 import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { TyrantsGame, type TyrantsState, type Color, type CardRef } from '../game';
 import { SITES } from '../data/sites';
@@ -34,6 +35,12 @@ import { RESERVED_MARKET_CARD_KEY } from '../houses/types';
 /** The seat-index string '0'..'3'. Matches Object.keys(G.players). */
 export type PlayerId = string;
 
+/** Bot difficulty that finishes a seat whose player gave up or walked away (a
+ *  key in src/online/aiControllers). Deliberately the weaker of the two: a seat
+ *  that has forfeited its placing shouldn't start playing BETTER than the
+ *  person who left, which would distort the remaining players' game. */
+export const TAKEOVER_DIFFICULTY = 'random';
+
 /** The action vocabulary = the bgio moves we expose online. `undo` and
  *  `loadState` are deliberately excluded (local-only / dev rewind). */
 export type TyrantsAction =
@@ -47,7 +54,15 @@ export type TyrantsAction =
   | { kind: 'houseAction'; abilityKey: string }
   | { kind: 'recruitReservedCard' }
   | { kind: 'resolveChoice'; response: unknown }
-  | { kind: 'endTurn' };
+  | { kind: 'endTurn' }
+  // Server-side only (the abandoned-seat sweep). Never returned by
+  // legalActions, so no client can reach it; the server validates via
+  // tryApplyAction, which accepts it.
+  | { kind: 'forfeitSeat'; seat: PlayerId }
+  // A player gives up. Deliberately carries NO seat: the adapter uses the
+  // authenticated submitter, so no one can concede for someone else. Not in
+  // legalActions — a bot must never pick it — and allowed out of turn.
+  | { kind: 'concede' };
 
 /** boardgame.io's full client/transport state. We treat it as opaque-ish: the
  *  adapter only reaches into `.G` and `.ctx`; `plugins` etc. ride along. */
@@ -79,10 +94,41 @@ export interface BgioState {
 
 type AnyReducer = (s: BgioState, action: unknown) => BgioState;
 
+// ONLINE ONLY: turn off boardgame.io's built-in undo bookkeeping.
+//
+// bgio stores a FULL copy of `G` (plus ctx + plugins) in `state._undo` on every
+// dispatched move, and only clears it at a turn boundary. On a Tyrants turn
+// that's ~10 moves × ~95 KB, so the state the server clones and re-clones grows
+// from ~0.3 MB to ~1.3 MB *within a single turn*, and every later move in that
+// turn pays to copy all of it. That cost compounds as a game gets longer; when a
+// server-side AI turn stops fitting in the request budget, nothing persists and
+// the seat is stranded — the human sees a board with no buttons (#104).
+//
+// Nothing online can undo: `undo`/`redo` are excluded from the action vocabulary
+// (see TyrantsAction), OnlinePlay stubs the bgio undo/redo props, and the game's
+// OWN rewind (`G.undoStack` + the `undo` move) is a hotseat-only affordance that
+// this flag does not touch. Hotseat builds its own bgio Client from TyrantsGame
+// and is unaffected — we spread into a copy so TyrantsGame itself is untouched.
+// Stamp G._online so the engine can tell it is being driven online. The only
+// thing that reads it today is pushUndoSnapshot, which skips capturing undo
+// restore-points: they are a hotseat affordance that redactState strips from
+// every online view and OnlinePlay stubs out, so building them server-side was
+// ~22KB of dead weight per move (#104 follow-up).
+function markOnline<T>(G: T): T {
+  (G as { _online?: boolean })._online = true;
+  return G;
+}
+const onlineSetup = (
+  setupData?: { halfDecks?: string[]; activeSections?: Array<"left" | "center" | "right">; humanColor?: Color; seatColors?: Color[]; botSeats?: string[] },
+) => (sa: Parameters<NonNullable<typeof TyrantsGame.setup>>[0]) =>
+  markOnline(TyrantsGame.setup!(sa, setupData));
+
+const ONLINE_GAME = { ...TyrantsGame, disableUndo: true, setup: onlineSetup() };
+
 let _reducer: AnyReducer | null = null;
 function reducer(): AnyReducer {
   if (!_reducer) {
-    _reducer = CreateGameReducer({ game: TyrantsGame }) as unknown as AnyReducer;
+    _reducer = CreateGameReducer({ game: ONLINE_GAME }) as unknown as AnyReducer;
   }
   return _reducer;
 }
@@ -91,15 +137,11 @@ function reducer(): AnyReducer {
  *  and the eventual server createGame. */
 export function initialBgioState(
   numPlayers: number,
-  setupData?: { halfDecks?: string[]; activeSections?: Array<'left' | 'center' | 'right'> },
+  setupData?: { halfDecks?: string[]; activeSections?: Array<'left' | 'center' | 'right'>; humanColor?: Color; seatColors?: Color[]; botSeats?: string[] },
 ): BgioState {
   const wrapped = setupData
-    ? {
-        ...TyrantsGame,
-        setup: (sa: Parameters<NonNullable<typeof TyrantsGame.setup>>[0]) =>
-          TyrantsGame.setup!(sa, setupData),
-      }
-    : TyrantsGame;
+    ? { ...ONLINE_GAME, setup: onlineSetup(setupData) }
+    : ONLINE_GAME;
   return InitializeGame({ game: wrapped, numPlayers }) as unknown as BgioState;
 }
 
@@ -126,6 +168,10 @@ function toBgioAction(action: TyrantsAction, actor: PlayerId, currentPlayer: str
     // resolves `G.pendingChoice` (which carries its own `playerId`) regardless
     // of who submitted it, so this is safe and fixes the cross-player lock (#91).
     case 'resolveChoice':       return mk('resolveChoice', [action.response], currentPlayer);
+    case 'forfeitSeat':       return mk('forfeitSeat', [action.seat]);
+    // Seat = the authenticated actor, never the request. Stamped with the
+    // current player so boardgame.io accepts it while someone else is on turn.
+    case 'concede':             return mk('concede', [actor], currentPlayer);
     case 'endTurn':             return mk('endTurn', []);
   }
 }
@@ -183,6 +229,10 @@ function enumerateLegal(state: BgioState, actor: PlayerId): TyrantsAction[] {
   const hasAnyMapPresence = SITES.some(s => hasPresence(G, color, { site: s.id }));
   if (me.power >= 1) {
     for (const t of TROOP_SPACES) {
+      // Only active-section spaces are keys in G.troops; an out-of-play space
+      // reads as undefined, i.e. "empty", so skip it before the occupancy
+      // check — the deployTroop move rejects it (scripts/test-legal-deploy-sections.ts).
+      if (!(t.id in G.troops)) continue;
       if (G.troops[t.id]) continue;
       let ok: boolean;
       if (!hasAnyMapPresence) ok = true;
@@ -334,9 +384,15 @@ function hideCards(cards: CardRef[]): CardRef[] {
 }
 
 function redactState(state: BgioState, viewer: PlayerId | null): BgioState {
-  // structuredClone keeps the full bgio state shape (ctx/plugins ride along).
-  const next = structuredClone(state);
-  const G = next.G;
+  // Copy-on-redact: copy only the containers changed below and share the rest
+  // with `state` (ctx/plugins ride along by reference). A whole-state
+  // structuredClone here ran once per poll and once per server-AI step — a
+  // third of the AI's per-request CPU against Cloudflare's per-request limit.
+  // The view is read-only: the server serialises it and the AI controllers
+  // only read it.
+  const G = { ...state.G, players: { ...state.G.players }, market: { ...state.G.market } };
+  for (const pid of Object.keys(G.players)) G.players[pid] = { ...G.players[pid] };
+  const next = { ...state, G };
 
   for (const [pid, p] of Object.entries(G.players)) {
     if (pid === viewer) {
@@ -405,23 +461,38 @@ function redactState(state: BgioState, viewer: PlayerId | null): BgioState {
 function resultOf(state: BgioState): GameResult<PlayerId> | null {
   if (!state.ctx.gameover) return null;
   const scores = scoreAll(state.G);
+  // A seat that walked away and was finished by a bot forfeits its placing: it
+  // can never win, and it ranks below every seat that played its own game,
+  // whatever the bot managed to score for it. Otherwise abandoning a losing
+  // position would be a way to dodge recording the loss.
+  const forfeited = new Set(state.G.forfeitedSeats ?? []);
+  const played = Object.entries(scores).filter(([pid]) => !forfeited.has(pid));
+
+  // Winners come from the seats that actually played. If EVERY seat forfeited
+  // there is no one to credit, so fall back to score alone rather than invent a
+  // winner from a table of bots.
+  const pool = played.length > 0 ? played : Object.entries(scores);
   let best = -Infinity;
-  for (const sb of Object.values(scores)) {
+  for (const [, sb] of pool) {
     if (sb.total > best) best = sb.total;
   }
   const winners: PlayerId[] = [];
-  for (const [pid, sb] of Object.entries(scores)) {
+  for (const [pid, sb] of pool) {
     if (sb.total === best) winners.push(pid);
   }
   // Finishing order (best-first) for N-player ratings. Ties on exact final score
   // are broken by seat order — rare, and only a half-pairwise rating difference.
-  const ranking = Object.entries(scores)
-    .sort(([, a], [, b]) => b.total - a.total)
-    .map(([pid]) => pid);
+  const byScore = (a: [string, { total: number }], b: [string, { total: number }]) => b[1].total - a[1].total;
+  const ranking = [
+    ...played.sort(byScore).map(([pid]) => pid),
+    ...Object.entries(scores).filter(([pid]) => forfeited.has(pid)).sort(byScore).map(([pid]) => pid),
+  ];
   return {
     winners,
     ranking,
-    reason: winners.length > 1 ? 'tie on final score' : 'highest final score',
+    reason: forfeited.size > 0
+      ? `${winners.length > 1 ? 'tie on final score' : 'highest final score'} (${forfeited.size} seat(s) forfeited)`
+      : winners.length > 1 ? 'tie on final score' : 'highest final score',
   };
 }
 
@@ -430,12 +501,13 @@ function resultOf(state: BgioState): GameResult<PlayerId> | null {
 // ---------------------------------------------------------------------------
 
 export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
-  schemaVersion: 1,
+  schemaVersion: 2,
 
   applyAction(state, action, actor) {
-    // bgio's reducer is pure given (state, action) and clones internally, but
-    // we structuredClone defensively so callers never observe shared mutation.
-    const input = structuredClone(state);
+    // bgio's reducer is pure given (state, action) — immer produces new objects
+    // and never writes to its input — so no defensive clone: a whole-state
+    // structuredClone per action was a third of the server AI's CPU.
+    const input = state;
     const next = reducer()(input, toBgioAction(action, actor, input.ctx.currentPlayer));
     if (next === input || next.G === input.G) {
       // bgio returns the same top-level reference on INVALID_MOVE.
@@ -445,7 +517,8 @@ export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
   },
 
   tryApplyAction(state, action, actor) {
-    const input = structuredClone(state);
+    const input = state; // pure reducer — see applyAction
+
     let next: BgioState;
     try {
       next = reducer()(input, toBgioAction(action, actor, input.ctx.currentPlayer));
@@ -474,6 +547,22 @@ export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
     return enumerateLegal(state, actor);
   },
 
+  // Giving up must work while you wait for someone else's turn. tryApplyAction
+  // still validates it (see canConcede).
+  allowsOutOfTurn(action) {
+    return action.kind === 'concede';
+  },
+
+  // A seat that gave up or walked away is finished by the server's bot, played
+  // in the same request as whatever move reaches its turn — so a concession in
+  // a 3-4 player game doesn't stall everyone else. The seat's identity is left
+  // alone, so the player stays in the rating report, ranked last by resultOf.
+  serverDrivenSeats(state) {
+    const out: Partial<Record<PlayerId, string>> = {};
+    for (const seat of state.G.forfeitedSeats ?? []) out[seat as PlayerId] = TAKEOVER_DIFFICULTY;
+    return out;
+  },
+
   currentActor(state) {
     return currentActorOf(state);
   },
@@ -492,7 +581,18 @@ export const tyrantsAdapter: GameAdapter<BgioState, TyrantsAction, PlayerId> = {
     return resultOf(state);
   },
 
-  migrate() {
-    throw new Error('tyrantsAdapter.migrate: no migrations yet (schemaVersion 1)');
+  migrate(rawState, fromVersion) {
+    const state = rawState as BgioState;
+    if (fromVersion < 2) {
+      // v1 → v2: G.log was string[] (prose lines); wrap into structured
+      // GameLogEntry objects (kind 'legacy') so old online snapshots in
+      // Supabase keep rendering and appendGameLog can extend them.
+      const G = state.G as unknown as { log?: unknown[] };
+      if (Array.isArray(G.log) && G.log.some(l => typeof l === 'string')) {
+        G.log = upgradeProseLog(G.log.map(l =>
+          typeof l === 'string' ? l : JSON.stringify(l)));
+      }
+    }
+    return state;
   },
 };

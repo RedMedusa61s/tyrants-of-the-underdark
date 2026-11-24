@@ -8,9 +8,13 @@
 // adapter's initialBgioState (boardgame.io's InitializeGame under the hood).
 // The seats are the bgio seat-index strings '0'..'3'.
 
-import type { GameServer, ReportSubmission } from 'digital-boardgame-framework/server';
+import type { GameServer, ReportSubmission, SnapshotStore, ReportFilter } from 'digital-boardgame-framework/server';
+import type { Codec } from 'digital-boardgame-framework';
+import { sweepAbandonedSeats } from './sweep';
 import type { BgioState, TyrantsAction, PlayerId } from '../src/adapter/tyrantsAdapter';
 import { initialBgioState } from '../src/adapter/tyrantsAdapter';
+import { isHalfDeck } from '../src/half-decks';
+import { SELECTABLE_COLORS, type Color } from '../src/game';
 
 export interface ApiResult {
   status: number;
@@ -37,12 +41,22 @@ function activeSectionsFor(numPlayers: number): Array<'left' | 'center' | 'right
   return ['left', 'center', 'right'];
 }
 
+/** Extra wiring the sweep needs but the plain request routes don't: it reads
+ *  and decodes snapshots directly, which the GameServer keeps private. Optional
+ *  so existing callers (and the chat test harness) are unaffected — without it
+ *  the sweep route simply reports itself unavailable rather than 500ing. */
+export interface SweepDeps {
+  store: SnapshotStore;
+  codec: Codec<BgioState>;
+}
+
 export async function handleApi(
   server: Server,
   method: string,
   pathname: string,
   query: URLSearchParams,
   body: unknown,
+  sweepDeps?: SweepDeps,
 ): Promise<ApiResult> {
   const segs = pathname.replace(/\/+$/, '').split('/').filter(Boolean);
   if (segs[0] !== 'api') return { status: 404, body: { error: 'not found' } };
@@ -57,16 +71,62 @@ export async function handleApi(
       // (framework >=0.37). E.g. { numPlayers: 2, ai: { '1': 'random' } } makes a
       // human-vs-AI game: seat '0' is the human, seat '1' the AI.
       if (segs.length === 2 && method === 'POST') {
-        const b = (body ?? {}) as { numPlayers?: unknown; ai?: Partial<Record<PlayerId, string>> };
+        const b = (body ?? {}) as {
+          numPlayers?: unknown; ai?: Partial<Record<PlayerId, string>>;
+          halfDecks?: unknown; humanColor?: unknown; seatColors?: unknown;
+        };
         const raw = b.numPlayers;
         const numPlayers = Math.trunc(Number(raw ?? 2));
         if (!Number.isFinite(numPlayers) || numPlayers < 2 || numPlayers > 4) {
           return { status: 422, body: { error: 'numPlayers must be 2, 3, or 4' } };
         }
+        // Market half-decks. Until these were accepted here, every online game
+        // fell through to the engine default pair, so elemental / demons / the
+        // expansion decks had never been playable online at all.
+        const rawDecks = Array.isArray(b.halfDecks) ? b.halfDecks : undefined;
+        let halfDecks: string[] | undefined;
+        if (rawDecks) {
+          if (rawDecks.length !== 2 || !rawDecks.every(isHalfDeck) || rawDecks[0] === rawDecks[1]) {
+            return { status: 422, body: { error: 'halfDecks must be two different half-deck names' } };
+          }
+          halfDecks = rawDecks as string[];
+        }
+        // The creator's own colour (seat 0). Everyone else takes the classic
+        // four in seat order, exactly as solo/hotseat does.
+        let humanColor: Color | undefined;
+        if (b.humanColor !== undefined) {
+          if (typeof b.humanColor !== 'string' || !(SELECTABLE_COLORS as string[]).includes(b.humanColor)) {
+            return { status: 422, body: { error: 'humanColor is not a selectable colour' } };
+          }
+          humanColor = b.humanColor as Color;
+        }
+        // Explicit colour per seat. The host picks for the whole table — two
+        // seats sharing a colour would make the board unreadable, so duplicates
+        // are refused rather than silently deduped.
+        let seatColors: Color[] | undefined;
+        if (b.seatColors !== undefined) {
+          const raw = b.seatColors;
+          if (!Array.isArray(raw) || raw.length !== numPlayers
+            || !raw.every(c => typeof c === 'string' && (SELECTABLE_COLORS as string[]).includes(c))) {
+            return { status: 422, body: { error: `seatColors must be ${numPlayers} selectable colours` } };
+          }
+          if (new Set(raw as string[]).size !== raw.length) {
+            return { status: 422, body: { error: 'seatColors must all be different' } };
+          }
+          seatColors = raw as Color[];
+        }
         const players: PlayerId[] = Array.from({ length: numPlayers }, (_, i) => String(i));
+        // Record which seats are bots IN the game state: the engine needs it to
+        // end a table where only bots are left playing (e.g. the one person in a
+        // game against AI gives up) — it can't see the framework's identities.
+        const botSeats = Object.keys(b.ai ?? {}).filter(seat => players.includes(seat as PlayerId));
         const r = await server.createGame({
           initialState: initialBgioState(numPlayers, {
             activeSections: activeSectionsFor(numPlayers),
+            ...(halfDecks ? { halfDecks } : {}),
+            ...(humanColor ? { humanColor } : {}),
+            ...(seatColors ? { seatColors } : {}),
+            ...(botSeats.length ? { botSeats } : {}),
           }),
           players,
           ...(b.ai ? { ai: b.ai } : {}),
@@ -131,12 +191,42 @@ export async function handleApi(
       }
     }
 
+    // ---- abandoned-seat sweep ----
+    //
+    // POST /api/sweep — hands a bot the turns of anyone who has stopped playing,
+    // so the rest of the table isn't stuck forever. Idempotent and safe to call
+    // often: it only acts on seats that have sat on a turn past the window, and
+    // a player who comes back simply resets the clock.
+    //
+    // Left unauthenticated on purpose: it takes no input, exposes no data, and
+    // does nothing a caller could steer — the worst a stranger can do is make an
+    // already-overdue bot turn happen sooner. Gating it behind a secret would
+    // just mean it never actually runs.
+    if (segs[1] === 'sweep' && method === 'POST') {
+      if (!sweepDeps) return { status: 501, body: { error: 'sweep not wired on this deployment' } };
+      const result = await sweepAbandonedSeats({
+        server,
+        store: sweepDeps.store,
+        codec: sweepDeps.codec,
+      });
+      return { status: 200, body: result };
+    }
+
     // ---- reports (public triage) ----
     if (segs[1] === 'reports') {
       // GET /api/reports
       if (segs.length === 2 && method === 'GET') {
-        const unresolved = query.get('unresolved') === '1';
-        return { status: 200, body: await server.listReports(unresolved ? { unresolved: true } : undefined) };
+        // Forward the supported filters. The backend is shared with other games:
+        // without ?app_id= (or ?category=) this lists EVERY game's reports.
+        const filter: ReportFilter = {};
+        if (query.get('unresolved') === '1') filter.unresolved = true;
+        for (const [k, f] of [['app_id', 'appId'], ['category', 'category'], ['severity', 'severity'], ['since', 'since'], ['gameId', 'gameId']] as const) {
+          const v = query.get(k); if (v) (filter as Record<string, unknown>)[f] = v;
+        }
+        // ?full=1 → include the state blobs; otherwise the DB isn't even asked for
+        // them (a 670-row listing on the shared backend was 40 MB / 10–12 s).
+        filter.bodies = query.get('full') === '1';
+        return { status: 200, body: await server.listReports(filter) };
       }
       // POST /api/reports/:id/resolve
       if (segs[3] === 'resolve' && method === 'POST') {

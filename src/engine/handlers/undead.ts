@@ -16,10 +16,11 @@ import { grant, flagEotPromote, placeSpyAtChosenSite, sequence, registerAll, tim
          marketDevourReplaceWithSelf, takeTrophyAndPlace,
          recruitFromMarketFiltered, recruitFromDevouredPile,
          promoteFromHandChoice, promoteSelf,
-         conditionalGrant, promoteFromDiscardChoice,
+         conditionalGrant, promoteFromDiscardChoice, promotableDiscardIndices,
          assassinateAtLastPlacedSpySite,
          playerHasOwnSpy, playerCanAssassinate } from '../handler-helpers';
 import { TROOP_SPACES } from '../../data/troop-spaces';
+import { Mechanics } from '../mechanics';
 import { totalTrophies } from '../../game';
 
 registerAll({
@@ -47,7 +48,7 @@ registerAll({
 
   // Cost 2 — Wraith: spy; optional devour-self → assassinate at the spy site
   'wraith':              sequence(
-                           placeSpyAtChosenSite(),
+                           placeSpyAtChosenSite({ followUp: 'assassinate' }),
                            optionalDevourSelfThen(assassinateAtLastPlacedSpySite(),
                                                   'Devour Wraith to assassinate at the spy site?')),
 
@@ -98,7 +99,8 @@ registerAll({
                              const spies = ctx.G.spies[siteId] ?? [];
                              if (spies.length > 1) {
                                ctx.G.players[ctx.actorId].power += 3;
-                               ctx.G.log.push(`P${Number(ctx.actorId) + 1} +3 Power from Banshee (another spy at ${siteId})`);
+                               Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +3 Power from Banshee (another spy at ${siteId})`,
+                                 { kind: 'power.gain', payload: { amount: 3, source: 'Banshee', site: siteId }, side: ctx.actorId });
                              }
                              return true;
                            })),
@@ -138,7 +140,8 @@ registerAll({
                            }
                            const me = ctx.G.players[ctx.actorId];
                            if (totalTrophies(me) >= 8) {
-                             ctx.G.log.push(`P${Number(ctx.actorId) + 1} promoted Revenant (8+ trophies)`);
+                             Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} promoted Revenant (8+ trophies)`,
+                               { kind: 'card.promote', payload: { card: 'Revenant', source: 'self-promote' }, side: ctx.actorId });
                              me.innerCircle.push({ ...ctx.card });
                              ctx.handlerState = { returnedToSupply: true };
                              return true;
@@ -165,8 +168,13 @@ registerAll({
                            { label: 'Promote this card (Necromancer → inner circle)', handler: promoteSelf() },
                            { label: 'Promote a card from your hand', handler: promoteFromHandChoice(),
                              available: (G, a) => G.players[a].hand.length > 0 },
+                           // #108: `discard.length > 0` counted this turn's
+                           // play-area cards, so the option showed up on turns
+                           // where nothing was actually promotable and picking
+                           // it did nothing. Ask the same question the picker
+                           // will.
                            { label: 'Promote a card from your discard', handler: promoteFromDiscardChoice(),
-                             available: (G, a) => G.players[a].discard.length > 0 }),
+                             available: (G, a) => promotableDiscardIndices(G, a).length > 0 }),
 
   // Cost 6 — Death Knight: supplant a troop + 1 VP per 5 player trophies
   'death-knight':        sequence(
@@ -182,7 +190,8 @@ registerAll({
                              const vp = Math.floor(coloredTrophies / 5);
                              if (vp > 0) {
                                me.vp += vp;
-                               ctx.G.log.push(`P${Number(ctx.actorId) + 1} +${vp} VP from Death Knight (${coloredTrophies} player trophies)`);
+                               Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +${vp} VP from Death Knight (${coloredTrophies} player trophies)`,
+                                 { kind: 'vp.gain', payload: { amount: vp, source: 'Death Knight' }, side: ctx.actorId });
                              }
                              return true;
                            })),
@@ -235,6 +244,13 @@ registerAll({
   'vampire':             chooseOne(
                            { label: 'Supplant a troop', handler: supplantChoice() },
                            { label: 'Promote from discard + VP-per-3-promoted',
+                             // NOT narrowed to promotableDiscardIndices (cf.
+                             // Necromancer, #108): unlike Necromancer's, this
+                             // option is not a no-op when the discard has
+                             // nothing promotable — the "then gain 1 VP for
+                             // every 3 cards in your inner circle" half still
+                             // applies, and promoteFromDiscardChoice logs why
+                             // the picker didn't open (#86).
                              available: (G, a) => G.players[a].discard.length > 0,
                              handler: sequence(
                                promoteFromDiscardChoice({ optional: false }),
@@ -243,7 +259,8 @@ registerAll({
                                  const vp = Math.floor(me.innerCircle.length / 3);
                                  if (vp > 0) {
                                    me.vp += vp;
-                                   ctx.G.log.push(`P${Number(ctx.actorId) + 1} +${vp} VP from Vampire (${me.innerCircle.length} promoted)`);
+                                   Mechanics.log(ctx.G, `P${Number(ctx.actorId) + 1} +${vp} VP from Vampire (${me.innerCircle.length} promoted)`,
+                                     { kind: 'vp.gain', payload: { amount: vp, source: 'Vampire' }, side: ctx.actorId });
                                  }
                                  return true;
                                })) }),
@@ -257,7 +274,7 @@ registerAll({
   //   Lich's deploy uses the plain deploy keyword — so placement is
   //   presence-restricted (restrictToPresence), per rulebook p.12.
   'lich':                sequence(
-                           placeSpyAtChosenSite(),
+                           placeSpyAtChosenSite({ followUp: 'opponent-troop' }),
                            (ctx => {
                              interface S { phase: 'check' | 'pick-victim' | 'taking'; victimPid?: string; subState?: unknown }
                              let state = (ctx.handlerState as S | null) ?? { phase: 'check' };

@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Client } from 'boardgame.io/react';
 import type { BoardProps } from 'boardgame.io/react';
-import { recordPlay } from 'digital-boardgame-framework';
-import { TyrantsGame, BASE_ACTION_POWER_COST, COLORS, SELECTABLE_COLORS, type TyrantsState, type CardRef, type Color } from './game';
+import { recordPlay, recordFinish, type PlayOutcome } from 'digital-boardgame-framework';
+import { TyrantsGame, BASE_ACTION_POWER_COST, COLORS, SELECTABLE_COLORS, type TyrantsState, type CardRef, type Color, concedeEndsGame } from './game';
 import { MapView } from './components/MapView';
 import { CardCalibration } from './components/CardCalibration';
 import { CostVerify } from './components/CostVerify';
@@ -10,15 +10,19 @@ import { SiteVerify } from './components/SiteVerify';
 import { SlotCalibration } from './components/SlotCalibration';
 import { SectionDividerCalibration } from './components/SectionDividerCalibration';
 import { MarkerCalibration } from './components/MarkerCalibration';
+import { HALF_DECKS, EXPANSION_HALF_DECKS, type HalfDeck } from './half-decks';
+import { colorHex, WHITE_TOKEN_HEX, needsLightRim, DARK_RIM_HEX } from './player-colors';
 import { GameLog } from './components/GameLog';
+import { GameTabLog } from './components/GameTabLog';
 import { CardLogText } from './components/CardLogText';
 import { CardTextVerify } from './components/CardTextVerify';
 import { RouteVerify } from './components/RouteVerify';
 import { ProblemReportDialog } from './components/ProblemReportDialog';
 import { FirstRunImageImport } from './components/FirstRunImageImport';
 import { PlaceholderCard } from './components/PlaceholderCard';
-import { useCachedImage, clearImageBlobUrl, evictImageFromCache } from './image-cache';
+import { useCachedImage, clearImageBlobUrl, evictImageFromCache, isImagePending } from './image-cache';
 import { cardWhiffReason } from './engine/card-targets';
+import { logLineText } from './engine/log';
 import { SITES } from './data/sites';
 import { sitesSpaces, TROOP_SPACES } from './data/troop-spaces';
 import { hasPresence, checkTokenConservation } from './engine/map-state';
@@ -30,11 +34,14 @@ import { fetchUnseenFixNotes, markFixNoteSeen, type FixNoteUpdate } from './bug-
 import { capturePageScreenshot } from './screenshot';
 import { decideAiMove, type AiMove } from './ai/random-ai';
 import { decideHeuristicMove, decideHeuristicMoveWithWeights } from './ai/heuristic-ai';
-import { DEFAULT_WEIGHTS } from './ai/heuristic-weights';
+import { AI_VERSION, BUILD_TIME } from './ai-version';
+import { rulesDiscard } from './engine/handler-helpers';
+import { AI_STYLES, labelForStyle, describeStyle, weightsForStyle, type AiStyle as AiStyleT } from './ai/difficulty';
 import type { SimulateMoveFn, RolloutToTurnEndFn } from './ai/lookahead';
 import { CreateGameReducer, InitializeGame } from 'boardgame.io/internal';
 import { lookupCard } from './card-data';
 import { scoreAll } from './engine/scoring';
+import { alertYourTurn, stopTurnAlert } from './online/turnAlert';
 import { HouseBar } from './components/HouseBar';
 import { HouseInfoModal } from './components/HouseInfoModal';
 import { HOUSES_BY_ID } from './houses/house-data';
@@ -91,13 +98,23 @@ export type OnlineReportCategory = 'game' | 'multiplayer' | 'other';
 /** Small colored chip so players can identify/pick opponents by colour at a
  *  glance instead of memorising which colour is P2/P3/P4 (#66). */
 function ColorSwatch({ color, size = 11 }: { color: string; size?: number }) {
+  // The chip used to paint the raw colour NAME, which meant the black player's
+  // swatch was CSS `black` — a #000 square on the near-black page, i.e. an
+  // empty hole in the scoreboard while every other seat showed a bright chip
+  // (#109: black is "so dull ... it makes it really difficult to read the board
+  // state"). Paint from the shared palette instead, the way the map and the
+  // end-of-game table already do, so the chip matches the tokens it stands for.
+  const paint = color === 'white' ? WHITE_TOKEN_HEX : colorHex(color);
   return (
     <span style={{
       display: 'inline-block', width: size, height: size, borderRadius: 2,
       // Flat gradient (a background-IMAGE) instead of a solid background-color so
       // Samsung Internet / Chrome Android "Website dark mode" can't repaint this
       // player-colour swatch. Looks identical to a solid fill everywhere else.
-      background: `linear-gradient(${color}, ${color})`, border: '1px solid rgba(255,255,255,0.6)',
+      background: `linear-gradient(${paint}, ${paint})`,
+      // A dark chip needs a crisp full-strength rim to have an edge at all; the
+      // mid-tones look better with the softer one.
+      border: `1px solid ${needsLightRim(color) ? DARK_RIM_HEX : 'rgba(255,255,255,0.6)'}`,
       marginRight: 6, verticalAlign: 'middle', flexShrink: 0,
     }} />
   );
@@ -116,6 +133,7 @@ const CONFIG_KEY = 'totu.gameconfig';
 const DEV_KEY = 'totu.dev-mode';
 const NO_IMAGES_KEY = 'totu.no-images';
 const SPLIT_VIEW_KEY = 'totu.split-view';
+const SKIP_SUMMARIES_KEY = 'totu.skip-turn-summaries';
 
 // Bulk "Upload logs": archived games already uploaded successfully are recorded
 // here (by their IndexedDB id) so later uploads skip them instead of re-sending
@@ -161,13 +179,31 @@ export function isNoImagesMode(): boolean {
 
 /** Split-view mode (?split-view=1 / ?split-view=0). When on, a new "play"
  *  tab becomes available that shows the map and the hand+market strip on
- *  the same page — map on top, cards below, with hover-to-expand. Per
+ *  the same page — map and cards, at fixed proportions. Per
  *  user feedback on the forum: "I wonder if it would be possible to
  *  somehow have your hand of cards and the market on the same 'page' as
  *  the map." Off by default; the existing game/map tabs stay unchanged. */
 export function isSplitViewMode(): boolean {
   return readUrlBoolFlag('split-view', SPLIT_VIEW_KEY);
 }
+
+/** Skip the between-turns summary (?skip-summaries=1 / =0). The modal exists so
+ *  you can see what happened while you weren't looking, but against AI seats
+ *  that's a click after every single opponent turn, and by mid-game a lot of
+ *  players stop reading it. Requested on the forum: "would it be possible to
+ *  add option (toggle on/off) to skip the AI bot log actions... sometimes I
+ *  don't care what they do."
+ *
+ *  Nothing is lost when it's on — the same lines are in the log tab, and each
+ *  turn is still listed under the Log tab's per-turn breakdown. Off by default:
+ *  online it's the only way to see a remote opponent's turn at all. */
+export function isSkipSummariesMode(): boolean {
+  return readUrlBoolFlag('skip-summaries', SKIP_SUMMARIES_KEY);
+}
+
+// Difficulty ladder lives in src/ai/difficulty.ts so the tier->weights mapping
+// has one definition shared with its test.
+type AiStyle = AiStyleT;
 
 // Difficulty tiers exposed in the new-game dialog. 'easy' is the same
 // heuristic as 'standard', but with the rollout-lookahead disabled — that
@@ -210,7 +246,9 @@ const AI_FNS: Record<AiStyle, (G: TyrantsState, pid: string) => AiMove | null> =
   // MoveWithWeights). These entries are here so the Record type is total.
   easy: decideHeuristicMove,
   heuristic: decideHeuristicMove,
+  hard: decideHeuristicMove,
 };
+
 
 /** Rulebook p.5: 2P = center only; 3P = center + one outer; 4P = all three. */
 function activeSectionsFor(cfg: GameConfig): Array<'left' | 'center' | 'right'> {
@@ -237,6 +275,29 @@ const HOVER_CAPABLE =
   typeof window !== 'undefined' &&
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(hover: hover)').matches;
+
+/** Split view stacks map-over-cards, which suits a laptop or a tablet. On a
+ *  wide desktop that wastes the screen: the board is landscape, so a stacked
+ *  layout leaves a third of the width empty while squeezing both panels
+ *  vertically. Past this width they sit side by side instead — "horizontal
+ *  layout for wide screens", requested on BGG.
+ *
+ *  A live media-query listener rather than a one-shot read, so dragging a
+ *  window across the threshold reflows instead of waiting for a reload. */
+const WIDE_LAYOUT_QUERY = '(min-width: 1200px)';
+function useWideLayout(): boolean {
+  const [wide, setWide] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia(WIDE_LAYOUT_QUERY).matches);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia(WIDE_LAYOUT_QUERY);
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return wide;
+}
 
 function Card({ card, onClick, label, dim }: { card: CardRef; onClick?: () => void; label?: string; dim?: boolean }) {
   const [hover, setHover] = useState(false);
@@ -320,7 +381,10 @@ function Card({ card, onClick, label, dim }: { card: CardRef; onClick?: () => vo
   };
   // No-images mode forces the placeholder regardless of cache state. Also
   // falls back to placeholder if the image actually 404s at runtime.
-  const showPlaceholder = isNoImagesMode() || imgFailed;
+  // Also while the art is still loading: the stand-in image loads fine, so
+  // without this the card is an empty frame until the source sheet arrives —
+  // indistinguishable from broken (#113).
+  const showPlaceholder = isNoImagesMode() || imgFailed || isImagePending(imgUrl);
   // Touch-only devices: never set hover from synthetic mouse events, so the
   // post-tap enlarge bug can't fire. The visual stays the same as the
   // resting state.
@@ -390,6 +454,21 @@ function Card({ card, onClick, label, dim }: { card: CardRef; onClick?: () => vo
 
 type BaseAction = null | { kind: 'deploy' | 'assassinate' } | { kind: 'return-spy'; siteId?: string };
 
+/** The human's result in a finished local game, ranked the same way as the
+ *  online adapter's result (tyrantsAdapter resultOf) and the game-over screen:
+ *  final scoreAll totals, forfeited seats can't win, a shared top score is a
+ *  draw. Used for the hub's "game finished" beacon. */
+function localOutcome(G: TyrantsState, seat: string): PlayOutcome {
+  const scores = scoreAll(G);
+  const forfeited = new Set(G.forfeitedSeats ?? []);
+  const played = Object.entries(scores).filter(([pid]) => !forfeited.has(pid));
+  const pool = played.length > 0 ? played : Object.entries(scores);
+  const best = Math.max(...pool.map(([, sb]) => sb.total));
+  const winners = pool.filter(([, sb]) => sb.total === best).map(([pid]) => pid);
+  if (!winners.includes(seat)) return 'loss';
+  return winners.length > 1 ? 'draw' : 'win';
+}
+
 export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const session = useContext(SessionContext);
   const [tab, setTab] = useState<'play' | 'game' | 'map' | 'calibrate' | 'routes' | 'cards' | 'costs' | 'text' | 'sites' | 'whites' | 'slots' | 'dividers' | 'markers' | 'log'>('game');
@@ -398,6 +477,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // to the game-selection dialog). Initialized from localStorage; the
   // toggle button below writes both state and storage in lockstep.
   const [splitView, setSplitView] = useState<boolean>(isSplitViewMode);
+  const [skipSummaries, setSkipSummaries] = useState<boolean>(isSkipSummariesMode);
   // No-images mode as React state so the toggle can flip it WITHOUT a page
   // reload. The old toggle called window.location.reload(), which ran the
   // resume-from-save path and (via loadState keeping the fresh-mount snapshots)
@@ -407,12 +487,16 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // new value with no reload.
   const [noImages, setNoImages] = useState<boolean>(isNoImagesMode);
   const [baseAction, setBaseAction] = useState<BaseAction>(null);
+  // Which opponent's spy to return, when a site holds more than one. Local UI
+  // state rather than an engine prompt: the returnEnemySpy move already takes a
+  // target colour, so the engine has nothing to decide.
+  const [spyPick, setSpyPick] = useState<{ siteId: string; colors: string[] } | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   // Which of the player's own card piles is open in the inspector overlay,
   // if any. Lets a player review what's in their deck / discard / inner
   // circle for planning (#68). The deck is shown UNORDERED (sorted by
   // deck+slot) so it isn't a peek at draw order.
-  const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | 'trophy' | 'played' | null>(null);
+  const [pileView, setPileView] = useState<'deck' | 'discard' | 'inner' | 'trophy' | 'played' | 'devoured' | null>(null);
   // Which player's pile the overlay is showing. null = the local viewer (me).
   // Opponents' discard / inner circle / trophy hall are public info, so any
   // player can be inspected from the scoreboard (#82, Drew W.). Deck and hand
@@ -423,6 +507,12 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // "Play all basic": when true, the driver effect auto-plays non-interactive
   // hand cards one at a time until none remain (#66).
   const [playingAll, setPlayingAll] = useState(false);
+  // After the final score, let players go back and look at the board. Tyrants
+  // stays close until the last turn, and half the fun afterwards is comparing
+  // how each strategy filled the map — but the game-over screen used to replace
+  // the whole board, so the moment you could finally discuss it was the moment
+  // it disappeared.
+  const [reviewingBoard, setReviewingBoard] = useState(false);
   // Auto-captured screenshot for the bug report. Grabbed BEFORE the dialog
   // mounts so it shows the actual game state, not the modal overlay.
   const [reportScreenshot, setReportScreenshot] = useState<string | null>(null);
@@ -563,6 +653,23 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     });
   }, [ctx.gameover, G, session]);
 
+  // Best-effort "game finished" play counter — the pair of App's recordPlay
+  // start beacon. Local games are always one human (seat 0) vs AI, so mode is
+  // 'ai' with the human's outcome. Fires only on a transition INTO gameover
+  // observed by this mount: the ref starts at the mount-time value, so
+  // re-mounting / re-rendering an already-finished game never counts it again.
+  // Online finishes are reported by the GameServer itself.
+  const prevGameoverRef = useRef(!!ctx.gameover);
+  useEffect(() => {
+    const over = !!ctx.gameover;
+    const wasOver = prevGameoverRef.current;
+    prevGameoverRef.current = over;
+    if (isOnline || !over || wasOver) return;
+    recordFinish('tyrants', 'ai', { outcome: localOutcome(G, HUMAN_SEAT) });
+    // isOnline is fixed for the Board's lifetime (and declared further down, so
+    // it can't sit in the deps array without a TDZ error at render).
+  }, [ctx.gameover, G]);
+
   // Dev-only: mirror the live game log to disk via the vite plugin endpoint.
   // Lets the developer (or an assistant) read the current state without manual
   // copy/paste. Writes on every state mutation (including silent INVALID_MOVE
@@ -571,7 +678,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   useEffect(() => {
     const violations = checkTokenConservation(G);
     if (violations.length > 0) {
-      const lastLog = G.log[G.log.length - 1] ?? '(no log entries)';
+      const lastEntry = G.log[G.log.length - 1];
+      const lastLog = lastEntry ? logLineText(lastEntry) : '(no log entries)';
       for (const v of violations) {
         const sign = v.delta > 0 ? '+' : '';
         // eslint-disable-next-line no-console
@@ -635,6 +743,17 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   const opponentTurnLabel = opponentColor
     ? `${opponentColor.charAt(0).toUpperCase()}${opponentColor.slice(1)} is taking their turn`
     : undefined;
+  // Online: blink the tab title and chime when control passes back to us while
+  // the window is in the background, so players can alt-tab during opponents'
+  // turns. Only fires on the handoff (not on every reload while it's our turn).
+  const needsMe = isOnline && currentActor === me && !ctx.gameover;
+  const prevNeedsMe = useRef(needsMe);
+  useEffect(() => {
+    if (needsMe && !prevNeedsMe.current) alertYourTurn();
+    if (!needsMe) stopTurnAlert();
+    prevNeedsMe.current = needsMe;
+  }, [needsMe]);
+  useEffect(() => () => stopTurnAlert(), []);
   // The local AI drives every seat that isn't the local human's — but ONLY in
   // hotseat. Online, every other seat is a remote human, so there is no AI turn.
   const isAiTurn = !isOnline && ctx.currentPlayer !== me;
@@ -673,8 +792,38 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     }
     return -1;
   })();
-  const pendingAiSummary = pendingAiSummaryIdx >= 0 ? G.turnLogs[pendingAiSummaryIdx] : null;
+  const pendingAiSummary = (pendingAiSummaryIdx >= 0 && !skipSummaries)
+    ? G.turnLogs[pendingAiSummaryIdx] : null;
   const showingModal = !!pendingAiSummary;
+
+  // Dismiss the AI turn summary from the keyboard. In a 4-player game this
+  // popup appears three times per round, so reaching for the mouse on every
+  // one of them is most of the clicking a player does — "it's pretty annoying
+  // to have to click this button every time" (michael irsutti, BGG).
+  // Enter / Space confirm, Escape does the same since there is only one action.
+  // A window-level listener rather than relying on focus alone, so it works no
+  // matter what the player last clicked. The button is also autoFocused, which
+  // gives it a visible focus ring; if both paths fire, they set the same value
+  // and React collapses the duplicate.
+  useEffect(() => {
+    if (!showingModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar' && e.key !== 'Escape') return;
+      e.preventDefault();
+      setShownTurnLogCount(pendingAiSummaryIdx + 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showingModal, pendingAiSummaryIdx]);
+
+  // While skipping, keep the counter moving past each opponent turn as it
+  // completes. Suppressing the modal without advancing would bank a backlog and
+  // dump every skipped turn on the player the moment they switched it back on.
+  useEffect(() => {
+    if (!skipSummaries || pendingAiSummaryIdx < 0) return;
+    setShownTurnLogCount(pendingAiSummaryIdx + 1);
+  }, [skipSummaries, pendingAiSummaryIdx]);
 
   // Reducer + template state for the heuristic AI's 1-ply / turn-end lookahead,
   // ALSO used by the "Play all basic" dry-run (basicPlayIdx below).
@@ -722,7 +871,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       const seatIdx = Number(aiPid);
       const style = session?.config.aiStyles[seatIdx - 1] ?? 'random';
       let decided: AiMove | null = null;
-      if (style === 'heuristic' && aiLookahead) {
+      const styleWeights = weightsForStyle(style);
+      if ((style === 'heuristic' || style === 'hard') && aiLookahead) {
         // Build simulate + rollout closures that hand the AI the boardgame.io
         // reducer for counterfactual play. Without these the heuristic falls
         // back to pure-score ranking (no chooseOne fix, no rollout) — that's
@@ -745,7 +895,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           while (inner-- > 0) {
             if (s.ctx.gameover) break;
             if (s.ctx.currentPlayer !== pid) break;
-            const m = decideHeuristicMoveWithWeights(s.G, pid, DEFAULT_WEIGHTS);
+            // Roll out with the SAME tier this seat is playing. Passing
+            // DEFAULT_WEIGHTS was harmless while every lookahead seat shared
+            // one weight-set; now that standard and hard differ, it would have
+            // a standard seat plan its turn as the hard AI.
+            const m = decideHeuristicMoveWithWeights(s.G, pid, styleWeights);
             if (!m) { s = reducer(s, action('endTurn', [], pid)); continue; }
             const next = reducer(s, action(m.name, m.args as unknown[], pid));
             if (next === s) s = reducer(s, action('endTurn', [], pid));
@@ -753,14 +907,15 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           }
           return s.G;
         };
-        decided = decideHeuristicMoveWithWeights(G, aiPid, DEFAULT_WEIGHTS, simulate, rollout);
-      } else if (style === 'easy') {
+        decided = decideHeuristicMoveWithWeights(G, aiPid, styleWeights, simulate, rollout);
+      } else if (style === 'easy' || style === 'heuristic' || style === 'hard') {
         // Easy tier: heuristic with lookahead disabled. The useLookahead
         // weight is respected by the AI's lookahead-aware code paths, so
         // setting it to 0 collapses the AI to pre-rollout strength (which
         // beat humans ~8% of the time vs ~32% for the standard tier).
-        const easyWeights = { ...DEFAULT_WEIGHTS, useLookahead: 0 };
-        decided = decideHeuristicMoveWithWeights(G, aiPid, easyWeights);
+        // Either the 'easy' tier (which opts out of lookahead) or a
+        // lookahead tier with no simulator available: score-only ranking.
+        decided = decideHeuristicMoveWithWeights(G, aiPid, styleWeights);
       } else {
         const decide = AI_FNS[style] ?? decideAiMove;
         decided = decide(G, aiPid);
@@ -982,20 +1137,28 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     ? new Set((humanSpacePick.options as string[] | undefined) ?? [])
     : baseActionClickableSpaces;
 
-  const highlightedSpaces = humanMapPick?.highlightSpaces
-    ? new Set(humanMapPick.highlightSpaces as string[])
+  // Advisory subset of the clickable sites: the ones where the card's *next*
+  // step (assassinate / supplant / the "opponent troop here" bonus) actually
+  // has something to bite on. Every clickable site stays clickable — this only
+  // changes how the ring is drawn. See PendingChoice.highlight (#105).
+  const highlightSites = humanSitePick?.highlight
+    ? new Set(humanSitePick.highlight as string[])
     : undefined;
 
   const handleSiteClick = (siteId: string) => {
     if (G.setupPhase && myTurn) { moves.deployStartingTroop(siteId); return; }
     if (humanSitePick) { moves.resolveChoice(siteId); return; }
     if (baseAction?.kind === 'return-spy') {
-      // Pick which enemy spy if multiple colors present at this site.
       const enemyColors = (G.spies[siteId] ?? []).filter(c => c !== p.color);
-      if (enemyColors.length > 0) {
-        // Just take the first for simplicity; could surface a sub-prompt if 2+.
+      if (enemyColors.length === 1) {
         moves.returnEnemySpy(siteId, enemyColors[0]);
         // Stay in return-spy mode; auto-cancelled by the power-watchdog effect.
+      } else if (enemyColors.length > 1) {
+        // Two opponents spying on the same site is a real decision — they
+        // belong to different people, and returning the wrong one can hand the
+        // site to whoever you were trying to block. This used to silently take
+        // the first colour in the array (reported from BGG).
+        setSpyPick({ siteId, colors: enemyColors });
       }
     }
   };
@@ -1059,7 +1222,15 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         cursor: enabled ? 'pointer' : 'not-allowed', opacity: enabled ? 1 : 0.4,
       }}>{label}</button>
   );
-  const deployLabel = p.barracksLeft <= 0 ? 'Deploy (1 Power → +1 VP)' : 'Deploy (1 Power)';
+  // Power lives in the status line at the very top of the page. In split view
+  // the action bar is often the only thing on screen above the map, so "how
+  // many troops can I still deploy?" meant scrolling back up. Put the count on
+  // the buttons that spend it — cost first, then what you actually have
+  // (requested on BGG).
+  const powerCost = (cost: number) => `${cost} of ${p.power} Power`;
+  const deployLabel = p.barracksLeft <= 0
+    ? `Deploy (${powerCost(1)} → +1 VP)`
+    : `Deploy (${powerCost(1)})`;
   // End-turn guard: resources reset each turn so unspent power / influence /
   // unplayed cards are wasted. Warn the player before ending — easy to bump
   // the End Turn button by accident, especially on touch. Skip the prompt
@@ -1168,6 +1339,101 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     );
   })();
 
+  // Whose spy? Shown when the clicked site holds spies from more than one
+  // opponent. Mirrors the engine's select-player prompt styling so the two
+  // routes to this action look the same.
+  const spyPickBar = spyPick ? (() => {
+    const siteName = SITES.find(s2 => s2.id === spyPick.siteId)?.name ?? spyPick.siteId;
+    return (
+      <div style={{ marginBottom: 8, padding: 10, background: '#3a2055', borderRadius: 4 }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 6 }}>Return whose spy from {siteName}?</div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {spyPick.colors.map(c => {
+            const pid = Object.keys(G.players).find(k => G.players[k].color === c);
+            return (
+              <button key={c}
+                onClick={() => { moves.returnEnemySpy(spyPick.siteId, c as Color); setSpyPick(null); }}
+                style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                {pid ? playerColorLabel(G.players[pid].color, pid) : c}
+              </button>
+            );
+          })}
+        </div>
+        <button onClick={() => setSpyPick(null)} style={{ marginTop: 8, padding: '4px 12px', fontSize: 12 }}>
+          Cancel
+        </button>
+      </div>
+    );
+  })() : null;
+
+  // Shown instead of the action bar once the game is over and the player has
+  // stepped back into the board to look around.
+  const reviewBanner = (ctx.gameover && reviewingBoard) ? (
+    <div style={{ marginTop: 16, padding: 10, background: '#3a2055', borderRadius: 4,
+      display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <span style={{ fontWeight: 'bold' }}>Game over — this is the final board.</span>
+      <button onClick={() => setReviewingBoard(false)}
+        style={{ padding: '6px 12px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
+        ← Back to results
+      </button>
+    </div>
+  ) : null;
+
+  // The market heading's two extras — the devoured-pile link and the low-deck
+  // warning — went into the game tab only, and split view has its own market
+  // header, so neither appeared there (reported from BGG). Build it once and
+  // hand it to both. Writing the rules a second time is exactly what produced
+  // the custom-colour bug a day ago.
+  const marketHeading = (
+    <>
+          Market
+          {/* Same reasoning as the power counts on the action bar: influence is
+              only shown in the top-of-page status line, so answering "can I
+              afford this card?" while looking at the market meant scrolling
+              away from the market. Show it in the heading instead. */}
+          <span
+            title="Influence you have to spend right now. Unspent influence is lost when your turn ends."
+            style={{
+              marginLeft: 8, fontSize: 13, fontWeight: 700,
+              color: p.influence > 0 ? '#ffd479' : '#8a8296',
+            }}>
+            · {p.influence} Influence
+          </span>
+          {(G.devouredPile?.length ?? 0) > 0 && (
+            <button onClick={() => setPileView('devoured')}
+              title="View the devoured pile — cards removed from the game. Some cards let you recruit the top one."
+              style={{
+                marginLeft: 10, background: 'none', border: 'none', padding: 0,
+                font: 'inherit', fontSize: 13, fontWeight: 'normal',
+                color: '#9ecbff', cursor: 'pointer', textDecoration: 'underline',
+              }}>
+              devoured: {G.devouredPile!.length}
+            </button>
+          )}
+          {(() => {
+            // The market running dry is one of the two end-game triggers, but it
+            // read as quiet grey trivia right up until it fired. Mirror the
+            // barracks treatment and make the last stretch look like the warning
+            // it is (requested on BGG).
+            const left = G.market.deck.length;
+            const low = left <= 10;
+            return (
+              <span
+                title={low
+                  ? `Only ${left} cards left in the market deck — when it empties, the game enters its final round.`
+                  : 'Cards left in the market deck. When it empties, the game enters its final round.'}
+                style={{
+                  fontSize: 13, fontWeight: low ? 700 : 'normal',
+                  opacity: low ? 1 : 0.7, color: low ? '#ff9d6c' : undefined, marginLeft: 6,
+                }}>
+                · {left} cards left in deck
+              </span>
+            );
+          })()}
+    </>
+  );
+
+  const discardOf = (pid: string) => rulesDiscard(G, pid, ctx.currentPlayer);
   // House Bar — the acting player's Drow House passives/actions, if any.
   // Renders nothing when houses are off for this game. Kept as its own
   // memo-free const (cheap to rebuild each render, same as actionBar) so it
@@ -1182,31 +1448,64 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         () => setBaseAction(baseAction?.kind === 'deploy' ? null : { kind: 'deploy' }))}
       {actionBtn(`Assassinate (${assassinateCost} Power)`, canAssassinate, baseAction?.kind === 'assassinate',
         () => setBaseAction(baseAction?.kind === 'assassinate' ? null : { kind: 'assassinate' }))}
-      {actionBtn('Return enemy spy (3 Power)', canReturnSpy, baseAction?.kind === 'return-spy',
+      {actionBtn(`Return enemy spy (${powerCost(BASE_ACTION_POWER_COST)})`, canReturnSpy, baseAction?.kind === 'return-spy',
         () => setBaseAction(baseAction?.kind === 'return-spy' ? null : { kind: 'return-spy' }))}
       {baseAction && actionBtn('Cancel', true, false, () => setBaseAction(null))}
       {(() => {
         const canPlayAll = myTurn && !G.pendingChoice && !G.setupPhase && basicPlayIdx != null;
         const active = canPlayAll && !playingAll;
+        // This button turning green is what tells you it is your turn — but it
+        // only lit up when there was something to auto-play, so on a hand of
+        // nothing but decision cards the one turn signal on screen went grey
+        // and the turn looked like somebody else's (michael irsutti, BGG).
+        // Keep it green and say so instead. Not clickable — there is nothing
+        // to run — but `default` rather than `not-allowed`, because nothing is
+        // wrong; it is an indicator at that point, not a disabled control.
+        const yourTurnIdle = myTurn && !G.pendingChoice && !G.setupPhase
+          && basicPlayIdx == null && !playingAll;
+        const lit = active || playingAll || yourTurnIdle;
+        // While it's running the button becomes STOP. Once started there was no
+        // way to interrupt it, which is how a player ended up auto-playing a
+        // card whose cost is "devour a card from your hand" with nothing left to
+        // devour — and online there's no undo to walk it back. Stopping only
+        // ends the run; cards already played stay played.
         return (
           <button
-            onClick={() => setPlayingAll(true)}
-            disabled={!active}
-            title="Play every hand card whose effect needs no decision (e.g. resource cards), one after another. Stops when only cards that require a choice remain."
-            style={{ padding: '8px 16px', background: active ? '#2a4a30' : '#2a2a2a', color: active ? 'white' : '#777', border: 'none', borderRadius: 4, cursor: active ? 'pointer' : 'not-allowed', marginLeft: 'auto' }}>
-            {playingAll ? 'Playing…' : '▶▶ Play all basic'}
+            onClick={() => setPlayingAll(p => !p)}
+            disabled={!active && !playingAll}
+            title={playingAll
+              ? 'Stop after the card currently being played. Cards already played stay played.'
+              : yourTurnIdle
+                ? 'It is your turn. Every card left in your hand needs a decision, so there is nothing to auto-play — play them yourself, or take a board action.'
+                : 'Play every hand card whose effect needs no decision (e.g. resource cards), one after another. Stops when only cards that require a choice remain.'}
+            style={{ padding: '8px 16px',
+              background: playingAll ? '#5a2a2a' : (active || yourTurnIdle) ? '#2a4a30' : '#2a2a2a',
+              color: lit ? 'white' : '#777',
+              border: 'none', borderRadius: 4,
+              cursor: (active || playingAll) ? 'pointer' : yourTurnIdle ? 'default' : 'not-allowed',
+              marginLeft: 'auto' }}>
+            {playingAll ? '■ Stop' : yourTurnIdle ? '✦ Your turn' : '▶▶ Play all basic'}
           </button>
         );
       })()}
       {(() => {
         const canUndo = myTurn && (G.undoStack?.length ?? 0) > 0;
+        // Undo is a hotseat-only affordance: redactState() zeroes G.undoStack
+        // for every viewer online, so canUndo is permanently false there. The
+        // button was therefore greyed out with the hidden-card explanation,
+        // which is the WRONG reason online and reads as undo being broken
+        // (in-game report #75, "undo doesnt work in multiplayer"). Say which
+        // of the two it actually is.
+        const undoTitle = canUndo
+          ? 'Undo your last action. You can keep undoing back to the start of your turn — but not past anything that revealed a hidden card (a draw or a market buy).'
+          : isOnline
+            ? 'Undo is not available in online games — every move is confirmed by the server as it happens, so there is nothing local to rewind. It works in solo and hotseat games.'
+            : 'Nothing to undo. Actions that reveal a hidden card (drawing, buying from the market) cannot be undone.';
         return (
           <button
             onClick={() => { setBaseAction(null); moves.undo(); }}
             disabled={!canUndo}
-            title={canUndo
-              ? 'Undo your last action. You can keep undoing back to the start of your turn — but not past anything that revealed a hidden card (a draw or a market buy).'
-              : 'Nothing to undo. Actions that reveal a hidden card (drawing, buying from the market) cannot be undone.'}
+            title={undoTitle}
             style={{ padding: '8px 16px', background: canUndo ? '#553a20' : '#2a2a2a', color: canUndo ? 'white' : '#777', border: 'none', borderRadius: 4, cursor: canUndo ? 'pointer' : 'not-allowed', marginLeft: 'auto' }}>
             ↶ Undo{canUndo ? ` (${G.undoStack.length})` : ''}
           </button>
@@ -1243,6 +1542,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
     if (!pileView) return null;
     // Resolve which player's pile we're showing (defaults to the local viewer).
     const pp = G.players[pilePlayer ?? me] ?? p;
+    const ppId = pilePlayer ?? me;
     const isMe = (pilePlayer ?? me) === me;
     const who = isMe ? 'Your' : `P${Number(pilePlayer) + 1} (${pp.color})'s`;
     // The trophy hall holds captured enemy troop FIGURES, not cards — show it
@@ -1302,8 +1602,44 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         </div>
       );
     }
+    if (pileView === 'devoured') {
+      // Shared pile, and ORDER matters: cards are pushed as they're devoured,
+      // so the last one is the top — which is the one a card like Ghost lets
+      // you take. Show it top-first and say which it is, rather than sorting
+      // like the private piles (requested on BGG: the stack should be visible
+      // even before you're able to use such an effect).
+      const pile = [...(G.devouredPile ?? [])].reverse();
+      return (
+        <div onClick={() => setPileView(null)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            width: '100vw', height: '100dvh', background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000, padding: 20,
+          }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: '#1a1228', borderRadius: 8, padding: 16, maxWidth: '90vw', maxHeight: '85vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
+              <h2 style={{ margin: 0, fontSize: 18 }}>Devoured pile ({pile.length})</h2>
+              <button onClick={() => setPileView(null)} style={{ marginLeft: 'auto', padding: '4px 12px' }}>Close</button>
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 10 }}>
+              Cards removed from the game. Listed top of the pile first — the top card is
+              the one that effects which recruit from the devoured pile can take.
+            </div>
+            {pile.length === 0
+              ? <div style={{ opacity: 0.6 }}>Nothing has been devoured yet.</div>
+              : <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {pile.map((c, i) => (
+                    <Card key={i} card={c} label={i === 0 ? 'top of pile' : undefined} dim={i > 0} />
+                  ))}
+                </div>}
+          </div>
+        </div>
+      );
+    }
     const cards = pileView === 'deck' ? pp.deck
-      : pileView === 'discard' ? pp.discard
+      : pileView === 'discard' ? discardOf(ppId)
       : pileView === 'played' ? pp.cardsPlayed
       : pp.innerCircle;
     const title = pileView === 'deck' ? `${who} Deck`
@@ -1356,13 +1692,59 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   })();
 
   // End-of-game scoreboard.
-  if (ctx.gameover) {
+  if (ctx.gameover && !reviewingBoard) {
     const scores = scoreAll(G);
-    const ranked = Object.entries(scores).sort((a, b) => b[1].total - a[1].total);
+    // Seats that gave up or left forfeit their placing: they rank below every
+    // seat that played its own game and can never be the winner — the same rule
+    // the server's result uses. Ranking on raw score alone named a player who
+    // conceded while ahead as the winner.
+    const out = new Set(G.forfeitedSeats ?? []);
+    const byScore = (a: [string, { total: number }], b: [string, { total: number }]) => b[1].total - a[1].total;
+    const ranked = [
+      ...Object.entries(scores).filter(([pid]) => !out.has(pid)).sort(byScore),
+      ...Object.entries(scores).filter(([pid]) => out.has(pid)).sort(byScore),
+    ];
     const winner = ranked[0];
+    const conceded = new Set(
+      (G.log as unknown as Array<string | { kind?: string; payload?: { seat?: string } }>)
+        .filter((e): e is { kind?: string; payload?: { seat?: string } } => typeof e !== 'string' && e.kind === 'seat.concede')
+        .map(e => e.payload?.seat ?? ''),
+    );
+    const iConceded = isOnline && conceded.has(me);
+    // Only when the game ENDED because the others gave up or left — in a 3-4
+    // player game someone can concede and the rest play on to a normal finish.
+    const byForfeit = !!(ctx.gameover as { byForfeit?: boolean } | undefined)?.byForfeit;
+    const theyConceded = isOnline && !iConceded && byForfeit && winner[0] === me;
     return (
-      <div style={{ padding: 24, maxWidth: 'min(900px, 95vw)', margin: '0 auto', boxSizing: 'border-box' }}>
+      <div style={{ padding: 24, maxWidth: 'min(900px, 95vw)', margin: '0 auto' }}>
+        {(iConceded || theyConceded) && (
+          <div style={{
+            margin: '0 0 20px', padding: '40px 24px', borderRadius: 10, textAlign: 'center',
+            background: iConceded
+              ? 'radial-gradient(ellipse at center, #4a1c1c 0%, #1a0a0a 75%)'
+              : 'radial-gradient(ellipse at center, #3d3410 0%, #1a1506 75%)',
+            border: `2px solid ${iConceded ? '#7a2e2e' : '#b8952a'}`,
+          }}>
+            <div style={{ fontSize: 56, fontWeight: 800, letterSpacing: 2,
+              color: iConceded ? '#e0a0a0' : '#ffd966', textShadow: '0 4px 24px rgba(0,0,0,0.8)' }}>
+              {iConceded ? 'Defeat' : 'Victory'}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 18, opacity: 0.85 }}>
+              {iConceded
+                ? 'You gave up. You are ranked last.'
+                : ctx.numPlayers === 2
+                  ? `Your opponent ${conceded.size ? 'gave up' : 'left the game'} — the game is yours.`
+                  : 'Everyone else gave up or left — the game is yours.'}
+            </div>
+          </div>
+        )}
         <h1 style={{ margin: 0 }}>Game Over</h1>
+        <button onClick={() => setReviewingBoard(true)}
+          title="Go back to the finished board — the map, the log and every pile, exactly as the game ended."
+          style={{ marginTop: 10, padding: '8px 16px', background: '#3a2055', color: '#e6e1f2',
+            border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
+          View the final board →
+        </button>
         <div style={{ marginTop: 8, fontSize: 18 }}>
           Winner: <b>P{Number(winner[0]) + 1} ({G.players[winner[0]].color})</b> — {winner[1].total} VP
         </div>
@@ -1402,7 +1784,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               const cell = (val: number | string, tip: string) => (
                 <td title={tip} style={{ cursor: 'help' }}>{val}</td>
               );
-              const COLOR_HEX: Record<string, string> = { black: '#1a1a1a', red: '#c43c3c', orange: '#e08a2e', blue: '#3473b8', white: '#d0d0d0' };
+
               const trophiesCell = (
                 <td title={trophiesTip} style={{ cursor: 'help' }}>
                   <div>{s.trophies}</div>
@@ -1420,8 +1802,9 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                             width: 8, height: 8, borderRadius: '50%',
                             // Flat gradient so Samsung/Chrome forced dark mode
                             // leaves this colour-coded trophy dot as authored.
-                            background: `linear-gradient(${COLOR_HEX[c] ?? '#888'}, ${COLOR_HEX[c] ?? '#888'})`,
-                            border: c === 'black' ? '1px solid #555' : 'none',
+                            background: `linear-gradient(${c === 'white' ? WHITE_TOKEN_HEX : colorHex(c)}, ${c === 'white' ? WHITE_TOKEN_HEX : colorHex(c)})`,
+                            // #555 on a #4a4a4a dot was a rim you couldn't see.
+                            border: needsLightRim(c) ? `1px solid ${DARK_RIM_HEX}` : 'none',
                           }} />
                           {n}
                         </span>
@@ -1431,7 +1814,14 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               );
               return (
                 <tr key={pid} style={{ borderBottom: '1px solid #1a1228' }}>
-                  <td style={{ padding: 4 }}>P{Number(pid) + 1} ({G.players[pid].color})</td>
+                  <td style={{ padding: 4 }}>
+                    P{Number(pid) + 1} ({G.players[pid].color})
+                    {out.has(pid) && (
+                      <span style={{ marginLeft: 6, fontSize: 11, opacity: 0.7 }}>
+                        {conceded.has(pid) ? '· gave up' : '· left the game'}
+                      </span>
+                    )}
+                  </td>
                   {cell(s.sites, sitesTip)}
                   {cell(s.totalControl, totalCtrlTip)}
                   {trophiesCell}
@@ -1505,10 +1895,13 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                 ))}
             </div>
             <div style={{ marginTop: 16, textAlign: 'right' }}>
-              <button onClick={() => setShownTurnLogCount(pendingAiSummaryIdx + 1)}
+              <button autoFocus onClick={() => setShownTurnLogCount(pendingAiSummaryIdx + 1)}
                 style={{ padding: '6px 16px', background: '#5a3380', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>
                 OK
               </button>
+              <div style={{ marginTop: 8, fontSize: 11, opacity: 0.55 }}>
+                Enter, Space or Esc also works
+              </div>
             </div>
           </div>
         </div>
@@ -1517,7 +1910,16 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           the flex layout): keeps the desktop single-row header, lets the
           buttons wrap below the title on narrow mobile viewports. */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
-        <h1 style={{ margin: 0, flex: 1 }}>Tyrants of the Underdark</h1>
+        <h1 style={{ margin: 0 }}>Tyrants of the Underdark</h1>
+        {/* Build stamp. The game ships several times a week, so "is the thing I
+            am looking at the thing you just changed?" was unanswerable from the
+            page — asked for on BGG. AI_VERSION is the git short SHA already
+            stamped into uploaded game logs, so a player quoting this can be
+            matched to an exact build. */}
+        <span title={`Build ${AI_VERSION}${BUILD_TIME !== 'dev' ? ` — ${BUILD_TIME}` : ''}`}
+          style={{ flex: 1, fontSize: 11, opacity: 0.45, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+          build {AI_VERSION}{BUILD_TIME !== 'dev' ? ` · ${BUILD_TIME.slice(0, 10)}` : ''}
+        </span>
         <button onClick={() => {
           // Flip in React state — NO page reload (reload triggered the
           // resume-from-save path that could reset the game; see noImages state).
@@ -1542,9 +1944,20 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             return next;
           });
         }}
-          title="Toggle split-view mode. Adds a 'play' tab that shows the map and your hand+market on the same page, with hover-to-expand. The original game/map tabs stay available."
+          title="Toggle split-view mode. Adds a 'play' tab showing the map and your hand+market on one page, at fixed proportions. The original game/map tabs stay available."
           style={{ padding: '6px 14px', background: splitView ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
           {splitView ? '📐 split view on' : '📐 split view off'}
+        </button>
+        <button onClick={() => {
+          setSkipSummaries(prev => {
+            const next = !prev;
+            try { localStorage.setItem(SKIP_SUMMARIES_KEY, next ? '1' : '0'); } catch { /* ignore */ }
+            return next;
+          });
+        }}
+          title="Skip the between-turns summary popup. Nothing is lost — every line is still in the Log tab, turn by turn. Leave it on in online games if you want to see what your opponent did."
+          style={{ padding: '6px 14px', background: skipSummaries ? '#5a3380' : 'transparent', color: '#e6e1f2', border: '1px solid #3a2055', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
+          {skipSummaries ? '⏭ turn popups off' : '⏭ turn popups on'}
         </button>
         {/* Log upload targets the worker /game-log relay, which does not exist on
             the online (Cloudflare Pages) deploy — so it always fails online. Online
@@ -1596,6 +2009,33 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           style={{ padding: '6px 14px', background: '#3a2055', color: '#e6e1f2', border: '1px solid #5a3380', borderRadius: 4, cursor: 'pointer' }}>
           Report a problem
         </button>
+        {isOnline && !ctx.gameover && (G.forfeitedSeats ?? []).includes(me) && (
+          <span style={{ padding: '6px 4px', color: '#c9a0a0', fontSize: 13 }}
+            title="You're ranked last. The other players are finishing the game; you can keep watching.">
+            You gave up — a bot is playing your seat.
+          </span>
+        )}
+        {isOnline && !ctx.gameover && !(G.forfeitedSeats ?? []).includes(me) && (() => {
+          // Give up (#111). Two-player (or everyone else a bot), the game ends.
+          // With other people still playing, the server's bot finishes the
+          // seat so they can play on — the confirmation says which.
+          const ends = concedeEndsGame(G, me);
+          const what = ends
+            ? 'The game ends now and you are ranked last.'
+            : 'You are ranked last, and a bot plays out your seat so everyone else can finish.';
+          return (
+            <button
+              onClick={() => {
+                if (!confirm(`Give up this game?\n\n${what} If the game is ranked, it counts as a loss.\n\nThis can't be undone.`)) return;
+                (moves as unknown as { concede: () => void }).concede();
+              }}
+              title={`Concede this game. ${what}`}
+              style={{ padding: '6px 14px', background: '#5a2a2a', color: '#f2dede',
+                border: '1px solid #6a3030', borderRadius: 4, cursor: 'pointer' }}>
+              Give up
+            </button>
+          );
+        })()}
         <button onClick={async () => {
           if (!confirm('Start a new game? Current progress will be lost.')) return;
           // Archive the current playthrough before discarding it, so it
@@ -1752,14 +2192,21 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                     background: isCurrent ? 'rgba(255,204,68,0.10)' : 'transparent',
                   }}>
                     <ColorSwatch color={pl.color} />
-                    <span style={{ minWidth: 78, opacity: 0.9 }}>
+                    <span style={{ minWidth: 92, opacity: 0.9 }}>
                       P{Number(pid) + 1}{isViewer ? ' (you)' : ''}
+                      {/* Who went first decides who gets the last turn of the
+                          final round, which matters for the end-game race —
+                          and it was nowhere on screen once setup scrolled past. */}
+                      {pid === G.firstPlayerId && (
+                        <span title="Went first this game — so they also take the last turn of the final round."
+                          style={{ marginLeft: 4, color: '#ffcc44', fontWeight: 700 }}>①</span>
+                      )}
                     </span>
                     <span style={{ color: '#ffcc44' }}>{pl.vp} VP</span>
                     <span style={{ opacity: 0.55 }}>·</span>
                     <span title="Sites you control">{markers} markers</span>
                     <span style={{ opacity: 0.55 }}>·</span>
-                    {link('discard', pl.discard.length, pid, 'discard')}
+                    {link('discard', discardOf(pid).length, pid, 'discard')}
                     <span style={{ opacity: 0.55 }}>·</span>
                     {link('inner-circle', pl.innerCircle.length, pid, 'inner')}
                     <span style={{ opacity: 0.55 }}>·</span>
@@ -1863,13 +2310,18 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
                   Decline
                 </button>
               )}
+              {(humanMapPick.highlight?.length ?? 0) > 0 && (
+                <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
+                  Green rings mark the sites where this card’s follow-up has a target.
+                </div>
+              )}
             </div>
           )}
           {/* choose-one / select-player prompts surfaced here too — without
               this the user has to flip back to the game tab to resolve each
               iteration of cards like Intellect Devourer that loop chooseOne
               under times(). */}
-          {interactivePromptBar}
+          {spyPickBar}{interactivePromptBar}
           {/* Action bar rendered ABOVE the map so it's reachable without
               scrolling past the (large) board image. Per user feedback —
               this is the bar most likely needed while looking at the map
@@ -1877,11 +2329,11 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
               Spy / End Turn). Kept inside the map-tab block so the bar
               only shows when relevant. */}
           {houseBar}
-          {actionBar}
+          {reviewBanner}{actionBar}
           <MapView G={G}
             clickableSites={startingClickable} onSiteClick={handleSiteClick}
-            clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} 
-            highlightedSpaces={highlightedSpaces}/>
+            highlightSites={highlightSites}
+            clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
         </div>
       )}
       {tab === 'play' && (
@@ -1889,13 +2341,15 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           G={G} ctx={ctx} myTurn={myTurn} p={p} moves={moves}
           playCardSafe={playCardSafe}
           startingClickable={startingClickable} handleSiteClick={handleSiteClick}
+          highlightSites={highlightSites}
           clickableSpaces={clickableSpaces} handleSpaceClick={handleSpaceClick}
           highlightedSpaces={highlightedSpaces}
           clickableMarketSlots={clickableMarketSlots}
+          marketHeading={marketHeading}
           humanMapPick={humanMapPick}
           houseBar={houseBar}
-          actionBar={actionBar}
-          interactivePromptBar={interactivePromptBar}
+          actionBar={<>{reviewBanner}{actionBar}</>}
+          interactivePromptBar={<>{spyPickBar}{interactivePromptBar}</>}
           mySeat={me}
           onViewPile={setPileView}
         />
@@ -1912,7 +2366,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
       {tab === 'markers' && <div style={{ marginTop: 16 }}><MarkerCalibration /></div>}
       {tab === 'log' && (
         <div style={{ marginTop: 16 }}>
-          {interactivePromptBar}
+          {spyPickBar}{interactivePromptBar}
           <GameLog G={G} onLoad={(codec) => moves.loadState(codec)} />
         </div>
       )}
@@ -1933,8 +2387,17 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             <div style={{ fontWeight: 'bold' }}>{G.pendingChoice.prompt}</div>
             <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
               For P{Number(G.pendingChoice.playerId) + 1}.
-              {G.pendingChoice.kind === 'select-card-in-hand' && ' Click a card in hand to discard it.'}
+              {/* Not always a discard — the same prompt kind covers Focus
+                  reveals (card stays in hand) and devour-from-hand. The
+                  prompt text above already says which; keep the hint neutral
+                  so it can't contradict it. */}
+              {G.pendingChoice.kind === 'select-card-in-hand' && ' Click a card in your hand.'}
               {G.pendingChoice.kind === 'select-site' && ' Click a glowing site on the map.'}
+              {/* #105: for place-a-spy prompts whose card acts at that same
+                  site afterwards, say which rings are the ones that pay off. */}
+              {G.pendingChoice.kind === 'select-site'
+                && (G.pendingChoice.highlight?.length ?? 0) > 0
+                && ' The green rings are where this card’s follow-up has a target.'}
               {G.pendingChoice.kind === 'select-troop-space' && ' Click a glowing troop space on the map.'}
             </div>
             {G.pendingChoice.kind === 'choose-one' && G.pendingChoice.playerId === me && (
@@ -1987,7 +2450,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
         )}
 
         {houseBar}
-        {actionBar}
+        {reviewBanner}{actionBar}
 
         {G.pendingChoice?.kind === 'select-card-in-discard' && G.pendingChoice.playerId === me && (
           <>
@@ -2109,9 +2572,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           })}
         </div>
 
-        <h2 style={{ marginTop: 24 }}>
-          Market <span style={{ fontSize: 13, opacity: 0.7, fontWeight: 'normal' }}>· {G.market.deck.length} cards left in deck · Influence: {p.influence}</span>
-        </h2>
+        <h2 style={{ marginTop: 24 }}>{marketHeading}</h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
           {/* Rotating market row (6 slots from the chosen half-decks). */}
           {G.market.row.map((c, i) => {
@@ -2119,13 +2580,20 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
             const inPickMode = !!clickableMarketSlots;
             const slotPickable = inPickMode && clickableMarketSlots!.has(i);
             const cost = lookupCard(c.deck, c.slot)?.cost ?? '?';
+            // A prompt that isn't a market pick (a Focus reveal, an end-of-turn
+            // promote, a forced discard…) still blocks recruiting: the move
+            // bounces as INVALID_MOVE and nothing happens. The hand and the
+            // aux stacks already gate on !pendingChoice; the rotating row was
+            // the one place left where "recruit" looked live but wasn't, which
+            // reads as the click having triggered the prompt.
+            const blocked = !inPickMode && !!G.pendingChoice;
             const label = inPickMode
               ? (slotPickable ? 'pick' : '—')
-              : `recruit (${cost} Inf)`;
+              : blocked ? '—' : `recruit (${cost} Inf)`;
             const onClick = inPickMode
               ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
-              : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
-            return <Card key={i} card={c} label={label} onClick={onClick} dim={inPickMode && !slotPickable} />;
+              : (myTurn && !blocked ? () => moves.recruitFromMarket(i) : undefined);
+            return <Card key={i} card={c} label={label} onClick={onClick} dim={(inPickMode && !slotPickable) || blocked} />;
           })}
           {/* Permanent stacks (House Guards, Priestesses of Lolth) — always
               recruitable while non-empty; once empty, greyed out and the
@@ -2164,26 +2632,7 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           })}
         </div>
 
-        <details style={{ marginTop: 24 }}>
-          <summary style={{ cursor: 'pointer', opacity: 0.7 }}>Log ({G.log.length})</summary>
-          {/* Full log, newest first, in a scrollable + wrapping panel. The old
-              <pre> showed only the last 20 lines and, being preformatted, ran
-              long lines off-screen with no scroll — so most of the game was
-              unviewable here. */}
-          <div style={{
-            marginTop: 6, fontSize: 12, opacity: 0.85,
-            maxHeight: '40vh', overflowY: 'auto',
-            background: '#0c0814', borderRadius: 4, padding: '6px 8px',
-          }}>
-            {G.log.length === 0
-              ? <div style={{ opacity: 0.5 }}>(no log entries yet)</div>
-              : G.log.slice().reverse().map((line, i) => (
-                <div key={i} style={{ padding: '1px 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  <CardLogText line={line} />
-                </div>
-              ))}
-          </div>
-        </details>
+        <GameTabLog log={G.log} />
       </>}
     </div>
   );
@@ -2317,18 +2766,14 @@ function NewGameDialog({ onStart, hasSave, onResume, lastConfig }: {
           {Array.from({ length: opponentCount }, (_, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
               <span style={{ width: 32, opacity: 0.7 }}>P{i + 2}</span>
-              {(['random', 'easy', 'heuristic'] as AiStyle[]).map(s => (
+              {AI_STYLES.map(s => (
                 <button key={s} onClick={() => setStyle(i, s)}
-                  title={
-                    s === 'random' ? 'Picks a legal move at random. Almost never wins.'
-                    : s === 'easy' ? 'Heuristic AI without lookahead. Plays sensible moves but doesn\'t see the consequences of choices. Beats humans ~8% in our data.'
-                    : 'Heuristic AI with full lookahead (looks ahead to end-of-turn state, picks targets that pay off). Beats humans ~32% in our data.'
-                  }
+                  title={describeStyle(s)}
                   style={{
                     padding: '4px 12px', cursor: 'pointer', borderRadius: 4, fontSize: 12,
                     background: trimmedStyles[i] === s ? '#5a3380' : '#2a1840',
                     color: '#e6e1f2', border: '1px solid #3a2055',
-                  }}>{s === 'heuristic' ? 'standard' : s}</button>
+                  }}>{labelForStyle(s)}</button>
               ))}
             </div>
           ))}
@@ -2509,11 +2954,15 @@ function SplitPlayView(props: {
   playCardSafe: (idx: number) => void;
   startingClickable: Set<string> | undefined;
   handleSiteClick: (siteId: string) => void;
+  /** Advisory subset of startingClickable whose ring is drawn solid (#105). */
+  highlightSites: Set<string> | undefined;
   clickableSpaces: Set<string> | undefined;
   handleSpaceClick: (spaceId: string) => void;
   highlightedSpaces: Set<string> | undefined;
   clickableMarketSlots: Set<number> | null | undefined;
-  humanMapPick: { prompt: string; optional?: boolean } | null;
+  /** Built by Board so both layouts show the same devoured link + low-deck warning. */
+  marketHeading: React.ReactNode;
+  humanMapPick: { prompt: string; optional?: boolean; highlight?: string[] } | null;
   houseBar: React.ReactNode;
   actionBar: React.ReactNode;
   interactivePromptBar: React.ReactNode;
@@ -2524,31 +2973,43 @@ function SplitPlayView(props: {
   onViewPile: (pile: 'deck' | 'discard' | 'inner' | 'trophy' | 'played') => void;
 }) {
   const { G, myTurn, p, moves, playCardSafe,
-          startingClickable, handleSiteClick, clickableSpaces, handleSpaceClick,
-          highlightedSpaces,
-          clickableMarketSlots, humanMapPick, houseBar, actionBar, interactivePromptBar,
+          startingClickable, handleSiteClick, highlightSites, clickableSpaces, handleSpaceClick,
+          clickableMarketSlots, humanMapPick, houseBar, actionBar, interactivePromptBar, marketHeading,
           mySeat: me, onViewPile } = props;
-  const [focus, setFocus] = useState<'map' | 'cards' | null>(null);
+  const wide = useWideLayout();
 
-  // Hover expansion: on hover-capable devices, mouse enter/leave drive
-  // which panel takes more vertical space. On touch, focus is unset and
-  // both panels share the space 50/50 (tap a card to play it normally).
-  const enterMap = HOVER_CAPABLE ? () => setFocus('map') : undefined;
-  const leaveMap = HOVER_CAPABLE ? () => setFocus(prev => prev === 'map' ? null : prev) : undefined;
-  const enterCards = HOVER_CAPABLE ? () => setFocus('cards') : undefined;
-  const leaveCards = HOVER_CAPABLE ? () => setFocus(prev => prev === 'cards' ? null : prev) : undefined;
-
-  // Flex weights — when one panel is focused it claims most of the height;
-  // otherwise the map gets ~60% (typical board games favor seeing the
-  // board at all times) and cards get ~40%.
-  const mapFlex = focus === 'map' ? '4 1 0' : focus === 'cards' ? '1 1 0' : '3 1 0';
-  const cardsFlex = focus === 'cards' ? '4 1 0' : focus === 'map' ? '1 1 0' : '2 1 0';
+  // Panels are FIXED at ~60/40. They used to expand on hover — whichever panel
+  // the cursor was over claimed most of the space — which turned out to be the
+  // single most disliked thing about split view, reported independently by two
+  // players in one day:
+  //
+  //   "once you hover your mouse over a card, whole layout changes completely
+  //    (map shrinks, then from MAP | HAND / MARKET it quickly moves to
+  //    MAP | HAND | MARKET) — it causes everything to fly all over the place,
+  //    while in shared view you'd rather like everything to be as static as
+  //    possible (with only one moving part — the card you hover your mouse
+  //    over)" — go4t, BGG
+  //
+  //   "every time I click it, the display switches ... it's even worse since
+  //    your latest display change" — michael irsutti, BGG, describing the same
+  //    thing from the other end: dismissing a popup leaves the cursor mid-screen
+  //    over a panel, so the layout reflowed on every AI turn.
+  //
+  // The wide-screen layout made it worse by turning that reflow horizontal.
+  // The point of split view is seeing the board and your cards at once; a
+  // layout that rearranges as the cursor moves defeats it. Removing the
+  // hover-expand also removes the only animated resize in this view, which is
+  // what go4t separately reported as losing its smoothness after a tab change.
+  const mapFlex = '3 1 0';
+  const cardsFlex = '2 1 0';
 
   const sectionBox = (kind: 'map' | 'cards'): React.CSSProperties => ({
     flex: kind === 'map' ? mapFlex : cardsFlex,
     overflow: 'auto',
-    transition: 'flex 280ms ease',
-    minHeight: 80,
+    // Stacked, each panel needs a floor so neither collapses to nothing. Side
+    // by side the floor has to move to the other axis, and minHeight must be
+    // released or the row cannot shrink to fit the viewport.
+    ...(wide ? { minWidth: 260, minHeight: 0 } : { minHeight: 80 }),
   });
 
   return (
@@ -2560,6 +3021,11 @@ function SplitPlayView(props: {
             <button onClick={() => moves.resolveChoice(null)} style={{ marginLeft: 12, padding: '2px 8px', fontSize: 12 }}>
               Decline
             </button>
+          )}
+          {(humanMapPick.highlight?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
+              Green rings mark the sites where this card’s follow-up has a target.
+            </div>
           )}
         </div>
       )}
@@ -2588,7 +3054,7 @@ function SplitPlayView(props: {
       {/* Pile inspector strip (#68): split view has no full status line, so
           surface clickable Deck / Discard / Inner Circle counts here. */}
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', fontSize: 13, flexWrap: 'wrap' }}>
-        {([['Deck', p.deck.length, 'deck'], ['Discard', p.discard.length, 'discard'], ['Inner Circle', p.innerCircle.length, 'inner'], ['Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), 'trophy']] as const).map(([label, count, key]) => (
+        {([['Deck', p.deck.length, 'deck'], ['Discard', rulesDiscard(G, me, props.ctx.currentPlayer).length, 'discard'], ['Inner Circle', p.innerCircle.length, 'inner'], ['Trophies', Object.values(p.trophyHall).reduce((s, n) => s + n, 0), 'trophy']] as const).map(([label, count, key]) => (
           <button key={key} onClick={() => onViewPile(key)}
             title={`View the cards in your ${label.toLowerCase()}`}
             style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#a9c6ff', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}>
@@ -2653,39 +3119,23 @@ function SplitPlayView(props: {
           </div>
         </div>
       )}
-      {G.pendingChoice?.kind === 'select-card-in-hand' && G.pendingChoice.playerId === me && G.pendingChoice.customHandTarget && (
-        <div>
-          <h3 style={{ margin: '4px 0', fontSize: 14, opacity: 0.85 }}>
-            P{Number(G.pendingChoice.customHandTarget) + 1}'s Hand — pick a card
-          </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-            {(() => {
-              const targetPid = G.pendingChoice!.customHandTarget!;
-              const targetHand = G.players[targetPid]?.hand ?? [];
-              const opts = G.pendingChoice!.options as number[] | undefined;
-              
-              return targetHand.map((c, i) => {
-                if (opts && !opts.includes(i)) return null;
-                return (
-                  <Card 
-                    key={i} 
-                    card={c} 
-                    label="pick" 
-                    onClick={() => moves.resolveChoice(i)} 
-                  />
-                );
-              });
-            })()}
-          </div>
-        </div>
-      )}
-      <div onMouseEnter={enterMap} onMouseLeave={leaveMap} style={sectionBox('map')}>
+      {/* Everything above stays in a column — banners, the action bar, the
+          pile strip. Only the two big panels flip axis, so a prompt never
+          ends up beside the board. */}
+      <div style={{
+        display: 'flex',
+        flexDirection: wide ? 'row' : 'column',
+        gap: 8,
+        flex: 1,
+        minHeight: 0,
+      }}>
+      <div style={sectionBox('map')}>
         <MapView G={G}
           clickableSites={startingClickable} onSiteClick={handleSiteClick}
-          clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick}
-          highlightedSpaces={highlightedSpaces} />
+          highlightSites={highlightSites}
+          clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
       </div>
-      <div onMouseEnter={enterCards} onMouseLeave={leaveCards} style={sectionBox('cards')}>
+      <div style={sectionBox('cards')}>
         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'center' }}>
           <div style={{ flex: '1 1 320px', minWidth: 280 }}>
             <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85, display: 'flex', alignItems: 'baseline', gap: 12 }}>
@@ -2719,22 +3169,23 @@ function SplitPlayView(props: {
             </div>
           </div>
           <div style={{ flex: '2 1 480px', minWidth: 360 }}>
-            <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85 }}>
-              Market <span style={{ opacity: 0.6, fontWeight: 'normal' }}>· {G.market.deck.length} left in deck · Influence: {p.influence}</span>
-            </h3>
+            <h3 style={{ margin: '0 0 6px', fontSize: 14, opacity: 0.85 }}>{marketHeading}</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start' }}>
               {G.market.row.map((c, i) => {
                 if (!c) return <div key={i} style={{ width: 120, height: 168, margin: 4, border: '1px dashed #444', borderRadius: 8 }} />;
                 const inPickMode = !!clickableMarketSlots;
                 const slotPickable = inPickMode && clickableMarketSlots!.has(i);
                 const cost = lookupCard(c.deck, c.slot)?.cost ?? '?';
+                // Blocked while any OTHER prompt is outstanding — see the game
+                // tab's market block for why.
+                const blocked = !inPickMode && !!G.pendingChoice;
                 const label = inPickMode
                   ? (slotPickable ? 'pick' : '—')
-                  : `recruit (${cost} Inf)`;
+                  : blocked ? '—' : `recruit (${cost} Inf)`;
                 const onClick = inPickMode
                   ? (slotPickable ? () => moves.resolveChoice(i) : undefined)
-                  : (myTurn ? () => moves.recruitFromMarket(i) : undefined);
-                return <Card key={i} card={c} label={label} onClick={onClick} dim={inPickMode && !slotPickable} />;
+                  : (myTurn && !blocked ? () => moves.recruitFromMarket(i) : undefined);
+                return <Card key={i} card={c} label={label} onClick={onClick} dim={(inPickMode && !slotPickable) || blocked} />;
               })}
               {(['houseGuards', 'priestesses'] as const).map(stack => {
                 const ref = stack === 'houseGuards'
@@ -2769,6 +3220,7 @@ function SplitPlayView(props: {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

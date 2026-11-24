@@ -4,6 +4,8 @@ import './engine/handlers'; // register card-effect handlers
 import './houses/handlers'; // register house ability handlers
 import { CardRegistry } from './engine/registry';
 import { Mechanics } from './engine/mechanics';
+import { logEvent, ensureStructuredLog, nextLogSeq, logLineText } from './engine/log';
+import { appendGameLog, type GameLogEntry } from 'digital-boardgame-framework';
 import { lookupCard, cardsInDeck } from './card-data';
 import type { EffectContext, PendingChoice } from './engine/types';
 import { SITES } from './data/sites';
@@ -155,7 +157,7 @@ export interface StolenMarker {
 
 /** Printed per-site values for both faces of each control marker. Sourced
  *  directly from assets/tokens/<site>-control.jpg and -total-control.jpg. */
-const MARKER_VALUES: Record<string, {
+export const MARKER_VALUES: Record<string, {
   controlInfluence: number; controlVp: number;
   totalControlInfluence: number; totalControlVp: number;
 }> = {
@@ -189,7 +191,13 @@ export interface TyrantsState {
    *  it to {} the same way it backfills other optional-field additions. */
   marketVpTokens: Record<number, { pid: string; vp: number }>;
   players: Record<string, PlayerData>;
-  log: string[];
+  /** Structured game log (framework log-format v2). Legacy saves carried
+   *  string[] here — ensureStructuredLog upgrades them on load/turn start. */
+  log: GameLogEntry[];
+  /** Turn number stamped onto log entries (set at turn.onBegin). */
+  logTurn?: number;
+  /** Acting seat stamped onto log entries (set at turn.onBegin). */
+  logSide?: string | null;
   /** Set while an effect is awaiting a player/AI choice. */
   pendingChoice: (PendingChoice & { playerId: string; cardKey: string }) | null;
   /** Opaque per-card state preserved across resumptions of the same effect. */
@@ -244,7 +252,8 @@ export interface TyrantsState {
    *  Used by end-of-turn promote-a-played-card effects. */
   cardsPlayedThisTurn: CardRef[];
 
-  /** Log index marker for the start of the current turn. */
+  /** Log SEQ marker for the start of the current turn (seq-based, not an
+   *  index, so the log cap can trim old entries without corrupting slices). */
   turnLogStart: number;
   /** Captured per-turn log slices. Each entry is one completed turn. */
   turnLogs: Array<{ turn: number; playerId: string; color: Color; lines: string[] }>;
@@ -293,6 +302,29 @@ export interface TyrantsState {
   /** Set by deployStartingTroop before it calls events.endTurn(); read+cleared in onEnd
    *  to skip the regular turn-end cleanup (discard hand, redraw, site-VP gain). */
   _endingSetupTurn?: boolean;
+  /** True when this state is driven by the ONLINE adapter (stamped at setup by
+   *  tyrantsAdapter, backfilled on decode for games created before the flag
+   *  existed). Undo is unusable online — redactState zeroes G.undoStack for
+   *  every viewer and OnlinePlay stubs undo/redo/loadState — so capturing undo
+   *  restore-points server-side is pure waste (#104 follow-up). */
+  _online?: boolean;
+
+  /** Seats whose player gave up (`concede`) or walked away (`forfeitSeat`,
+   *  recorded by the server-side sweep). Neither is ever offered in
+   *  legalActions, so no bot can choose them and no player does so by accident.
+   *  Online, the server's bot plays these seats from then on (the adapter's
+   *  serverDrivenSeats). For scoring it is a placement marker: the seat keeps playing so the
+   *  table isn't stuck, but it can never win and always ranks below every seat
+   *  that played its own game. Without this, walking away from a losing position
+   *  would be the cheapest way to avoid recording the loss. */
+  forfeitedSeats?: string[];
+
+  /** Seats driven by the server's AI, recorded at game creation (online only;
+   *  undefined for hotseat and for games created before this existed). The
+   *  engine otherwise has no idea which seats are people, and it needs to: a
+   *  table where every seat still playing is a bot has no one left to play for,
+   *  so it should end rather than have bots finish a game nobody is watching. */
+  botSeats?: string[];
 
   /** Player ID (as a string seat index) chosen at setup to act first. Drives
    *  turn.order.first; the human is always seated at "0" but doesn't necessarily
@@ -322,6 +354,12 @@ export const COLORS: Color[] = ['black', 'red', 'orange', 'blue'];
 export const SELECTABLE_COLORS: Color[] = [
   ...COLORS, 'purple', 'green', 'teal', 'pink', 'yellow',
 ];
+// The order seats nobody chose a colour for (the AI seats in solo play) take
+// the leftover canonical colours. Black goes last: it is the hardest colour to
+// pick out on the map, so an AI should only get it once red, orange and blue
+// are all taken. (Player feedback: with any pick other than black, the first
+// AI always came out black.)
+export const LEFTOVER_COLORS: Color[] = ['red', 'orange', 'blue', 'black'];
 const HAND_SIZE = 5;
 // Max per-turn state snapshots kept for the hotseat "Load turn" rewind. Bounds
 // the persisted state size (each snapshot is a full state codec). See onBegin.
@@ -564,6 +602,12 @@ const UNDO_SEAT = '0';
  *  (including this entry), so the move becomes non-undoable. No-op for non-
  *  human seats. */
 function pushUndoSnapshot(G: TyrantsState, currentPlayer: string): void {
+  // Online can never use these, so skip before doing any work. Without this,
+  // seat 0 (UNDO_SEAT) piled a full state codec per move into G.undoStack
+  // server-side — ~22KB a move, ~4x live-state growth over a turn. The codec
+  // strips it on write so storage was safe, but the server still built and
+  // hauled it every single move.
+  if (G._online) return;
   if (currentPlayer !== UNDO_SEAT) return;
   if (!G.undoStack) G.undoStack = [];
   G.undoStack.push(encodeSnapshot(G));
@@ -579,12 +623,64 @@ function checkEndGameTriggers(G: TyrantsState, ctx: { turn: number }) {
   }
 }
 
+/** Seats still playing their own game — not conceded, not abandoned. */
+export function liveSeats(G: TyrantsState): string[] {
+  const out = new Set(G.forfeitedSeats ?? []);
+  return Object.keys(G.players).filter(p => !out.has(p));
+}
+
+/** Whether a table with forfeits has no meaningful game left to finish.
+ *
+ *  - At most one seat still playing: in a 2-player game one concession means
+ *    the other player has won. Making them play the rest out against a bot,
+ *    with the result already fixed, is pointless.
+ *  - Every seat still playing is a bot: no person is left to play for.
+ *
+ *  Applies to abandoned seats too (the sweep's forfeitSeat), which changes one
+ *  existing behaviour on purpose: a 2-player game whose opponent walked away
+ *  now ends in the remaining player's favour when the seat is forfeited,
+ *  instead of making them finish against a bot. */
+export function tableIsOver(G: TyrantsState): boolean {
+  if (!(G.forfeitedSeats?.length)) return false;
+  const live = liveSeats(G);
+  if (live.length <= 1) return true;
+  if (G.botSeats?.length) {
+    const bots = new Set(G.botSeats);
+    if (live.every(p => bots.has(p))) return true;
+  }
+  return false;
+}
+
+/** Whether `seat` may give up right now: any seat that hasn't already.
+ *
+ *  What follows depends on the table. If conceding leaves nobody to play for
+ *  (see tableIsOver), the game ends. Otherwise — a 3-4 player game with other
+ *  people still in — the seat stays in the game and the server's bot finishes
+ *  it, straight away on each of its turns (the adapter's serverDrivenSeats), so
+ *  nobody else is kept waiting. */
+export function canConcede(G: TyrantsState, seat: string): boolean {
+  if (!G.players[seat]) return false;
+  return !(G.forfeitedSeats ?? []).includes(seat);
+}
+
+/** Whether giving up would end the game outright, as opposed to handing the
+ *  seat to a bot while everyone else plays on. The UI words its confirmation
+ *  from this. */
+export function concedeEndsGame(G: TyrantsState, seat: string): boolean {
+  const after = { ...G, forfeitedSeats: [...(G.forfeitedSeats ?? []), seat] };
+  return tableIsOver(after);
+}
+
 export const TyrantsGame: Game<TyrantsState> = {
   name: 'tyrants-of-the-underdark',
 
   // The game ends after the round containing the trigger turn finishes (rulebook p.14).
   // We compute the last turn number of that round and bail when ctx.turn exceeds it.
   endIf: ({ G, ctx }) => {
+    // A table that has lost its players ends at once, before the normal
+    // end-game check: when at most one seat is still playing its own game, or
+    // when every seat still playing is a bot. See tableIsOver.
+    if (tableIsOver(G)) return { ended: true, byForfeit: true };
     if (G.endGameTriggeredAtTurn === null) return undefined;
     const N = ctx.numPlayers;
     const triggerRound = Math.floor((G.endGameTriggeredAtTurn - 1) / N);
@@ -597,7 +693,7 @@ export const TyrantsGame: Game<TyrantsState> = {
   },
 
   setup: ({ ctx, random }, setupData?: {
-    halfDecks?: string[]; activeSections?: Array<'left'|'center'|'right'>; humanColor?: Color;
+    halfDecks?: string[]; activeSections?: Array<'left'|'center'|'right'>; humanColor?: Color; seatColors?: Color[]; botSeats?: string[];
     /** Drow House system config (off by default — a game with no `houses`
      *  input plays exactly as before). `humanHouse` picks seat 0's house;
      *  'random' (or omitted while enabled) assigns a random house. Every
@@ -629,9 +725,19 @@ export const TyrantsGame: Game<TyrantsState> = {
     // Seat → colour. The human is always seat 0; if they picked a colour, put
     // it first and let the AI seats take the remaining colours in order. No
     // pick → the default seat order (black, red, orange, blue).
-    const colorOrder: Color[] = setupData?.humanColor
-      ? [setupData.humanColor, ...COLORS.filter(c => c !== setupData.humanColor)]
-      : COLORS;
+    // Seat colours. `seatColors` sets every seat explicitly (online table setup,
+    // where the host picks for the whole table so nobody ends up on a colour
+    // that's hard to pick out against the board); `humanColor` is the older
+    // solo/hotseat form that only chooses seat 0's. Any seat left uncovered
+    // falls back to the classic four, skipping colours already handed out so a
+    // partial list can't produce two seats of the same colour — black last
+    // (LEFTOVER_COLORS). With no pick at all, the plain seat order is kept.
+    const explicit = setupData?.seatColors ?? (setupData?.humanColor ? [setupData.humanColor] : []);
+    const colorOrder: Color[] = [];
+    const taken = new Set<Color>(explicit.slice(0, ctx.numPlayers));
+    const spare = (explicit.length ? LEFTOVER_COLORS : COLORS).filter(c => !taken.has(c));
+    for (let i = 0; i < ctx.numPlayers; i++) {
+      colorOrder.push(explicit[i] ?? spare.shift() ?? COLORS[i % COLORS.length]);
     const housesEnabled = !!setupData?.houses?.enabled;
     // Assign each seat a distinct house — no two players may share one. The
     // human's explicit pick (if any) is reserved for seat 0 first; every
@@ -707,13 +813,15 @@ export const TyrantsGame: Game<TyrantsState> = {
     const firstSeat = Math.floor(rng() * ctx.numPlayers);
     const startLog = `Game started. P${firstSeat + 1} (${colorOrder[firstSeat]}) goes first.`;
 
+    const botSeats = (setupData?.botSeats ?? []).filter(b => Number(b) >= 0 && Number(b) < ctx.numPlayers);
     return {
+      ...(botSeats.length ? { botSeats } : {}),
       firstPlayerId: String(firstSeat),
       market: { deck: marketDeck, row },
       // Permanent stacks per rulebook components (page 2): 15 of each.
       auxStacks: { houseGuards: 15, priestesses: 15 },
       players,
-      log: [startLog],
+      log: appendGameLog<string>([], { turn: 0, side: String(firstSeat), kind: 'game.start', msg: startLog, payload: { firstSeat } }),
       pendingChoice: null,
       pausedHandlerState: null,
       marketVpTokens: {},
@@ -744,7 +852,17 @@ export const TyrantsGame: Game<TyrantsState> = {
 
   turn: {
     minMoves: 0,
-    maxMoves: 50,
+    // NO maxMoves. boardgame.io's maxMoves force-ends the turn the instant
+    // ctx.numMoves hits the cap, from *outside* our move handlers — so it
+    // sails straight past the `if (G.pendingChoice) return INVALID_MOVE`
+    // guard in endTurn and past the eot-promote picker. We used to cap at 50,
+    // which a long human turn can genuinely reach (every prompt click is a
+    // move, and "Load turn"/undo replays keep counting on the same ctx). When
+    // it fired on the move that raised the mandatory end-of-turn promote
+    // prompt, the turn advanced to the next seat with that prompt still
+    // standing — nobody could answer it and the game was stuck (report #106).
+    // Turns here always end explicitly via the endTurn move; a move cap buys
+    // us nothing and every AI/sim driver carries its own iteration bound.
     // Randomize who acts first. The seat order beyond that is the default
     // sequential cycle (0 → 1 → ... → N-1 → 0). G.firstPlayerId is picked once
     // in setup and persists through the game.
@@ -757,9 +875,15 @@ export const TyrantsGame: Game<TyrantsState> = {
       next: ({ ctx }) => (ctx.playOrderPos + 1) % ctx.numPlayers,
     },
     onBegin: ({ G, ctx }) => {
-      // Mark where this turn's log lines begin so onEnd can slice them out.
-      G.turnLogStart = G.log.length;
-      G.log.push(`Turn: P${Number(ctx.currentPlayer) + 1} (${G.players[ctx.currentPlayer].color})`);
+      // Legacy saves (and old online snapshots not yet migrated) carry a
+      // string[] log — upgrade before anything reads/writes entries.
+      ensureStructuredLog(G);
+      G.logTurn = ctx.turn;
+      G.logSide = ctx.currentPlayer;
+      // Mark where this turn's log entries begin (by seq) so onEnd can slice them out.
+      G.turnLogStart = nextLogSeq(G);
+      logEvent(G, `Turn: P${Number(ctx.currentPlayer) + 1} (${G.players[ctx.currentPlayer].color})`,
+        { kind: 'turn.start', payload: { player: ctx.currentPlayer, color: G.players[ctx.currentPlayer].color }, side: ctx.currentPlayer });
       G.cardsPlayedThisTurn = [];
       G.pendingEotPromotions = [];
       G.pendingEotInnerCircleVp = [];
@@ -847,6 +971,10 @@ export const TyrantsGame: Game<TyrantsState> = {
       payHeldMarkerEffectsAtTurnStart(G, G.players[ctx.currentPlayer].color);
       // Capture a snapshot of the game state at turn start (excluding the snapshots
       // field itself to prevent recursive bloat). loadState can rewind here.
+      // Online never reads them (loadState is a no-op, the codec and viewFor
+      // strip them), and encoding the whole G every turn was ~11% of the server
+      // AI's CPU — so skip it there.
+      if (G._online) return;
       G.snapshots.push({
         turn: ctx.turn,
         playerId: ctx.currentPlayer,
@@ -865,9 +993,22 @@ export const TyrantsGame: Game<TyrantsState> = {
       }
     },
     onEnd: ({ G, ctx, random }) => {
+      // Safety net: no legitimate path ends a turn with a prompt outstanding —
+      // the endTurn move refuses while G.pendingChoice is set, and the eot
+      // promote loop only calls events.endTurn() once it has cleared the
+      // prompt. But if anything ever force-ends a turn from outside our move
+      // handlers, an orphaned prompt belongs to a seat that is no longer
+      // acting, so nobody can answer it and the game locks up (report #106).
+      // Drop it here so a forced end degrades into a lost prompt rather than a
+      // dead game.
+      if (G.pendingChoice) {
+        Mechanics.log(G, '(turn ended with an unanswered prompt — prompt discarded)');
+        G.pendingChoice = null;
+        G.pausedHandlerState = null;
+      }
       // Capture this turn's log slice for the per-turn summary modal. We do this for
       // every turn (including setup deploys) so the human can review what happened.
-      const lines = G.log.slice(G.turnLogStart);
+      const lines = G.log.filter(e => typeof e !== 'string' && e.seq >= G.turnLogStart).map(logLineText);
       G.turnLogs.push({
         turn: ctx.turn,
         playerId: ctx.currentPlayer,
@@ -974,7 +1115,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       if (!deployTroop(G, color, space.id)) return INVALID_MOVE;
       player.houseState.data[chosenSiteKey] = siteId;
       player.barracksLeft -= 1;
-      Mechanics.log(G, `P${Number(pid) + 1} deployed starting troop at ${site.name}`);
+      Mechanics.log(G, `P${Number(pid) + 1} deployed starting troop at ${site.name}`,
+        { kind: 'troop.deploy', payload: { site: siteId, setup: true }, side: pid });
 
       // Most players deploy exactly 1 starting troop (the default when the
       // counter was never seeded). Nasadra's "deploy 3 instead of 1" seeds
@@ -1016,7 +1158,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       pushUndoSnapshot(G, ctx.currentPlayer);
 
       p.hand.splice(handIndex, 1);
-      G.log.push(`P${Number(pid) + 1} played ${card.name}`);
+      logEvent(G, `P${Number(pid) + 1} played ${card.name}`,
+        { kind: 'card.play', payload: { card: card.name }, side: pid });
 
       // Reset the per-card deploy trace; Gibbering Mouther etc. read this to find
       // every space they deployed to during resolution.
@@ -1433,6 +1576,56 @@ export const TyrantsGame: Game<TyrantsState> = {
       Mechanics.log(G, `P${Number(pid) + 1} used ${HOUSES_BY_ID[houseId].name}: ${ability.name}`);
     },
 
+    /** Mark a seat as having abandoned the game. Server-side only: the online
+     *  sweep submits this with the stale seat's own token once that seat has sat
+     *  on its turn past the abandonment window, just before a bot starts taking
+     *  its turns. Deliberately absent from legalActions — it is not a player
+     *  choice, and tryApplyAction (not legalActions) is what the server
+     *  validates against, so it stays unreachable from any client UI.
+     *
+     *  Records the flag and nothing else: the turn does NOT pass and the game
+     *  does NOT end, because the point is for the seat to keep playing so the
+     *  remaining players can finish. */
+    /** A player gives up (#111). `seat` is NOT taken from the request: the
+     *  adapter fills it in from the authenticated submitter and stamps the move
+     *  with the current player so boardgame.io accepts it on anyone's turn — the
+     *  same technique resolveChoice uses. So nobody can concede on another
+     *  seat's behalf. The seat forfeits its placing exactly as an abandoned one
+     *  does (ranked last, counted as a loss). If that leaves nobody to play
+     *  for, endIf closes the table; otherwise the server's bot plays the seat
+     *  from here on (tyrantsAdapter.serverDrivenSeats). */
+    concede: ({ G }, seat: string) => {
+      if (!canConcede(G, seat)) return INVALID_MOVE;
+      if (!G.forfeitedSeats) G.forfeitedSeats = [];
+      G.forfeitedSeats.push(seat);
+      Mechanics.log(G, `P${Number(seat) + 1} gave up.`,
+        { kind: 'seat.concede', payload: { seat }, side: seat });
+    },
+
+    forfeitSeat: ({ G, playerID }, seat: string) => {
+      // A seat may only forfeit ITSELF. Keeping this move out of legalActions
+      // hides it from the UI but does not stop a crafted request: the server
+      // validates with tryApplyAction, which accepted any seat argument — so a
+      // player could forfeit their OPPONENT on their own turn and pin that
+      // opponent to last place in a rated game. The abandoned-seat sweep is
+      // unaffected: it submits with the abandoned seat's own token, so the
+      // submitter and the seat are the same.
+      if (playerID !== seat) return INVALID_MOVE;
+      // Deliberately NOT gated on setupPhase. A table where someone joined and
+      // then never placed their starting troop is the single most common way a
+      // game dies, and it's exactly what this exists for — the others are stuck
+      // before the game has even begun. The old guard made the sweep throw
+      // "That move isn't legal right now" on every such game, every run, so
+      // they were never rescued and the errors were never explained. The flag
+      // is only a scoring marker; nothing about it depends on setup being over.
+      if (!G.players[seat]) return INVALID_MOVE;
+      if (!G.forfeitedSeats) G.forfeitedSeats = [];
+      if (G.forfeitedSeats.includes(seat)) return; // idempotent — sweeps repeat
+      G.forfeitedSeats.push(seat);
+      Mechanics.log(G, `P${Number(seat) + 1} left the game — a bot will take their turns, and they forfeit their placing.`,
+        { kind: 'seat.forfeit', payload: { seat }, side: seat });
+    },
+
     deployTroop: ({ G, ctx }, spaceId: string) => {
       if (G.setupPhase) return INVALID_MOVE;
       if (G.pendingChoice) return INVALID_MOVE;
@@ -1463,7 +1656,8 @@ export const TyrantsGame: Game<TyrantsState> = {
         return INVALID_MOVE;
       }
       p.barracksLeft -= 1;
-      Mechanics.log(G, `P${Number(pid) + 1} deployed at ${spaceId} (barracks: ${p.barracksLeft})`);
+      Mechanics.log(G, `P${Number(pid) + 1} deployed at ${spaceId} (barracks: ${p.barracksLeft})`,
+        { kind: 'troop.deploy', payload: { site: spaceId }, side: pid });
       checkEndGameTriggers(G, ctx);
     },
 
@@ -1486,7 +1680,8 @@ export const TyrantsGame: Game<TyrantsState> = {
       const killed = assassinateTroop(G, spaceId);
       if (killed === 'white') p.trophyHall.white += 1;
       else if (killed) p.trophyHall[killed] = (p.trophyHall[killed] ?? 0) + 1;
-      Mechanics.log(G, `P${Number(pid) + 1} assassinated ${killed} at ${spaceId}`);
+      Mechanics.log(G, `P${Number(pid) + 1} assassinated ${killed} at ${spaceId}`,
+        { kind: 'troop.assassinate', payload: { site: spaceId, target: killed }, side: pid });
     },
 
     returnEnemySpy: ({ G, ctx }, siteId: string, targetColor: Color) => {
@@ -1536,7 +1731,9 @@ export const TyrantsGame: Game<TyrantsState> = {
       // The decoded codec never carries an undo stack (peeled on encode), and
       // loading a saved/rewound state starts a fresh undo history.
       G.undoStack = [];
-      G.log.push('[state loaded from codec]');
+      // The pasted codec may predate the structured log (string[]).
+      ensureStructuredLog(G);
+      logEvent(G, '[state loaded from codec]', { kind: 'system', side: null });
     },
 
     /** Step-by-step within-turn undo. Pops the most recent restore-point off

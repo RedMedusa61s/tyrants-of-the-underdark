@@ -25,8 +25,71 @@
 
 import type { TyrantsState } from '../game';
 import { scoreAll } from '../engine/scoring';
-import { TROOP_SPACES } from '../data/troop-spaces';
-import { SITES } from '../data/sites';
+import { SITES_BY_ID } from '../data/sites';
+import { differentialFeatures, applyFitted, EVAL_FEATURE_NAMES, type FittedEval } from './eval-features';
+import FITTED_MODEL from './fitted-eval.json';
+
+/** Linear evaluator fitted against the logged corpus (scripts/fit-eval.ts).
+ *  Enabled per-decision via setFittedEval; null means "score by VP alone",
+ *  which is the long-standing behaviour. */
+let FITTED: FittedEval | null = null;
+
+export function setFittedEval(on: boolean): FittedEval | null {
+  const prev = FITTED;
+  const m = FITTED_MODEL as unknown as FittedEval;
+  // A model whose feature list has drifted from the code's is worse than no
+  // model — the weights would be applied to the wrong quantities silently.
+  const sameShape = on
+    && Array.isArray(m?.featureNames)
+    && m.featureNames.length === EVAL_FEATURE_NAMES.length
+    && m.featureNames.every((n, i) => n === EVAL_FEATURE_NAMES[i]);
+  FITTED = sameShape ? m : null;
+  return prev;
+}
+
+/** Board presence that `scoreAll` cannot see, priced in VP-equivalents.
+ *
+ *  scoreAll answers "who would win if the game ended now?" — it counts VP and
+ *  nothing else. A spy on the board is worth zero VP, so every evaluation that
+ *  ends at turn-end priced a spy at nothing, while the alternative on the same
+ *  card ("return a spy → +5 Power") priced out at whatever VP that power bought
+ *  before the turn ended. The AI therefore cashed spies in almost every time it
+ *  was offered the choice — reported from BGG as the AI making poor use of
+ *  spies. These weights put a standing price on the presence itself. */
+export interface PositionalWeights {
+  /** VP-equivalent of one of your spies being on the board at all. */
+  spy: number;
+  /** Extra VP-equivalent when that spy sits at a control-marker site, where it
+   *  denies the holder total control and taxes 3 power to remove. */
+  spyAtMarker: number;
+}
+
+/** Module-level pointer, set by heuristic-ai for the duration of one move
+ *  decision — same pattern as its WEIGHTS / SIMULATE globals. Null means
+ *  "value VP only", which is the pre-existing behaviour. */
+let POSITIONAL: PositionalWeights | null = null;
+
+export function setPositionalWeights(w: PositionalWeights | null): PositionalWeights | null {
+  const prev = POSITIONAL;
+  POSITIONAL = w;
+  return prev;
+}
+
+/** Raw presence score for one colour. Returns 0 once the end-game trigger has
+ *  fired: from that point the game is decided on VP alone, and whatever a spy
+ *  is still worth (denying total control in the final marker payouts) is
+ *  already counted by scoreAll. This is the reporter's "except maybe during
+ *  the last turn" caveat, read off the simulated state rather than guessed. */
+function presenceFor(G: TyrantsState, color: string, w: PositionalWeights): number {
+  if (G.endGameTriggeredAtTurn !== null) return 0;
+  let v = 0;
+  for (const [siteId, colors] of Object.entries(G.spies ?? {})) {
+    if (!colors || !colors.includes(color as never)) continue;
+    v += w.spy;
+    if (SITES_BY_ID[siteId]?.hasControlMarker) v += w.spyAtMarker;
+  }
+  return v;
+}
 
 /** Apply one move to G and return the resulting G, or null if the move
  *  was rejected (INVALID_MOVE). The implementation lives in the harness
@@ -99,22 +162,25 @@ function evaluateBoardPresence(G: TyrantsState, pid: string): number {
  *  function decides "do I expect to WIN if the game ends now?", which
  *  is a binary against the leader, not an expected-value calculation. */
 export function stateValue(G: TyrantsState, pid: string): number {
+  // Fitted evaluator, when enabled: a linear model over position features
+  // trained on real logged games to predict final margin directly. On held-out
+  // games it identifies the eventual winner ~14pp more often than the VP-only
+  // score below, and ~18pp more often in the opening third — where the VP score
+  // is barely better than guessing and the AI's choices matter most.
+  if (FITTED) {
+    try { return applyFitted(FITTED, differentialFeatures(G, pid)); }
+    catch { /* malformed position — fall through to the VP score */ }
+  }
   const all = scoreAll(G);
-
-  // Combine Hard VP and Soft VP for the evaluating player
-  const myHardVp = all[pid]?.total ?? 0;
-  const mySoftVp = evaluateBoardPresence(G, pid);
-  const myTotalValue = myHardVp + mySoftVp;
-
+  const w = POSITIONAL;
+  const pres = (id: string) =>
+    w ? presenceFor(G, G.players[id]?.color ?? '', w) : 0;
+  const my = (all[pid]?.total ?? 0) + pres(pid);
   let oppSum = 0;
   let oppCount = 0;
   for (const [id, s] of Object.entries(all)) {
     if (id === pid) continue;
-
-    // Combine Hard VP and Soft VP for opponents
-    const oppSoftVp = evaluateBoardPresence(G, id);
-    oppSum += (s.total + oppSoftVp);
-
+    oppSum += s.total + pres(id);
     oppCount++;
   }
   if (oppCount === 0) return myTotalValue;

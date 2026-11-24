@@ -6,17 +6,18 @@
 //   - Grab site control whenever practical.
 
 import type { TyrantsState, Color } from '../game';
-import { BASE_ACTION_POWER_COST } from '../game';
+import { BASE_ACTION_POWER_COST, MARKER_VALUES } from '../game';
 import { SITES, SITES_BY_ID } from '../data/sites';
 import { TROOP_SPACES, TROOP_SPACES_BY_ID, sitesSpaces } from '../data/troop-spaces';
+import { ADJACENCY } from '../data/routes';
 import { lookupCard } from '../card-data';
-import { hasPresence } from '../engine/map-state';
+import { hasPresence, hasTotalControl } from '../engine/map-state';
 import type { AiMove } from './random-ai';
 import { pickHouseAction } from './house-ai';
 import { DEFAULT_WEIGHTS, type HeuristicWeights } from './heuristic-weights';
 import { takePhaseSnapshot, type PhaseSnapshot } from './game-phase';
-import { lookaheadPick, type SimulateMoveFn, type RolloutToTurnEndFn } from './lookahead';
-import { categoryOfCard, categoryRank } from './card-classes';
+import { lookaheadPick, setPositionalWeights, setFittedEval, type SimulateMoveFn, type RolloutToTurnEndFn } from './lookahead';
+import { categoryOfCard, categoryRank, influenceYieldOf } from './card-classes';
 
 // Module-level pointer to the currently active weights. Per-call entrypoints
 // (decideHeuristicMove / decideHeuristicMoveWithWeights) swap this in for the
@@ -101,6 +102,61 @@ function pickRandom<T>(arr: T[]): T | undefined {
   return arr.length ? arr[Math.floor(Math.random() * arr.length)] : undefined;
 }
 
+/** Troops you'd have to place to project presence from `from` into every other
+ *  in-play site: one per troop space along each route, plus one to enter the
+ *  site at the far end. Sites outside the current player count (absent from
+ *  G.siteControl) are not traversable. Dijkstra over 26 nodes — cheap, and only
+ *  called during setup. */
+function deployDistances(G: TyrantsState, from: string): Record<string, number> {
+  const dist: Record<string, number> = { [from]: 0 };
+  // Small graph: a linear-scan frontier is faster than a heap here.
+  const seen = new Set<string>();
+  for (;;) {
+    let cur: string | null = null;
+    let best = Infinity;
+    for (const [id, d] of Object.entries(dist)) {
+      if (seen.has(id) || d >= best) continue;
+      cur = id; best = d;
+    }
+    if (cur === null) break;
+    seen.add(cur);
+    for (const { other, route } of ADJACENCY[cur] ?? []) {
+      if (!(other in G.siteControl)) continue;
+      const next = best + route.spaces + 1;
+      if (next < (dist[other] ?? Infinity)) dist[other] = next;
+    }
+  }
+  return dist;
+}
+
+/** Payout of a control marker per troop it takes to hold outright. Whites count
+ *  toward the cost because each one has to be supplanted before the slot is
+ *  yours. Higher = a marker worth opening near. */
+function markerWorth(siteId: string): number {
+  const m = MARKER_VALUES[siteId];
+  const site = SITES_BY_ID[siteId];
+  if (!m || !site) return 0;
+  const payout = m.controlInfluence + m.controlVp + m.totalControlInfluence + m.totalControlVp;
+  const cost = site.troopSlots + site.whitesAtStart;
+  return cost > 0 ? payout / cost : 0;
+}
+
+/** How well-placed a candidate starting site is for contesting the control
+ *  markers that are actually on the board this game. Starting sites carry no
+ *  marker themselves, so without this the opening was ranked on printed VP —
+ *  which says nothing about where the game is won. */
+function openingProximity(G: TyrantsState, siteId: string): number {
+  const dist = deployDistances(G, siteId);
+  let v = 0;
+  for (const site of SITES) {
+    if (!site.hasControlMarker || !(site.id in G.siteControl)) continue;
+    const d = dist[site.id];
+    if (d === undefined) continue;
+    v += markerWorth(site.id) / (1 + d);
+  }
+  return v;
+}
+
 /** Score an empty troop space for deployment. Higher = better. */
 function scoreDeploySpace(G: TyrantsState, pid: string, spaceId: string): number {
   const me = G.players[pid];
@@ -156,6 +212,14 @@ function siteDenialValue(G: TyrantsState, siteId: string, myColor: Color): numbe
   if (spiesHere.some(c => c !== myColor)) return 0;
   const controller = G.siteControl[siteId];
   if (!controller || controller === myColor) return 0;
+  // A BREAK is worth far more than a PREVENT: the opponent is already banking
+  // total-control VP every turn, and this spy ends it now. Scale by what is
+  // actually at stake at this city. With no opposing spy present (returned 0
+  // above), hasTotalControl reduces to "they own every space here".
+  if (hasTotalControl(G, controller, siteId)) {
+    const perTurnVp = MARKER_VALUES[siteId]?.totalControlVp ?? 0;
+    return WEIGHTS.siteDenialBonus + WEIGHTS.siteBreakBonusPerVp * perTurnVp;
+  }
   return WEIGHTS.siteDenialBonus;
 }
 
@@ -377,6 +441,18 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
     case 'select-site': {
       const ids = opts as string[];
       if (ids.length === 0) return { name: 'resolveChoice', args: [pc.optional ? null : null] };
+      // City preference applies to PLAIN spy placements only.
+      //   - This same case also answers RETURN prompts ("which of your spies
+      //     comes back?"). Preferring a city there would hand back the best
+      //     spy on the board, so gate on the placement prompt specifically.
+      //   - Cards that place a spy and THEN act at that site (supplant,
+      //     assassinate) carry a `highlight` list of sites where the follow-up
+      //     actually pays. Those should drive the pick, not a blanket city
+      //     rule — so leave them alone.
+      const plainSpyPlacement = /^Place a spy/.test(pc.prompt ?? '')
+        && !((pc as unknown as { highlight?: string[] }).highlight?.length);
+      const cityPull = (id: string) =>
+        plainSpyPlacement && SITES_BY_ID[id]?.hasControlMarker ? WEIGHTS.spyCityBonus : 0;
       // 1-ply lookahead beats the per-component scoring here too — it
       // automatically accounts for the consequences a spy placement
       // triggers (denying total control, drawing/grant chains on the
@@ -391,6 +467,7 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
           const s = SITES_BY_ID[id];
           let v = (s?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (s?.vp ?? 0);
           v += siteDenialValue(G, id, me.color);
+          v += cityPull(id);
           if ((G.spies[id] ?? []).includes(me.color)) v -= WEIGHTS.siteOwnSpyPenalty;
           return v;
         };
@@ -412,8 +489,8 @@ function resolveChoice(G: TyrantsState, pid: string): AiMove {
         const sa = SITES_BY_ID[a], sb = SITES_BY_ID[b];
         let av = (sa?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (sa?.vp ?? 0);
         let bv = (sb?.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + (sb?.vp ?? 0);
-        av += siteDenialValue(G, a, me.color);
-        bv += siteDenialValue(G, b, me.color);
+        av += siteDenialValue(G, a, me.color) + cityPull(a);
+        bv += siteDenialValue(G, b, me.color) + cityPull(b);
         if ((G.spies[a] ?? []).includes(me.color)) av -= WEIGHTS.siteOwnSpyPenalty;
         if ((G.spies[b] ?? []).includes(me.color)) bv -= WEIGHTS.siteOwnSpyPenalty;
         return bv - av;
@@ -479,6 +556,13 @@ export function decideHeuristicMoveWithWeights(
   const prevS = SIMULATE;
   const prevR = ROLLOUT;
   WEIGHTS = weights;
+  // The lookahead evaluator prices board presence that scoreAll can't see.
+  // Zero weights restore pure-VP evaluation, so a weight file opts in.
+  const prevP = setPositionalWeights(
+    (weights.spyPresenceValue || weights.spyMarkerPresenceValue)
+      ? { spy: weights.spyPresenceValue, spyAtMarker: weights.spyMarkerPresenceValue }
+      : null);
+  const prevF = setFittedEval(weights.useFittedEval > 0);
   // Respect the weight-level toggle so a weight file can opt OUT of
   // lookahead even when the harness offers one — used by the validation
   // tournament to compare lookahead-on vs lookahead-off variants under
@@ -491,6 +575,9 @@ export function decideHeuristicMoveWithWeights(
     WEIGHTS = prevW;
     SIMULATE = prevS;
     ROLLOUT = prevR;
+    setPositionalWeights(prevP);
+    setFittedEval(false);
+    if (prevF) setFittedEval(true);
   }
 }
 
@@ -529,11 +616,13 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     // Prefer a starting site with a control marker / highest VP, then sample
     // among the top few (weighted by rank) so the AI doesn't open at the same
     // site every game — keeps the strongest most likely but adds variety (#83).
-    open.sort((a, b) => {
-      const av = (a.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + a.vp;
-      const bv = (b.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + b.vp;
-      return bv - av;
-    });
+    const proximity = WEIGHTS.openingMarkerProximity > 0
+      ? new Map(open.map(s => [s.id, openingProximity(G, s.id)]))
+      : null;
+    const openingScore = (s: (typeof open)[number]) =>
+      (s.hasControlMarker ? WEIGHTS.siteControlMarkerBonus : 0) + s.vp
+      + (proximity ? WEIGHTS.openingMarkerProximity * proximity.get(s.id)! : 0);
+    open.sort((a, b) => openingScore(b) - openingScore(a));
     const pick = weightedRankPick(open, WEIGHTS.openingVarianceTopK) ?? pickRandom(open);
     return pick ? { name: 'deployStartingTroop', args: [pick.id] } : null;
   }
@@ -679,8 +768,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
   // had nothing cheap. Per competitive-play notes, Priestess at 2 inf
   // is a strong buy and worth recruiting repeatedly.
   type Cand =
-    | { kind: 'market'; idx: number; cost: number; icVp: number; deckVp: number; isAux: false; tactical: boolean }
-    | { kind: 'aux'; stack: 'houseGuards' | 'priestesses'; cost: number; icVp: number; deckVp: number; isAux: true; tactical: false };
+    | { kind: 'market'; idx: number; cost: number; icVp: number; deckVp: number; isAux: false; tactical: boolean; influence: number }
+    | { kind: 'aux'; stack: 'houseGuards' | 'priestesses'; cost: number; icVp: number; deckVp: number; isAux: true; tactical: false; influence: number };
   const candidates: Cand[] = [];
 
   for (let i = 0; i < G.market.row.length; i++) {
@@ -691,6 +780,7 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     candidates.push({
       kind: 'market', idx: i, cost: data.cost,
       icVp: data.innerCircleVp ?? 0, deckVp: data.deckVp ?? 0, isAux: false,
+      influence: influenceYieldOf(c),
       // 'tactical' = effect touches the board (spy / assassinate / supplant /
       // promote). Aux stacks (Priestess=influence, House Guard=power) never are.
       tactical: categoryOfCard(c) === 'tactical',
@@ -708,6 +798,8 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
     candidates.push({
       kind: 'aux', stack, cost: ref.cost,
       icVp: ref.innerCircleVp ?? 0, deckVp: ref.deckVp ?? 0, isAux: true, tactical: false,
+      influence: influenceYieldOf({ deck: stack === 'priestesses' ? 'priestesses' : 'house-guards',
+                                    slot: stack === 'priestesses' ? 43 : 40, name: '', image: '' }),
     });
   }
 
@@ -717,6 +809,7 @@ export function decideHeuristicMove(G: TyrantsState, currentPlayer: string): AiM
         WEIGHTS.recruitIcVpWeight * c.icVp +
         WEIGHTS.recruitDeckVpWeight * c.deckVp +
         WEIGHTS.recruitCostWeight * c.cost +
+        WEIGHTS.recruitInfluenceWeight * c.influence +
         (c.isAux ? WEIGHTS.recruitAuxStackBonus : 0) +
         (c.tactical ? WEIGHTS.recruitTacticalBonus : 0);
       // Blend raw value vs per-influence efficiency. Per-inf favors low-cost
