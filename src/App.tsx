@@ -213,14 +213,14 @@ type AiStyle = AiStyleT;
 // current default. We deliberately don't call it "hard" — it still loses
 // ~2/3 of games to a competent human; truly hard would need deeper
 // lookahead or opponent-reply modeling.
-type AiStyle = 'random' | 'easy' | 'heuristic';
-type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead' | 'mercenaries';
-const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'mercenaries'];
+// type AiStyle = 'random' | 'easy' | 'heuristic';
+// type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead' | 'mercenaries';
+// const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'mercenaries'];
 // Half-decks introduced in the Aberrations & Undead expansion. The new-game
 // dialog separates these from the base half-decks under an "Expansion" header
 // so unfamiliar players see clearly which decks are base-game and which need
 // the expansion. Game logic treats all six identically.
-const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead', 'mercenaries']);
+// const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set(['aberrations', 'undead', 'mercenaries']);
 type ThirdPlayerSide = 'left' | 'right';
 interface GameConfig {
   numPlayers: number;
@@ -1143,6 +1143,10 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
   // changes how the ring is drawn. See PendingChoice.highlight (#105).
   const highlightSites = humanSitePick?.highlight
     ? new Set(humanSitePick.highlight as string[])
+    : undefined;
+
+  const highlightedSpaces = humanMapPick?.highlightSpaces
+    ? new Set(humanMapPick.highlightSpaces as string[])
     : undefined;
 
   const handleSiteClick = (siteId: string) => {
@@ -2333,7 +2337,8 @@ export function Board({ G, ctx, moves }: BoardProps<TyrantsState>) {
           <MapView G={G}
             clickableSites={startingClickable} onSiteClick={handleSiteClick}
             highlightSites={highlightSites}
-            clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} />
+            clickableSpaces={clickableSpaces} onSpaceClick={handleSpaceClick} 
+            highlightedSpaces={highlightedSpaces}/>
         </div>
       )}
       {tab === 'play' && (

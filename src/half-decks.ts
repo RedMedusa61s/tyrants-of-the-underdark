@@ -7,15 +7,15 @@
 // had never once been playable online (reported from BGG: "you always play the
 // same game variation").
 
-export type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead';
+export type HalfDeck = 'drow' | 'dragons' | 'elemental' | 'demons' | 'aberrations' | 'undead' | 'mercenaries';
 
-export const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead'];
+export const HALF_DECKS: HalfDeck[] = ['drow', 'dragons', 'elemental', 'demons', 'aberrations', 'undead', 'mercenaries'];
 
 /** Half-decks introduced in the Aberrations & Undead expansion. Setup screens
  *  group these under their own header so unfamiliar players can see which decks
  *  are base-game and which need the expansion. Game logic treats all six
  *  identically. */
-export const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set<HalfDeck>(['aberrations', 'undead']);
+export const EXPANSION_HALF_DECKS: ReadonlySet<HalfDeck> = new Set<HalfDeck>(['aberrations', 'undead', 'mercenaries']);
 
 export const isHalfDeck = (v: unknown): v is HalfDeck =>
   typeof v === 'string' && (HALF_DECKS as string[]).includes(v);

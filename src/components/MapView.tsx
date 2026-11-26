@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { PLAYER_COLOR_HEX, WHITE_TOKEN_HEX, needsLightRim, rimHex, DARK_RIM_HEX, DARK_RIM_SHADOW } from '../player-colors';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { SITES, type Site } from '../data/sites';
 import { ROUTES, type Route } from '../data/routes';
 import { sitesSpaces } from '../data/troop-spaces';
@@ -225,7 +226,7 @@ function ControlMarkerToken(
   );
 }
 
-export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, highlightSites, clickableSpaces, onSpaceClick }: MapViewProps) {
+export function MapView({ calibrate = false, editRoutes = false, G, clickableSites, onSiteClick, highlightSites, highlightedSpaces, clickableSpaces, onSpaceClick }: MapViewProps) {
   const boardUrl = useCachedImage('assets/board/map.jpg');
   const [overrides, setOverrides] = useState<PositionOverride>(loadOverrides);
   const [slotPositions] = useState<SlotPositions>(loadSlotPositions);

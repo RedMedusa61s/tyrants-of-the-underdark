@@ -738,6 +738,7 @@ export const TyrantsGame: Game<TyrantsState> = {
     const spare = (explicit.length ? LEFTOVER_COLORS : COLORS).filter(c => !taken.has(c));
     for (let i = 0; i < ctx.numPlayers; i++) {
       colorOrder.push(explicit[i] ?? spare.shift() ?? COLORS[i % COLORS.length]);
+    }
     const housesEnabled = !!setupData?.houses?.enabled;
     // Assign each seat a distinct house — no two players may share one. The
     // human's explicit pick (if any) is reserved for seat 0 first; every
@@ -945,7 +946,7 @@ export const TyrantsGame: Game<TyrantsState> = {
 
       G.markerInfluenceGrantedThisTurn = [];
       // G.markerTcGrantedThisTurn = [];
-      if (!G.devouredPile) G.devouredPile = [];
+      // if (!G.devouredPile) G.devouredPile = [];
 
       // --- NEW: Process Stolen Marker Expirations ---
       if (G.stolenMarkers && G.stolenMarkers.length > 0) {

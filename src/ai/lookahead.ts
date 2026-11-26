@@ -183,8 +183,8 @@ export function stateValue(G: TyrantsState, pid: string): number {
     oppSum += s.total + pres(id);
     oppCount++;
   }
-  if (oppCount === 0) return myTotalValue;
-  return myTotalValue - (oppSum / oppCount);
+  if (oppCount === 0) return my;
+  return my - (oppSum / oppCount);
 }
 
 /** Pick the best candidate by 1-ply lookahead.
